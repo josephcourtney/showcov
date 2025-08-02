@@ -237,7 +237,7 @@ def test_get_xml_from_config_exception(monkeypatch, tmp_path):
     config_file.write_text("some invalid content")
 
     # Force an exception when reading the config file so that the exception branch is taken.
-    def fake_read(self, filenames, encoding=None):  # noqa: ARG001
+    def fake_read(self, filenames, encoding=None):
         msg = "simulated error"
         raise OSError(msg)
 
@@ -254,7 +254,7 @@ def test_get_xml_from_pyproject_exception(monkeypatch, tmp_path):
     pyproject.write_text("invalid content")
 
     # Force an exception during tomllib.load to simulate a failure parsing the pyproject.toml.
-    def fake_tomllib_load(f):  # noqa: ARG001
+    def fake_tomllib_load(f):
         msg = "simulated error"
         raise OSError(msg)
 
@@ -313,7 +313,7 @@ def test_print_uncovered_sections_file_open_error(monkeypatch, capsys, tmp_path)
 
     # Simulate an OSError when trying to open a source file. The function should catch the exception,
     # log the error, and still print the grouped line numbers.
-    def fake_open(*args, **kwargs):  # noqa: ARG001
+    def fake_open(*args, **kwargs):
         msg = "simulated file open error"
         raise OSError(msg)
 
