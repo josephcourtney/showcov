@@ -135,9 +135,90 @@ def parse_json_output(data: str) -> list[UncoveredSection]:
     return [UncoveredSection.from_dict(f) for f in files]
 
 
+def format_markdown(
+    sections: list[UncoveredSection],
+    *,
+    context_lines: int,
+    with_code: bool,  # noqa: ARG001 - kept for signature consistency
+    coverage_xml: Path,  # noqa: ARG001
+    color: bool,  # noqa: ARG001
+) -> str:
+    context_lines = max(0, context_lines)
+    parts: list[str] = []
+    root = Path.cwd().resolve()
+    for section in sections:
+        try:
+            rel = section.file.resolve().relative_to(root)
+        except ValueError:
+            rel = section.file.resolve()
+        code_blocks: list[str] = []
+        try:
+            with section.file.open(encoding="utf-8") as f:
+                file_lines = [ln.rstrip("\n") for ln in f.readlines()]
+        except OSError:
+            file_lines = []
+        for start, end in section.ranges:
+            start_idx = max(1, start - context_lines)
+            end_idx = min(len(file_lines), end + context_lines)
+            snippet = "\n".join(
+                f"{i:4d}: {file_lines[i - 1] if 1 <= i <= len(file_lines) else '<line not found>'}"
+                for i in range(start_idx, end_idx + 1)
+            )
+            code_blocks.append(f"```python\n{snippet}\n```")
+        details = "\n\n".join(code_blocks)
+        parts.append(
+            f"<details>\n<summary>Uncovered sections in {rel.as_posix()}</summary>\n\n{details}\n</details>"
+        )
+    return "\n\n".join(parts)
+
+
+def format_sarif(
+    sections: list[UncoveredSection],
+    *,
+    context_lines: int,  # noqa: ARG001
+    with_code: bool,  # noqa: ARG001
+    coverage_xml: Path,  # noqa: ARG001
+    color: bool,  # noqa: ARG001
+) -> str:
+    results: list[dict[str, object]] = []
+    for section in sections:
+        for start, end in section.ranges:
+            results.append({
+                "ruleId": "uncovered-code",
+                "level": "note",
+                "message": {"text": "Uncovered code"},
+                "locations": [
+                    {
+                        "physicalLocation": {
+                            "artifactLocation": {"uri": section.file.as_posix()},
+                            "region": {"startLine": start, "endLine": end},
+                        }
+                    }
+                ],
+            })
+    sarif = {
+        "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+        "version": "2.1.0",
+        "runs": [
+            {
+                "tool": {
+                    "driver": {
+                        "name": "showcov",
+                        "semanticVersion": __version__,
+                    }
+                },
+                "results": results,
+            }
+        ],
+    }
+    return json.dumps(sarif, indent=2, sort_keys=True)
+
+
 FORMATTERS: dict[str, Formatter] = {
     "human": format_human,
     "json": format_json,
+    "markdown": format_markdown,
+    "sarif": format_sarif,
 }
 
 

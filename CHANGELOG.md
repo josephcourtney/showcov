@@ -1,3 +1,11 @@
+## [0.0.8] - 2025-08-02
+
+### Added
+- reimplement CLI with click, path filtering, exclusion patterns, and file output
+- add markdown and sarif output formats
+
+---
+
 ## [0.0.7] - 2025-08-02
 
 ### Added
