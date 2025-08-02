@@ -6,10 +6,12 @@ a configuration file (pyproject.toml, .coveragerc, or setup.cfg).
 """
 
 import logging
+import operator
 import tomllib
 from argparse import Namespace
 from configparser import ConfigParser
 from configparser import Error as ConfigError
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
@@ -29,6 +31,66 @@ logger = logging.getLogger(__name__)
 
 class CoverageXMLNotFoundError(Exception):
     """Coverage XML file not found."""
+
+
+@dataclass(slots=True)
+class UncoveredSection:
+    """Structured representation of uncovered code for a single file.
+
+    Parameters
+    ----------
+    file:
+        Path to the source file.
+    ranges:
+        List of ``(start, end)`` tuples representing uncovered line ranges.
+    """
+
+    file: Path
+    ranges: list[tuple[int, int]]
+
+    def to_dict(self, *, with_code: bool = False, context_lines: int = 0) -> dict[str, object]:
+        """Convert the section into a JSON-serialisable dictionary.
+
+        Parameters
+        ----------
+        with_code:
+            Include source code lines within each uncovered range. When
+            ``context_lines`` is greater than zero, the returned lines will
+            also include that many lines of surrounding context.
+        context_lines:
+            Number of context lines to include before and after each uncovered
+            range when ``with_code`` is ``True``.
+        """
+        root = Path.cwd().resolve()
+        try:
+            path = self.file.resolve().relative_to(root)
+        except ValueError:
+            path = self.file.resolve()
+        file_str = path.as_posix()
+
+        uncovered_entries: list[dict[str, object]] = []
+
+        file_lines: list[str] = []
+        if with_code:
+            try:
+                with self.file.open(encoding="utf-8") as f:
+                    file_lines = [ln.rstrip("\n") for ln in f.readlines()]
+            except OSError:
+                file_lines = []
+
+        for start, end in self.ranges:
+            entry: dict[str, object] = {"start": start, "end": end}
+            if with_code and file_lines:
+                start_idx = max(1, start - context_lines)
+                end_idx = min(len(file_lines), end + context_lines)
+                lines = [
+                    file_lines[i - 1] if 1 <= i <= len(file_lines) else "<line not found>"
+                    for i in range(start_idx, end_idx + 1)
+                ]
+                entry["lines"] = lines
+            uncovered_entries.append(entry)
+
+        return {"file": file_str, "uncovered": uncovered_entries}
 
 
 def _get_xml_from_config(config_path: Path, section: str, option: str) -> str | None:
@@ -126,7 +188,9 @@ def merge_blank_gap_groups(groups: list[list[int]], file_lines: list[str]) -> li
         gap_start = last_grp[-1] + 1
         gap_end = grp[0] - 1
 
-        if gap_start <= gap_end and all(not file_lines[i - 1].strip() for i in range(gap_start, gap_end + 1)):
+        if gap_start <= gap_end and all(
+            i - 1 < len(file_lines) and not file_lines[i - 1].strip() for i in range(gap_start, gap_end + 1)
+        ):
             merged[-1].extend(grp)
         else:
             merged.append(grp)
@@ -165,6 +229,23 @@ def gather_uncovered_lines(root: "Element") -> dict[Path, list[int]]:
                 uncovered.setdefault(resolved_path, []).append(line_no)
 
     return uncovered
+
+
+def build_sections(uncovered: dict[Path, list[int]]) -> list[UncoveredSection]:
+    """Convert mapping of uncovered line numbers to structured sections."""
+    sections: list[UncoveredSection] = []
+    for filename in sorted(uncovered.keys(), key=lambda p: p.as_posix()):
+        lines_sorted = sorted(uncovered[filename])
+        groups = group_consecutive_numbers(lines_sorted)
+        try:
+            with filename.open(encoding="utf-8") as f:
+                file_lines = f.readlines()
+            groups = merge_blank_gap_groups(groups, file_lines)
+        except OSError:
+            pass
+        ranges = [(grp[0], grp[-1]) for grp in sorted(groups, key=operator.itemgetter(0))]
+        sections.append(UncoveredSection(filename, ranges))
+    return sections
 
 
 def parse_large_xml(file_path: Path) -> Optional["Element"]:
