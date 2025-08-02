@@ -1,10 +1,10 @@
 ## features
-- [ ] reimplement CLI with `click`
-- [ ] add input handling similar to ruff, allowing the user to specify a list of files, folders, or globs specifying the source files to process
-- [ ] add an `--exclude` flag that accepts glob patterns to remove some files from the ouptut 
-- [ ] Add `--output FILE` and write JSON directly
-- [ ] Add a 'markdown' output format option that outputs collapsible code blocks for easy pasting into pull-request comments
-- [ ] add an option to emit SARIF so GitHub Advanced Security can annotate lines inline.
+- [x] reimplement CLI with `click`
+- [x] add input handling similar to ruff, allowing the user to specify a list of files, folders, or globs specifying the source files to process
+- [x] add an `--exclude` flag that accepts glob patterns to remove some files from the ouptut
+- [x] Add `--output FILE` and write JSON directly
+- [x] Add a 'markdown' output format option that outputs collapsible code blocks for easy pasting into pull-request comments
+- [x] add an option to emit SARIF so GitHub Advanced Security can annotate lines inline.
 
 ## internal details
 - [ ] Embed schema.json via importlib.resources.files("showcov.data") at build time and list it under [tool.uv_build].resources to avoid runtime FileNotFoundError when installed as a wheel.

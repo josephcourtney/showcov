@@ -1,7 +1,7 @@
 # =================================== project ====================================
 [project]
   name = "showcov"
-  version = "0.0.7"
+  version = "0.0.8"
   description = "Print out uncovered code."
   readme = "README.md"
   authors = [
@@ -21,6 +21,7 @@
     "configparser>=7.1.0",
     "defusedxml>=0.7.1",
     "jsonschema>=4.23.0",  # Runtime JSON schema validation
+    "click>=8.1.7",  # CLI framework
   ]
 
   [project.scripts]
