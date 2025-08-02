@@ -15,9 +15,9 @@
       "properties": {
         "coverage_xml": {"type": "string"},
         "context_lines": {"type": "integer", "minimum": 0},
-        "with_code": {"type": "boolean"}
+        "embed_source": {"type": "boolean"}
       },
-      "required": ["coverage_xml", "context_lines", "with_code"],
+      "required": ["coverage_xml", "context_lines", "embed_source"],
       "additionalProperties": false
     },
     "files": {
@@ -44,11 +44,17 @@
                   "type": "integer",
                   "minimum": 1
                 },
-                "lines": {
+                "source": {
                   "description": "Optional source code lines in this range.",
                   "type": "array",
                   "items": {
-                    "type": "string"
+                    "type": "object",
+                    "properties": {
+                      "line": {"type": "integer", "minimum": 1},
+                      "code": {"type": "string"}
+                    },
+                    "required": ["line", "code"],
+                    "additionalProperties": false
                   },
                   "minItems": 1
                 }

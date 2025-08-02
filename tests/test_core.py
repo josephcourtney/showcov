@@ -11,7 +11,6 @@ from _pytest.monkeypatch import MonkeyPatch
 from defusedxml import ElementTree
 
 from showcov.cli import main, parse_args
-from showcov.output import format_human
 
 # Import functions and exceptions from your module.
 from showcov.core import (
@@ -26,6 +25,7 @@ from showcov.core import (
     merge_blank_gap_groups,
     parse_large_xml,
 )
+from showcov.output import format_human
 
 # Set logging level to capture output for tests
 logging.basicConfig(level=logging.INFO)
@@ -95,6 +95,7 @@ def test_parse_args_no_file(monkeypatch: MonkeyPatch) -> None:
     assert args.xml_file is None
     assert args.no_color is False
     assert args.format == "human"
+    assert args.embed_source is False
 
 
 def test_parse_args_with_file(monkeypatch: MonkeyPatch) -> None:
@@ -104,6 +105,7 @@ def test_parse_args_with_file(monkeypatch: MonkeyPatch) -> None:
     assert args.xml_file == "coverage.xml"
     assert args.no_color is False
     assert args.format == "human"
+    assert args.embed_source is False
 
 
 def test_parse_args_no_color_flag(monkeypatch: MonkeyPatch) -> None:
@@ -112,6 +114,7 @@ def test_parse_args_no_color_flag(monkeypatch: MonkeyPatch) -> None:
     args = parse_args()
     assert args.no_color is True
     assert args.format == "human"
+    assert args.embed_source is False
 
 
 def test_parse_args_format_json(monkeypatch: MonkeyPatch) -> None:
@@ -119,6 +122,14 @@ def test_parse_args_format_json(monkeypatch: MonkeyPatch) -> None:
     monkeypatch.setattr(sys, "argv", test_args)
     args = parse_args()
     assert args.format == "json"
+    assert args.embed_source is False
+
+
+def test_parse_args_embed_source(monkeypatch: MonkeyPatch) -> None:
+    test_args = ["prog", "--embed-source"]
+    monkeypatch.setattr(sys, "argv", test_args)
+    args = parse_args()
+    assert args.embed_source is True
 
 
 # --- Tests for `print_uncovered_sections` ---
@@ -131,7 +142,7 @@ def test_format_human(tmp_path: Path) -> None:
     out = format_human(
         sections,
         context_lines=0,
-        with_code=False,
+        embed_source=False,
         coverage_xml=tmp_path / "cov.xml",
         color=True,
     )
@@ -149,7 +160,7 @@ def test_format_human_no_color(tmp_path: Path) -> None:
     out = format_human(
         sections,
         context_lines=0,
-        with_code=False,
+        embed_source=False,
         coverage_xml=tmp_path / "cov.xml",
         color=False,
     )
@@ -165,7 +176,7 @@ def test_format_human_sorted_files(tmp_path: Path) -> None:
     out = format_human(
         sections,
         context_lines=0,
-        with_code=False,
+        embed_source=False,
         coverage_xml=tmp_path / "cov.xml",
         color=True,
     )
@@ -404,7 +415,7 @@ def test_format_human_file_open_error(tmp_path: Path) -> None:
     out = format_human(
         sections,
         context_lines=0,
-        with_code=False,
+        embed_source=False,
         coverage_xml=tmp_path / "cov.xml",
         color=True,
     )

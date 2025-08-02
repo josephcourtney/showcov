@@ -30,11 +30,11 @@
 
 ### Phase 3: Feature Completion and Determinism Guarantees (LLM Usability focus)
 
-* [ ] Add option `--embed-source` to include raw source lines under each uncovered range.
-* [ ] Avoid floating or system-dependent fields (timestamps, random hashes, etc.) in all outputs.
+* [x] Add option `--embed-source` to include raw source lines under each uncovered range.
+* [x] Avoid floating or system-dependent fields (timestamps, random hashes, etc.) in all outputs.
 * [x] Ensure stable sorting: files alphabetically by posix path, uncovered groups ordered numerically, as invariants.
-* [ ] Ensure all JSON output fully complies with machine-friendly constraints (no ANSI in non-human modes, consistent structure).
-* [ ] Design output to conform to emerging context-tool protocols (e.g. OpenAI tool-calling, LangChain toolkits) as needed.
+* [x] Ensure all JSON output fully complies with machine-friendly constraints (no ANSI in non-human modes, consistent structure).
+* [x] Design output to conform to emerging context-tool protocols (e.g. OpenAI tool-calling, LangChain toolkits) as needed.
 
 ### Phase 4: Testing Enhancements beyond Basic Correctness
 
