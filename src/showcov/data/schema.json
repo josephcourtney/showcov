@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/showcov.schema.json",
+  "title": "Showcov Coverage Report",
+  "type": "object",
+  "properties": {
+    "version": {
+      "description": "Version of the showcov tool or schema.",
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "files": {
+      "description": "List of source files with uncovered code sections.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "description": "Path to the source file.",
+            "type": "string"
+          },
+          "uncovered": {
+            "description": "List of uncovered line ranges.",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "start": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "end": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "lines": {
+                  "description": "Optional source code lines in this range.",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "minItems": 1
+                }
+              },
+              "required": [
+                "start",
+                "end"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "file",
+          "uncovered"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "version",
+    "files"
+  ],
+  "additionalProperties": false
+}
