@@ -89,11 +89,11 @@ def determine_xml_file(xml_file: Namespace | None = None) -> Path:
         xml_file = xml_file.xml_file
 
     if xml_file:
-        return Path(xml_file)
+        return Path(xml_file).resolve()
 
     config_xml = get_config_xml_file()
     if config_xml:
-        return Path(config_xml)
+        return Path(config_xml).resolve()
 
     msg = "No coverage XML file specified or found in configuration."
     raise CoverageXMLNotFoundError(msg)

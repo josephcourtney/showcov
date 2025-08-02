@@ -2,14 +2,14 @@
 
 #### Add Output Format Option
 
-* [ ] Add CLI option `--format {human,json}` (default: `human`).
-* [ ] Modify `main()` and `print_uncovered_sections()` to dispatch based on format.
+* [x] Add CLI option `--format {human,json}` (default: `human`).
+* [x] Modify `main()` and `print_uncovered_sections()` to dispatch based on format.
 * [ ] Abstract uncovered data into a structured internal model before formatting.
 
 #### Implement JSON Output
 
 * [ ] Assess the proposed JSON schema in the appendix for suitability.
-* [ ] Write `print_json_output(uncovered_data: dict[Path, list[int]]) -> None`.
+* [x] Write `print_json_output(uncovered_data: dict[Path, list[int]]) -> None`.
 * [ ] Add `--context-lines=N` (optional): include source lines ±N around each uncovered section.
 * [ ] Validate generated JSON matches schema using a static schema or runtime validator.
 
@@ -18,8 +18,8 @@
 #### Machine-Friendliness
 
 * [x] add a --no-color flag
-* [ ] Remove all ANSI color codes and text styling from `json` mode.
-* [ ] Normalize all paths to POSIX-style (`/`) and resolve relative paths.
+* [x] Remove all ANSI color codes and text styling from `json` mode.
+* [x] Normalize all paths to POSIX-style (`/`) and resolve relative paths.
 
 #### Determinism and Consistency
 
@@ -67,7 +67,7 @@
 
 #### Add Format-Specific Tests
 
-* [ ] Add tests for `--format json` using `json.loads` and structural assertions.
+* [x] Add tests for `--format json` using `json.loads` and structural assertions.
 * [ ] Add round-trip validation: uncovered → JSON → parsed → == original.
 
 #### Ensure LLM Usability
