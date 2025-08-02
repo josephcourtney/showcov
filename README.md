@@ -42,6 +42,41 @@ Uncovered sections in /Users/josephcourtney/code/showcov/src/showcov/main.py:
      241:             sys.exit(1)
 ```
 
+
+## API Usage
+
+You can use `showcov` programmatically via the `get_coverage_data` function:
+
+```python
+from pathlib import Path
+from showcov.core import build_sections, parse_large_xml, determine_xml_file, gather_uncovered_lines
+
+xml_path = determine_xml_file()
+root = parse_large_xml(xml_path)
+uncovered = gather_uncovered_lines(root)
+sections = build_sections(uncovered)
+````
+
+This returns a list of `UncoveredSection` instances, which can be serialized to JSON using:
+
+```python
+from showcov.output import format_json
+
+output = format_json(sections, context_lines=1, with_code=True, coverage_xml=xml_path, color=False)
+print(output)
+```
+
+## JSON Output Format
+
+The `--format json` output is guaranteed to conform to the schema at `src/showcov/data/schema.json`, which supports:
+
+- Tool version (`version`)
+- Execution environment metadata (`environment`)
+- Deterministic list of uncovered code blocks grouped by file
+
+Use this format for toolchain integration with LLMs, CI pipelines, or coverage dashboards.
+```
+
 ## License
 
 This project is licensed under the [MIT License](LICENSE).

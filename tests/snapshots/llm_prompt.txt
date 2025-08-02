@@ -42,6 +42,6 @@ Please review the following coverage data and suggest tests:
       ]
     }
   ],
-  "version": "0.0.5"
+  "version": "0.0.6"
 }
 
