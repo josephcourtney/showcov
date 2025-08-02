@@ -1,48 +1,15 @@
-### Phase 1: Structured JSON Output with Schema and Options
-
-* [x] Define `UncoveredSection(file: Path, ranges: list[tuple[int, int]])` model with `.to_dict()` for JSON export.
-* [x] Add CLI option `--format {human,json}` (default: `human`).
-* [x] Modify `main()` and `print_uncovered_sections()` to dispatch based on format.
-* [x] Write `print_json_output(uncovered_data: dict[Path, list[int]]) -> None`.
-* [x] Abstract uncovered data into the structured internal model before formatting.
-* [x] Add `--context-lines=N` (optional): include source lines ±N around each uncovered section.
-* [x] Assess the JSON schema (`src/showcov/data/schema.json`) and update it as necessary.
-* [x] Ensure that `schema.json` file is included when packaging.
-* [x] Validate generated JSON matches schema using a static schema or runtime validator.
-* [x] Ensure path normalize to POSIX-style (`/`) and resolve paths relative to project root.
-* [x] Update/add tests covering:
-
-  * [x] JSON output structure using the model.
-  * [x] Schema validation success/failure.
-  * [x] No ANSI escape codes in JSON.
-  * [x] Stable ordering of files and ranges.
-
-### Phase 2: Decouple formatting/output from Logic
-
-* [x] Add an item to the JSON output (and update the schema) to indicate the "environment" like what coverage file was run, and other important details.
-* [x] Make the behavior with respect to different command line flags consistent across output formats.
-* [x] Move all printing/formatting into dedicated module: `showcov/output.py`.
-* [x] Introduce output selection via a registry or strategy pattern so `--format` selects formatter.
-* [x] Update `main()` to call into the new output layer via a clean API, passing model instances.
-* [x] Ensure the human formatter still honors `--no-color` and that JSON formatter remains colorless.
-* [x] Add tests for the new output module (unit tests invoking formatters with deterministic input).
-
-### Phase 3: Feature Completion and Determinism Guarantees (LLM Usability focus)
-
-* [x] Add option `--with-code` to include raw source lines under each uncovered range.
-* [x] Avoid floating or system-dependent fields (timestamps, random hashes, etc.) in all outputs.
-* [x] Ensure stable sorting: files alphabetically by posix path, uncovered groups ordered numerically, as invariants.
-* [x] Ensure all JSON output fully complies with machine-friendly constraints (no ANSI in non-human modes, consistent structure).
-* [x] Design output to conform to emerging context-tool protocols (e.g. OpenAI tool-calling, LangChain toolkits) as needed.
-
-### Phase 4: Testing Enhancements beyond Basic Correctness
-
-* [x] Add round-trip validation: uncovered → JSON → parsed → == original model instances.
-* [x] Add snapshot tests of JSON output and sample prompts to LLMs for smoke-checking usability.
-* [x] Expand coverage for edge/corner cases introduced by new features (missing source files when embedding, invalid context ranges, etc.).
-
-### Phase 5: Protocol/tooling Integration Readiness
-
-* [x] Ensure output JSON is valid with `application/json` MIME type, no extra preamble or wrapper.
-* [x] Expose main logic as a function callable via API: `get_coverage_data(xml_path: Path) -> list[UncoveredSection]` (already done but ensure documentation and tests).
-* [x] Annotate output functions with complete type hints using `TypedDict` or `pydantic.BaseModel`.
+- [ ] implement streaming of the coverage XML file and file_lines caching.
+- [ ] add handling for UnicdodeDecodeError when reading source code
+- [ ] add input and config value validation
+- [ ] Embed schema.json via importlib.resources.files("showcov.data") at build time and list it under [tool.uv_build].resources to avoid runtime FileNotFoundError when installed as a wheel.
+- [ ] reimplement CLI with `click`
+- [ ] enumerate and eliminate module-level side effects
+- [ ] add input handling similar to ruff, allowing the user to specify a list of files, folders, or globs specifying the source files to process
+- [ ] add an `--exclude` flag that accepts glob patterns to remove some files from the ouptut 
+- [ ] Add `--output FILE` and write JSON directly
+- [ ] Improve tests using parameterization, reusable mocks and fixtures, and make them more consistent with idiomatic pytest usage
+- [ ] Add property-based tests with `hypothesis`
+- [ ] implement version bump automation by adding a `pre-commit` hook that checks `CHANGELOG.md` against `pyproject.toml`.
+- [ ] Add a 'markdown' output format option that outputs collapsible code blocks for easy pasting into pull-request comments
+- [ ] add an option to emit SARIF so GitHub Advanced Security can annotate lines inline.
+- [ ] move `CONSECUTIVE_STEP` and any other constants or default values into a config files

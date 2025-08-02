@@ -1,26 +1,22 @@
 import argparse
-import logging
 import sys
 from typing import TYPE_CHECKING, cast
 
 from defusedxml import ElementTree
 
-from .core import (
+from showcov import logger
+from showcov.core import (
     CoverageXMLNotFoundError,
     build_sections,
     determine_xml_file,
     gather_uncovered_lines,
     parse_large_xml,
 )
-from .output import FORMATTERS
+from showcov.output import get_formatter
 
 if TYPE_CHECKING:
     from pathlib import Path
     from xml.etree.ElementTree import Element  # noqa: S405
-
-# Configure logging
-logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
-logger = logging.getLogger(__name__)
 
 
 def parse_args() -> argparse.Namespace:
@@ -75,7 +71,7 @@ def main() -> None:
     uncovered = gather_uncovered_lines(cast("Element", root))
     sections = build_sections(uncovered)
 
-    formatter = FORMATTERS[args.format]
+    formatter = get_formatter(args.format)
     output = formatter(
         sections,
         context_lines=args.context_lines,

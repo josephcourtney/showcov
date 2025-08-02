@@ -5,7 +5,6 @@ If no XML filename is given as a command-line argument, the script will try to r
 a configuration file (pyproject.toml, .coveragerc, or setup.cfg).
 """
 
-import logging
 import operator
 import tomllib
 from argparse import Namespace
@@ -17,16 +16,14 @@ from typing import TYPE_CHECKING, Optional, cast
 
 from defusedxml import ElementTree
 
+from showcov import logger
+
 if TYPE_CHECKING:
     from xml.etree.ElementTree import Element  # noqa: S405
 
 
 # Constants
 CONSECUTIVE_STEP = 1
-
-# Configure logging
-logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
-logger = logging.getLogger(__name__)
 
 
 class CoverageXMLNotFoundError(Exception):

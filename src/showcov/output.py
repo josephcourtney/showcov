@@ -11,8 +11,8 @@ from colorama import Fore, Style
 from colorama import init as colorama_init
 from jsonschema import validate
 
-from . import __version__
-from .core import UncoveredSection
+from showcov import __version__
+from showcov.core import UncoveredSection
 
 colorama_init(autoreset=True)
 
@@ -139,3 +139,12 @@ FORMATTERS: dict[str, Formatter] = {
     "human": format_human,
     "json": format_json,
 }
+
+
+def get_formatter(format_name: str) -> Formatter:
+    """Return a formatter callable for the given format name."""
+    try:
+        return FORMATTERS[format_name]
+    except KeyError as e:
+        msg = f"Unsupported format: {format_name!r}"
+        raise ValueError(msg) from e
