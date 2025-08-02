@@ -16,6 +16,7 @@ from showcov.main import (
     _get_xml_from_config,
     _get_xml_from_pyproject,
     determine_xml_file,
+    disable_colors,
     get_config_xml_file,
     group_consecutive_numbers,
     main,
@@ -91,6 +92,7 @@ def test_parse_args_no_file(monkeypatch: MonkeyPatch) -> None:
     monkeypatch.setattr(sys, "argv", test_args)
     args = parse_args()
     assert args.xml_file is None
+    assert args.no_color is False
 
 
 def test_parse_args_with_file(monkeypatch: MonkeyPatch) -> None:
@@ -98,6 +100,14 @@ def test_parse_args_with_file(monkeypatch: MonkeyPatch) -> None:
     monkeypatch.setattr(sys, "argv", test_args)
     args = parse_args()
     assert args.xml_file == "coverage.xml"
+    assert args.no_color is False
+
+
+def test_parse_args_no_color_flag(monkeypatch: MonkeyPatch) -> None:
+    test_args = ["prog", "--no-color"]
+    monkeypatch.setattr(sys, "argv", test_args)
+    args = parse_args()
+    assert args.no_color is True
 
 
 # --- Tests for `print_uncovered_sections` ---
@@ -114,6 +124,29 @@ def test_print_uncovered_sections(tmp_path: Path, capsys: CaptureFixture) -> Non
     assert "2" in captured
     assert "4" in captured
     assert "5" in captured
+
+
+def test_print_uncovered_sections_no_color(tmp_path: Path, capsys: CaptureFixture) -> None:
+    source_file = tmp_path / "dummy.py"
+    source_file.write_text("print('hi')\n")
+    uncovered = {source_file: [1]}
+    disable_colors()
+    print_uncovered_sections(uncovered)
+    captured = capsys.readouterr().out
+    assert "\x1b" not in captured
+
+
+def test_print_uncovered_sections_sorted_files(tmp_path: Path, capsys: CaptureFixture) -> None:
+    file_b = tmp_path / "b.py"
+    file_a = tmp_path / "a.py"
+    file_a.write_text("a=1\n")
+    file_b.write_text("b=1\n")
+    uncovered = {file_b: [1], file_a: [1]}
+    print_uncovered_sections(uncovered)
+    captured = capsys.readouterr().out
+    first = captured.find(file_a.as_posix())
+    second = captured.find(file_b.as_posix())
+    assert first < second
 
 
 # --- Tests for `_gather_uncovered_lines` ---
@@ -138,8 +171,9 @@ def test_gather_uncovered_lines_invalid_hits() -> None:
     """)
     root = ElementTree.fromstring(xml_content)
     uncovered = _gather_uncovered_lines(root)
-    assert Path("dummy.py") in uncovered
-    assert uncovered[Path("dummy.py")] == [2]
+    key = next(iter(uncovered))
+    assert key.name == "dummy.py"
+    assert uncovered[key] == [2]
 
 
 # --- Tests for `parse_large_xml` ---
@@ -165,9 +199,41 @@ def test_parse_large_xml(tmp_path: Path) -> None:
     xml_file = tmp_path / "coverage.xml"
     xml_file.write_text(xml_content)
     root = parse_large_xml(xml_file)
+    assert root is not None
     uncovered = _gather_uncovered_lines(root)
-    assert Path("dummy.py") in uncovered
-    assert uncovered[Path("dummy.py")] == [3, 5]
+    key = next(iter(uncovered))
+    assert key.name == "dummy.py"
+    assert uncovered[key] == [3, 5]
+
+
+def test_gather_uncovered_lines_resolves_paths(tmp_path: Path) -> None:
+    pkg = tmp_path / "pkg"
+    pkg.mkdir()
+    source_file = pkg / "dummy.py"
+    source_file.write_text("print('hi')\n")
+    xml_content = f"""
+    <coverage>
+      <sources>
+        <source>{tmp_path}</source>
+      </sources>
+      <packages>
+        <package>
+          <classes>
+            <class filename="pkg/dummy.py">
+              <lines>
+                <line number="1" hits="0"/>
+              </lines>
+            </class>
+          </classes>
+        </package>
+      </packages>
+    </coverage>
+    """
+    root = ElementTree.fromstring(xml_content)
+    uncovered = _gather_uncovered_lines(root)
+    key = next(iter(uncovered))
+    assert key.is_absolute()
+    assert key.as_posix().endswith("pkg/dummy.py")
 
 
 # --- Tests for `main()` ---
@@ -341,19 +407,22 @@ def test_parse_large_xml_no_coverage(tmp_path):
 
 def test_main_coverage_xml_not_found(monkeypatch):
     # Force determine_xml_file to throw CoverageXMLNotFoundError and verify that main() calls sys.exit(1).
+    monkeypatch.setattr(sys, "argv", ["prog"])
     monkeypatch.setattr(
         "showcov.main.determine_xml_file",
-        lambda: (_ for _ in ()).throw(CoverageXMLNotFoundError("No coverage XML file specified")),
+        lambda _args: (_ for _ in ()).throw(CoverageXMLNotFoundError("No coverage XML file specified")),
     )
     with pytest.raises(SystemExit) as exc_info:
         main()
+    assert isinstance(exc_info.value, SystemExit)
     assert exc_info.value.code == 1
 
 
 def test_main_parse_error(monkeypatch):
     # Force parse_large_xml to raise an ElementTree.ParseError and verify that main() calls sys.exit(1).
     fake_path = Path("dummy.xml")
-    monkeypatch.setattr("showcov.main.determine_xml_file", lambda: fake_path)
+    monkeypatch.setattr(sys, "argv", ["prog"])
+    monkeypatch.setattr("showcov.main.determine_xml_file", lambda _args: fake_path)
 
     def fake_parse_large_xml(_):
         msg = "simulated parse error"
@@ -362,13 +431,15 @@ def test_main_parse_error(monkeypatch):
     monkeypatch.setattr("showcov.main.parse_large_xml", fake_parse_large_xml)
     with pytest.raises(SystemExit) as exc_info:
         main()
+    assert isinstance(exc_info.value, SystemExit)
     assert exc_info.value.code == 1
 
 
 def test_main_os_error(monkeypatch):
     # Force parse_large_xml to raise an OSError and verify that main() calls sys.exit(1).
     fake_path = Path("dummy.xml")
-    monkeypatch.setattr("showcov.main.determine_xml_file", lambda: fake_path)
+    monkeypatch.setattr(sys, "argv", ["prog"])
+    monkeypatch.setattr("showcov.main.determine_xml_file", lambda _args: fake_path)
 
     def fake_parse_large_xml(_):
         msg = "simulated OS error"
@@ -377,4 +448,5 @@ def test_main_os_error(monkeypatch):
     monkeypatch.setattr("showcov.main.parse_large_xml", fake_parse_large_xml)
     with pytest.raises(SystemExit) as exc_info:
         main()
+    assert isinstance(exc_info.value, SystemExit)
     assert exc_info.value.code == 1
