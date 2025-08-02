@@ -48,18 +48,18 @@ class UncoveredSection:
     file: Path
     ranges: list[tuple[int, int]]
 
-    def to_dict(self, *, embed_source: bool = False, context_lines: int = 0) -> dict[str, object]:
+    def to_dict(self, *, with_code: bool = False, context_lines: int = 0) -> dict[str, object]:
         """Convert the section into a JSON-serialisable dictionary.
 
         Parameters
         ----------
-        embed_source:
+        with_code:
             Include raw source lines within each uncovered range. When
             ``context_lines`` is greater than zero, the returned lines will
             also include that many lines of surrounding context.
         context_lines:
             Number of context lines to include before and after each uncovered
-            range when ``embed_source`` is ``True``.
+            range when ``with_code`` is ``True``.
         """
         root = Path.cwd().resolve()
         try:
@@ -71,7 +71,7 @@ class UncoveredSection:
         uncovered_entries: list[dict[str, object]] = []
 
         file_lines: list[str] = []
-        if embed_source:
+        if with_code:
             try:
                 with self.file.open(encoding="utf-8") as f:
                     file_lines = [ln.rstrip("\n") for ln in f.readlines()]
@@ -80,7 +80,7 @@ class UncoveredSection:
 
         for start, end in self.ranges:
             entry: dict[str, object] = {"start": start, "end": end}
-            if embed_source and file_lines:
+            if with_code and file_lines:
                 start_idx = max(1, start - context_lines)
                 end_idx = min(len(file_lines), end + context_lines)
                 source = [

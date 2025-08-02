@@ -28,7 +28,7 @@ class Formatter(Protocol):
         sections: list[UncoveredSection],
         *,
         context_lines: int,
-        embed_source: bool,
+        with_code: bool,
         coverage_xml: Path,
         color: bool,
     ) -> str: ...
@@ -52,7 +52,7 @@ def format_human(
     sections: list[UncoveredSection],
     *,
     context_lines: int,
-    embed_source: bool,  # noqa: ARG001 - kept for consistent signature
+    with_code: bool,  # noqa: ARG001 - kept for consistent signature
     coverage_xml: Path,  # noqa: ARG001
     color: bool,
 ) -> str:
@@ -105,7 +105,7 @@ def format_json(
     sections: list[UncoveredSection],
     *,
     context_lines: int,
-    embed_source: bool,
+    with_code: bool,
     coverage_xml: Path,
     color: bool,  # noqa: ARG001
 ) -> str:
@@ -119,9 +119,9 @@ def format_json(
         "environment": {
             "coverage_xml": xml_path.as_posix(),
             "context_lines": context_lines,
-            "embed_source": embed_source,
+            "with_code": with_code,
         },
-        "files": [sec.to_dict(embed_source=embed_source, context_lines=context_lines) for sec in sections],
+        "files": [sec.to_dict(with_code=with_code, context_lines=context_lines) for sec in sections],
     }
     validate(data, SCHEMA)
     return json.dumps(data, indent=2, sort_keys=True)

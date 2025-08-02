@@ -20,7 +20,7 @@ def test_format_json_output(tmp_path: Path) -> None:
     sections = build_sections({source_file: [1, 2, 4]})
     out = format_json(
         sections,
-        embed_source=False,
+        with_code=False,
         context_lines=0,
         coverage_xml=tmp_path / "cov.xml",
         color=True,
@@ -30,7 +30,7 @@ def test_format_json_output(tmp_path: Path) -> None:
     assert data["environment"] == {
         "coverage_xml": (tmp_path / "cov.xml").resolve().as_posix(),
         "context_lines": 0,
-        "embed_source": False,
+        "with_code": False,
     }
     assert data["files"][0]["file"] == source_file.resolve().as_posix()
     assert data["files"][0]["uncovered"] == [
@@ -67,7 +67,7 @@ def test_main_json_output(tmp_path: Path, monkeypatch: MonkeyPatch, capsys: Capt
     assert data["environment"] == {
         "coverage_xml": xml_file.resolve().as_posix(),
         "context_lines": 0,
-        "embed_source": False,
+        "with_code": False,
     }
     assert data["files"][0]["file"] == source_file.resolve().as_posix()
     assert data["files"][0]["uncovered"] == [{"start": 1, "end": 1}]
@@ -100,14 +100,12 @@ def test_main_json_output_no_uncovered(
     assert data["environment"] == {
         "coverage_xml": xml_file.resolve().as_posix(),
         "context_lines": 0,
-        "embed_source": False,
+        "with_code": False,
     }
     assert data["files"] == []
 
 
-def test_main_json_output_embed_source(
-    tmp_path: Path, monkeypatch: MonkeyPatch, capsys: CaptureFixture
-) -> None:
+def test_main_json_output_with_code(tmp_path: Path, monkeypatch: MonkeyPatch, capsys: CaptureFixture) -> None:
     source_file = tmp_path / "dummy.py"
     source_file.write_text("a\nb\nc\n")
     xml_content = f"""
@@ -135,7 +133,7 @@ def test_main_json_output_embed_source(
             str(xml_file),
             "--format",
             "json",
-            "--embed-source",
+            "--with-code",
             "--context-lines",
             "1",
         ],
@@ -146,7 +144,7 @@ def test_main_json_output_embed_source(
     assert data["environment"] == {
         "coverage_xml": xml_file.resolve().as_posix(),
         "context_lines": 1,
-        "embed_source": True,
+        "with_code": True,
     }
     assert data["files"][0]["uncovered"][0]["source"] == [
         {"line": 1, "code": "a"},
@@ -155,13 +153,13 @@ def test_main_json_output_embed_source(
     ]
 
 
-def test_format_json_output_embed_source_with_context(tmp_path: Path) -> None:
+def test_format_json_output_with_code_with_context(tmp_path: Path) -> None:
     source_file = tmp_path / "dummy.py"
     source_file.write_text("a\nb\nc\n")
     sections = build_sections({source_file: [2]})
     out = format_json(
         sections,
-        embed_source=True,
+        with_code=True,
         context_lines=1,
         coverage_xml=tmp_path / "cov.xml",
         color=True,
@@ -180,7 +178,7 @@ def test_json_schema_validation(tmp_path: Path, capsys: CaptureFixture) -> None:
     sections = build_sections({source_file: [1]})
     out = format_json(
         sections,
-        embed_source=True,
+        with_code=True,
         context_lines=0,
         coverage_xml=tmp_path / "cov.xml",
         color=True,
@@ -200,7 +198,7 @@ def test_format_json_output_relative_path(tmp_path: Path, monkeypatch: MonkeyPat
     sections = build_sections({source_file: [1]})
     out = format_json(
         sections,
-        embed_source=False,
+        with_code=False,
         context_lines=0,
         coverage_xml=Path("cov.xml"),
         color=True,
