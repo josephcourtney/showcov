@@ -1,20 +1,20 @@
 ### Phase 1: Structured JSON Output with Schema and Options
 
-* [ ] Define `UncoveredSection(file: Path, ranges: list[tuple[int, int]])` model with `.to_dict()` for JSON export.
+* [x] Define `UncoveredSection(file: Path, ranges: list[tuple[int, int]])` model with `.to_dict()` for JSON export.
 * [x] Add CLI option `--format {human,json}` (default: `human`).
 * [x] Modify `main()` and `print_uncovered_sections()` to dispatch based on format.
 * [x] Write `print_json_output(uncovered_data: dict[Path, list[int]]) -> None`.
-* [ ] Abstract uncovered data into the structured internal model before formatting.
-* [ ] Add `--context-lines=N` (optional): include source lines ±N around each uncovered section.
+* [x] Abstract uncovered data into the structured internal model before formatting.
+* [x] Add `--context-lines=N` (optional): include source lines ±N around each uncovered section.
 * [x] Assess the JSON schema (`src/showcov/data/schema.json`) and update it as necessary.
-* [ ] Ensure that `schema.json` file is included when packaging.
-* [ ] Validate generated JSON matches schema using a static schema or runtime validator.
-* [ ] Ensure path normalize to POSIX-style (`/`) and resolve paths relative to project root.
+* [x] Ensure that `schema.json` file is included when packaging.
+* [x] Validate generated JSON matches schema using a static schema or runtime validator.
+* [x] Ensure path normalize to POSIX-style (`/`) and resolve paths relative to project root.
 * [x] Update/add tests covering:
 
   * [x] JSON output structure using the model.
   * [x] Presence/absence of code with `--with-code` and context lines.
-  * [ ] Schema validation success/failure.
+  * [x] Schema validation success/failure.
   * [x] No ANSI escape codes in JSON.
   * [x] Stable ordering of files and ranges.
 
