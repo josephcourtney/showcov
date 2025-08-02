@@ -1,15 +1,20 @@
-- [x] implement streaming of the coverage XML file and file_lines caching.
-- [x] add handling for UnicdodeDecodeError when reading source code
-- [x] add input and config value validation
-- [ ] Embed schema.json via importlib.resources.files("showcov.data") at build time and list it under [tool.uv_build].resources to avoid runtime FileNotFoundError when installed as a wheel.
+## features
 - [ ] reimplement CLI with `click`
-- [ ] enumerate and eliminate module-level side effects
 - [ ] add input handling similar to ruff, allowing the user to specify a list of files, folders, or globs specifying the source files to process
 - [ ] add an `--exclude` flag that accepts glob patterns to remove some files from the ouptut 
 - [ ] Add `--output FILE` and write JSON directly
-- [ ] Improve tests using parameterization, reusable mocks and fixtures, and make them more consistent with idiomatic pytest usage
-- [ ] Add property-based tests with `hypothesis`
-- [ ] implement version bump automation by adding a `pre-commit` hook that checks `CHANGELOG.md` against `pyproject.toml`.
 - [ ] Add a 'markdown' output format option that outputs collapsible code blocks for easy pasting into pull-request comments
 - [ ] add an option to emit SARIF so GitHub Advanced Security can annotate lines inline.
+
+## internal details
+- [ ] Embed schema.json via importlib.resources.files("showcov.data") at build time and list it under [tool.uv_build].resources to avoid runtime FileNotFoundError when installed as a wheel.
+- [ ] enumerate and eliminate module-level side effects
 - [ ] move `CONSECUTIVE_STEP` and any other constants or default values into a config files
+
+## testing
+- [ ] Improve tests using parameterization, reusable mocks and fixtures, and make them more consistent with idiomatic pytest usage
+- [ ] Add property-based tests with `hypothesis`
+
+## dev ops
+- [ ] implement version bump automation by adding a `pre-commit` hook that checks `CHANGELOG.md` against `pyproject.toml`.
+
