@@ -1,6 +1,6 @@
-- [ ] implement streaming of the coverage XML file and file_lines caching.
-- [ ] add handling for UnicdodeDecodeError when reading source code
-- [ ] add input and config value validation
+- [x] implement streaming of the coverage XML file and file_lines caching.
+- [x] add handling for UnicdodeDecodeError when reading source code
+- [x] add input and config value validation
 - [ ] Embed schema.json via importlib.resources.files("showcov.data") at build time and list it under [tool.uv_build].resources to avoid runtime FileNotFoundError when installed as a wheel.
 - [ ] reimplement CLI with `click`
 - [ ] enumerate and eliminate module-level side effects

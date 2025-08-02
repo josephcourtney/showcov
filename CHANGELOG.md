@@ -1,3 +1,14 @@
+## [0.0.7] - 2025-08-02
+
+### Added
+- stream coverage XML parsing to reduce memory usage
+
+### Fixed
+- cache source file lines and handle UnicodeDecodeError gracefully
+- validate CLI inputs and configuration paths
+
+---
+
 ## [0.0.6] - 2025-08-02
 
 ### Added

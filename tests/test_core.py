@@ -17,9 +17,11 @@ from showcov.core import (
     CoverageXMLNotFoundError,
     _get_xml_from_config,
     _get_xml_from_pyproject,
+    _read_file_lines,
     build_sections,
     determine_xml_file,
     gather_uncovered_lines,
+    gather_uncovered_lines_from_xml,
     get_config_xml_file,
     group_consecutive_numbers,
     merge_blank_gap_groups,
@@ -65,17 +67,21 @@ def test_get_config_xml_file_pyproject(monkeypatch: MonkeyPatch, tmp_path: Path)
 # --- Tests for `determine_xml_file` ---
 
 
-def test_determine_xml_file_argument(monkeypatch: MonkeyPatch) -> None:
-    test_args = ["prog", "coverage.xml"]
+def test_determine_xml_file_argument(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
+    xml = tmp_path / "coverage.xml"
+    xml.write_text("<coverage/>")
+    test_args = ["prog", str(xml)]
     monkeypatch.setattr(sys, "argv", test_args)
-    assert determine_xml_file(argparse.Namespace(xml_file="coverage.xml")) == Path("coverage.xml").resolve()
+    assert determine_xml_file(argparse.Namespace(xml_file=str(xml))) == xml.resolve()
 
 
-def test_determine_xml_file_from_config(monkeypatch: MonkeyPatch) -> None:
+def test_determine_xml_file_from_config(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
+    xml = tmp_path / "coverage.xml"
+    xml.write_text("<coverage/>")
     test_args = ["prog"]
     monkeypatch.setattr(sys, "argv", test_args)
-    monkeypatch.setattr("showcov.core.get_config_xml_file", lambda: "coverage.xml")
-    assert determine_xml_file(argparse.Namespace(xml_file="coverage.xml")) == Path("coverage.xml").resolve()
+    monkeypatch.setattr("showcov.core.get_config_xml_file", lambda: str(xml))
+    assert determine_xml_file(argparse.Namespace(xml_file=None)) == xml.resolve()
 
 
 def test_determine_xml_file_no_args(monkeypatch: MonkeyPatch) -> None:
@@ -272,6 +278,59 @@ def test_gather_uncovered_lines_resolves_paths(tmp_path: Path) -> None:
     assert key.as_posix().endswith("pkg/dummy.py")
 
 
+def test_gather_uncovered_lines_from_xml(tmp_path: Path) -> None:
+    src = tmp_path / "dummy.py"
+    src.write_text("print('hi')\n")
+    xml_content = f"""
+    <coverage>
+      <packages>
+        <package>
+          <classes>
+            <class filename=\"{src}\">
+              <lines>
+                <line number=\"1\" hits=\"0\"/>
+              </lines>
+            </class>
+          </classes>
+        </package>
+      </packages>
+    </coverage>
+    """
+    xml_file = tmp_path / "coverage.xml"
+    xml_file.write_text(xml_content)
+    uncovered = gather_uncovered_lines_from_xml(xml_file)
+    key = next(iter(uncovered))
+    assert key == src.resolve()
+    assert uncovered[key] == [1]
+
+
+def test_read_file_lines_handles_unicode_error(tmp_path: Path) -> None:
+    bad = tmp_path / "bad.py"
+    bad.write_bytes(b"\xff\xfe")
+    _read_file_lines.cache_clear()
+    assert _read_file_lines(bad) == []
+
+
+def test_read_file_lines_caches(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
+    file = tmp_path / "a.py"
+    file.write_text("print(1)\n")
+    _read_file_lines.cache_clear()
+    assert _read_file_lines(file) == ["print(1)"]
+
+    def fail(*args, **kwargs):
+        msg = "should not open file again"
+        raise AssertionError(msg)
+
+    monkeypatch.setattr(Path, "open", fail)
+    assert _read_file_lines(file) == ["print(1)"]
+
+
+def test_parse_args_negative_context_lines(monkeypatch: MonkeyPatch) -> None:
+    monkeypatch.setattr(sys, "argv", ["prog", "--context-lines", "-1"])
+    with pytest.raises(SystemExit):
+        parse_args()
+
+
 # --- Tests for `main()` ---
 
 
@@ -454,16 +513,16 @@ def test_main_coverage_xml_not_found(monkeypatch):
 
 
 def test_main_parse_error(monkeypatch):
-    # Force parse_large_xml to raise an ElementTree.ParseError and verify that main() calls sys.exit(1).
+    # Force gather_uncovered_lines_from_xml to raise an ElementTree.ParseError and verify exit code 1.
     fake_path = Path("dummy.xml")
     monkeypatch.setattr(sys, "argv", ["prog"])
     monkeypatch.setattr("showcov.core.determine_xml_file", lambda _args: fake_path)
 
-    def fake_parse_large_xml(_):
+    def fake_gather(_):
         msg = "simulated parse error"
         raise ElementTree.ParseError(msg)
 
-    monkeypatch.setattr("showcov.core.parse_large_xml", fake_parse_large_xml)
+    monkeypatch.setattr("showcov.core.gather_uncovered_lines_from_xml", fake_gather)
     with pytest.raises(SystemExit) as exc_info:
         main()
     assert isinstance(exc_info.value, SystemExit)
@@ -471,16 +530,16 @@ def test_main_parse_error(monkeypatch):
 
 
 def test_main_os_error(monkeypatch):
-    # Force parse_large_xml to raise an OSError and verify that main() calls sys.exit(1).
+    # Force gather_uncovered_lines_from_xml to raise an OSError and verify exit code 1.
     fake_path = Path("dummy.xml")
     monkeypatch.setattr(sys, "argv", ["prog"])
     monkeypatch.setattr("showcov.core.determine_xml_file", lambda _args: fake_path)
 
-    def fake_parse_large_xml(_):
+    def fake_gather(_):
         msg = "simulated OS error"
         raise OSError(msg)
 
-    monkeypatch.setattr("showcov.core.parse_large_xml", fake_parse_large_xml)
+    monkeypatch.setattr("showcov.core.gather_uncovered_lines_from_xml", fake_gather)
     with pytest.raises(SystemExit) as exc_info:
         main()
     assert isinstance(exc_info.value, SystemExit)
