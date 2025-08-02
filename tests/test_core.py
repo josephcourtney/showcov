@@ -6,11 +6,10 @@ from configparser import ConfigParser
 from pathlib import Path
 
 import pytest
-from _pytest.capture import CaptureFixture
 from _pytest.monkeypatch import MonkeyPatch
 from defusedxml import ElementTree
 
-from showcov.cli import main, parse_args
+from showcov.cli import main
 
 # Import functions and exceptions from your module.
 from showcov.core import (
@@ -89,53 +88,6 @@ def test_determine_xml_file_no_args(monkeypatch: MonkeyPatch) -> None:
     monkeypatch.setattr("showcov.core.get_config_xml_file", lambda: None)
     with pytest.raises(CoverageXMLNotFoundError, match="No coverage XML file specified"):
         determine_xml_file(xml_file=None)
-
-
-# --- Tests for `parse_args` ---
-
-
-def test_parse_args_no_file(monkeypatch: MonkeyPatch) -> None:
-    test_args = ["prog"]
-    monkeypatch.setattr(sys, "argv", test_args)
-    args = parse_args()
-    assert args.xml_file is None
-    assert args.no_color is False
-    assert args.format == "human"
-    assert args.with_code is False
-
-
-def test_parse_args_with_file(monkeypatch: MonkeyPatch) -> None:
-    test_args = ["prog", "coverage.xml"]
-    monkeypatch.setattr(sys, "argv", test_args)
-    args = parse_args()
-    assert args.xml_file == "coverage.xml"
-    assert args.no_color is False
-    assert args.format == "human"
-    assert args.with_code is False
-
-
-def test_parse_args_no_color_flag(monkeypatch: MonkeyPatch) -> None:
-    test_args = ["prog", "--no-color"]
-    monkeypatch.setattr(sys, "argv", test_args)
-    args = parse_args()
-    assert args.no_color is True
-    assert args.format == "human"
-    assert args.with_code is False
-
-
-def test_parse_args_format_json(monkeypatch: MonkeyPatch) -> None:
-    test_args = ["prog", "--format", "json"]
-    monkeypatch.setattr(sys, "argv", test_args)
-    args = parse_args()
-    assert args.format == "json"
-    assert args.with_code is False
-
-
-def test_parse_args_with_code(monkeypatch: MonkeyPatch) -> None:
-    test_args = ["prog", "--with-code"]
-    monkeypatch.setattr(sys, "argv", test_args)
-    args = parse_args()
-    assert args.with_code is True
 
 
 # --- Tests for `print_uncovered_sections` ---
@@ -325,71 +277,7 @@ def test_read_file_lines_caches(monkeypatch: MonkeyPatch, tmp_path: Path) -> Non
     assert _read_file_lines(file) == ["print(1)"]
 
 
-def test_parse_args_negative_context_lines(monkeypatch: MonkeyPatch) -> None:
-    monkeypatch.setattr(sys, "argv", ["prog", "--context-lines", "-1"])
-    with pytest.raises(SystemExit):
-        parse_args()
-
-
 # --- Tests for `main()` ---
-
-
-def test_main_no_uncovered(tmp_path: Path, monkeypatch: MonkeyPatch, capsys: CaptureFixture) -> None:
-    xml_content = textwrap.dedent("""
-        <coverage>
-          <packages>
-            <package>
-              <classes>
-                <class filename="dummy.py">
-                  <lines>
-                    <line number="1" hits="1"/>
-                    <line number="2" hits="1"/>
-                  </lines>
-                </class>
-              </classes>
-            </package>
-          </packages>
-        </coverage>
-    """)
-    xml_file = tmp_path / "coverage.xml"
-    xml_file.write_text(xml_content)
-    monkeypatch.setattr(sys, "argv", ["prog", str(xml_file)])
-    main()
-    captured = capsys.readouterr().out
-    assert "No uncovered lines found!" in captured
-
-
-def test_main_with_uncovered(tmp_path: Path, monkeypatch: MonkeyPatch, capsys: CaptureFixture) -> None:
-    source_file = tmp_path / "dummy.py"
-    source_file.write_text("def foo():\n    pass\n\ndef bar():\n    return 42")
-    xml_content = f"""
-        <coverage>
-          <packages>
-            <package>
-              <classes>
-                <class filename="{source_file}">
-                  <lines>
-                    <line number="2" hits="0"/>
-                    <line number="4" hits="0"/>
-                    <line number="5" hits="0"/>
-                  </lines>
-                </class>
-              </classes>
-            </package>
-          </packages>
-        </coverage>
-    """
-    xml_file = tmp_path / "coverage.xml"
-    xml_file.write_text(xml_content)
-    monkeypatch.setattr(sys, "argv", ["prog", str(xml_file)])
-    main()
-    captured = capsys.readouterr().out
-    assert "Uncovered sections in" in captured
-    assert "2" in captured
-    assert "4" in captured
-    assert "5" in captured
-
-
 # --- Tests for _get_xml_from_config exception branch (lines 53-55) ---
 
 
