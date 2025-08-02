@@ -20,6 +20,8 @@
 
 ### Phase 2: Decouple formatting/output from Logic
 
+* [ ] Add an item to the JSON output (and update the schema) to indicate the "environment" like what coverage file was run, and other important details.
+* [ ] Make the behavior with respect to different command line flags consistent across output formats.
 * [ ] Move all printing/formatting into dedicated module: `showcov/output.py`.
 * [ ] Introduce output selection via a registry or strategy pattern so `--format` selects formatter.
 * [ ] Update `main()` to call into the new output layer via a clean API, passing model instances.
