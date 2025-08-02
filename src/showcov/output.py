@@ -5,16 +5,14 @@ from __future__ import annotations
 import json
 from importlib import resources
 from pathlib import Path
-from typing import TYPE_CHECKING, Protocol
+from typing import Protocol
 
 from colorama import Fore, Style
 from colorama import init as colorama_init
 from jsonschema import validate
 
 from . import __version__
-
-if TYPE_CHECKING:
-    from .core import UncoveredSection
+from .core import UncoveredSection
 
 colorama_init(autoreset=True)
 
@@ -56,6 +54,7 @@ def format_human(
     coverage_xml: Path,  # noqa: ARG001
     color: bool,
 ) -> str:
+    context_lines = max(0, context_lines)
     colors = _colors(enabled=color)
     if not sections:
         return f"{colors['GREEN']}{colors['BOLD']}No uncovered lines found!{colors['RESET']}"
@@ -109,6 +108,7 @@ def format_json(
     coverage_xml: Path,
     color: bool,  # noqa: ARG001
 ) -> str:
+    context_lines = max(0, context_lines)
     root = Path.cwd().resolve()
     try:
         xml_path = coverage_xml.resolve().relative_to(root)
@@ -125,6 +125,14 @@ def format_json(
     }
     validate(data, SCHEMA)
     return json.dumps(data, indent=2, sort_keys=True)
+
+
+def parse_json_output(data: str) -> list[UncoveredSection]:
+    """Parse JSON coverage data into :class:`UncoveredSection` instances."""
+    obj = json.loads(data)
+    validate(obj, SCHEMA)
+    files = obj.get("files", [])
+    return [UncoveredSection.from_dict(f) for f in files]
 
 
 FORMATTERS: dict[str, Formatter] = {

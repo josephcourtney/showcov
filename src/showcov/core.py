@@ -13,7 +13,7 @@ from configparser import ConfigParser
 from configparser import Error as ConfigError
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, cast
 
 from defusedxml import ElementTree
 
@@ -61,6 +61,8 @@ class UncoveredSection:
             Number of context lines to include before and after each uncovered
             range when ``with_code`` is ``True``.
         """
+        context_lines = max(0, context_lines)
+
         root = Path.cwd().resolve()
         try:
             path = self.file.resolve().relative_to(root)
@@ -94,6 +96,14 @@ class UncoveredSection:
             uncovered_entries.append(entry)
 
         return {"file": file_str, "uncovered": uncovered_entries}
+
+    @classmethod
+    def from_dict(cls, data: dict[str, object]) -> "UncoveredSection":
+        """Create an :class:`UncoveredSection` from a dictionary."""
+        file = Path(str(data["file"]))
+        items = cast("list[dict[str, object]]", data.get("uncovered", []))
+        ranges = [(int(item["start"]), int(item["end"])) for item in items]
+        return cls(file.resolve(), ranges)
 
 
 def _get_xml_from_config(config_path: Path, section: str, option: str) -> str | None:
