@@ -13,7 +13,6 @@
 * [x] Update/add tests covering:
 
   * [x] JSON output structure using the model.
-  * [x] Presence/absence of code with `--with-code` and context lines.
   * [x] Schema validation success/failure.
   * [x] No ANSI escape codes in JSON.
   * [x] Stable ordering of files and ranges.
@@ -30,7 +29,7 @@
 
 ### Phase 3: Feature Completion and Determinism Guarantees (LLM Usability focus)
 
-* [x] Add option `--embed-source` to include raw source lines under each uncovered range.
+* [x] Add option `--with-code` to include raw source lines under each uncovered range.
 * [x] Avoid floating or system-dependent fields (timestamps, random hashes, etc.) in all outputs.
 * [x] Ensure stable sorting: files alphabetically by posix path, uncovered groups ordered numerically, as invariants.
 * [x] Ensure all JSON output fully complies with machine-friendly constraints (no ANSI in non-human modes, consistent structure).

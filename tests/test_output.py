@@ -11,14 +11,14 @@ def test_format_human_respects_color(tmp_path: Path) -> None:
     colored = format_human(
         sections,
         context_lines=0,
-        embed_source=False,
+        with_code=False,
         coverage_xml=tmp_path / "cov.xml",
         color=True,
     )
     plain = format_human(
         sections,
         context_lines=0,
-        embed_source=False,
+        with_code=False,
         coverage_xml=tmp_path / "cov.xml",
         color=False,
     )

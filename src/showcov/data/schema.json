@@ -13,11 +13,22 @@
       "description": "Execution environment details.",
       "type": "object",
       "properties": {
-        "coverage_xml": {"type": "string"},
-        "context_lines": {"type": "integer", "minimum": 0},
-        "embed_source": {"type": "boolean"}
+        "coverage_xml": {
+          "type": "string"
+        },
+        "context_lines": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "with_code": {
+          "type": "boolean"
+        }
       },
-      "required": ["coverage_xml", "context_lines", "embed_source"],
+      "required": [
+        "coverage_xml",
+        "context_lines",
+        "with_code"
+      ],
       "additionalProperties": false
     },
     "files": {
@@ -50,10 +61,18 @@
                   "items": {
                     "type": "object",
                     "properties": {
-                      "line": {"type": "integer", "minimum": 1},
-                      "code": {"type": "string"}
+                      "line": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "code": {
+                        "type": "string"
+                      }
                     },
-                    "required": ["line", "code"],
+                    "required": [
+                      "line",
+                      "code"
+                    ],
                     "additionalProperties": false
                   },
                   "minItems": 1
