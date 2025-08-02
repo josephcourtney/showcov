@@ -17,13 +17,13 @@
 
 #### Machine-Friendliness
 
-* [ ] add a --no-color flag
+* [x] add a --no-color flag
 * [ ] Remove all ANSI color codes and text styling from `json` mode.
 * [ ] Normalize all paths to POSIX-style (`/`) and resolve relative paths.
 
 #### Determinism and Consistency
 
-* [ ] Ensure stable ordering: files sorted alphabetically, uncovered groups ordered numerically.
+* [x] Ensure stable ordering: files sorted alphabetically, uncovered groups ordered numerically.
 * [ ] Avoid floating or system-dependent fields (timestamps, random hashes, etc.).
 
 #### Contextual Source Embedding (optional future support)
@@ -55,7 +55,7 @@
 
 #### CLI + API Parity
 
-* [ ] Expose main logic as a function callable via API:
+* [x] Expose main logic as a function callable via API:
   `get_coverage_data(xml_path: Path) -> list[UncoveredSection]`
 
 #### JSON Schema + Type Hints

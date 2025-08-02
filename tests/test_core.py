@@ -1,3 +1,4 @@
+import argparse
 import logging
 import sys
 import textwrap
@@ -9,21 +10,24 @@ from _pytest.capture import CaptureFixture
 from _pytest.monkeypatch import MonkeyPatch
 from defusedxml import ElementTree
 
+from showcov.cli import (
+    disable_colors,
+    main,
+    parse_args,
+    print_uncovered_sections,
+)
+
 # Import functions and exceptions from your module.
-from showcov.main import (
+from showcov.core import (
     CoverageXMLNotFoundError,
-    _gather_uncovered_lines,
     _get_xml_from_config,
     _get_xml_from_pyproject,
     determine_xml_file,
-    disable_colors,
+    gather_uncovered_lines,
     get_config_xml_file,
     group_consecutive_numbers,
-    main,
     merge_blank_gap_groups,
-    parse_args,
     parse_large_xml,
-    print_uncovered_sections,
 )
 
 # Set logging level to capture output for tests
@@ -67,21 +71,21 @@ def test_get_config_xml_file_pyproject(monkeypatch: MonkeyPatch, tmp_path: Path)
 def test_determine_xml_file_argument(monkeypatch: MonkeyPatch) -> None:
     test_args = ["prog", "coverage.xml"]
     monkeypatch.setattr(sys, "argv", test_args)
-    assert determine_xml_file() == Path("coverage.xml")
+    assert determine_xml_file(argparse.Namespace(xml_file="coverage.xml")) == Path("coverage.xml")
 
 
 def test_determine_xml_file_from_config(monkeypatch: MonkeyPatch) -> None:
     test_args = ["prog"]
     monkeypatch.setattr(sys, "argv", test_args)
-    monkeypatch.setattr("showcov.main.get_config_xml_file", lambda: "coverage.xml")
-    assert determine_xml_file() == Path("coverage.xml")
+    monkeypatch.setattr("showcov.core.get_config_xml_file", lambda: "coverage.xml")
+    assert determine_xml_file(argparse.Namespace(xml_file="coverage.xml")) == Path("coverage.xml")
 
 
 def test_determine_xml_file_no_args(monkeypatch: MonkeyPatch) -> None:
     monkeypatch.setattr(sys, "argv", ["prog"])
-    monkeypatch.setattr("showcov.main.get_config_xml_file", lambda: None)
+    monkeypatch.setattr("showcov.core.get_config_xml_file", lambda: None)
     with pytest.raises(CoverageXMLNotFoundError, match="No coverage XML file specified"):
-        determine_xml_file()
+        determine_xml_file(xml_file=None)
 
 
 # --- Tests for `parse_args` ---
@@ -149,7 +153,7 @@ def test_print_uncovered_sections_sorted_files(tmp_path: Path, capsys: CaptureFi
     assert first < second
 
 
-# --- Tests for `_gather_uncovered_lines` ---
+# --- Tests for `gather_uncovered_lines` ---
 
 
 def test_gather_uncovered_lines_invalid_hits() -> None:
@@ -170,7 +174,7 @@ def test_gather_uncovered_lines_invalid_hits() -> None:
     </coverage>
     """)
     root = ElementTree.fromstring(xml_content)
-    uncovered = _gather_uncovered_lines(root)
+    uncovered = gather_uncovered_lines(root)
     key = next(iter(uncovered))
     assert key.name == "dummy.py"
     assert uncovered[key] == [2]
@@ -200,7 +204,7 @@ def test_parse_large_xml(tmp_path: Path) -> None:
     xml_file.write_text(xml_content)
     root = parse_large_xml(xml_file)
     assert root is not None
-    uncovered = _gather_uncovered_lines(root)
+    uncovered = gather_uncovered_lines(root)
     key = next(iter(uncovered))
     assert key.name == "dummy.py"
     assert uncovered[key] == [3, 5]
@@ -230,7 +234,7 @@ def test_gather_uncovered_lines_resolves_paths(tmp_path: Path) -> None:
     </coverage>
     """
     root = ElementTree.fromstring(xml_content)
-    uncovered = _gather_uncovered_lines(root)
+    uncovered = gather_uncovered_lines(root)
     key = next(iter(uncovered))
     assert key.is_absolute()
     assert key.as_posix().endswith("pkg/dummy.py")
@@ -324,7 +328,7 @@ def test_get_xml_from_pyproject_exception(monkeypatch, tmp_path):
         msg = "simulated error"
         raise OSError(msg)
 
-    monkeypatch.setattr("showcov.main.tomllib.load", fake_tomllib_load)
+    monkeypatch.setattr("showcov.core.tomllib.load", fake_tomllib_load)
     result = _get_xml_from_pyproject(pyproject)
     assert result is None
 
@@ -408,10 +412,13 @@ def test_parse_large_xml_no_coverage(tmp_path):
 def test_main_coverage_xml_not_found(monkeypatch):
     # Force determine_xml_file to throw CoverageXMLNotFoundError and verify that main() calls sys.exit(1).
     monkeypatch.setattr(sys, "argv", ["prog"])
-    monkeypatch.setattr(
-        "showcov.main.determine_xml_file",
-        lambda _args: (_ for _ in ()).throw(CoverageXMLNotFoundError("No coverage XML file specified")),
-    )
+
+    def fail(*_):
+        msg = "No coverage XML file specified"
+        raise CoverageXMLNotFoundError(msg)
+
+    monkeypatch.setattr("showcov.core.determine_xml_file", fail)
+
     with pytest.raises(SystemExit) as exc_info:
         main()
     assert isinstance(exc_info.value, SystemExit)
@@ -422,13 +429,13 @@ def test_main_parse_error(monkeypatch):
     # Force parse_large_xml to raise an ElementTree.ParseError and verify that main() calls sys.exit(1).
     fake_path = Path("dummy.xml")
     monkeypatch.setattr(sys, "argv", ["prog"])
-    monkeypatch.setattr("showcov.main.determine_xml_file", lambda _args: fake_path)
+    monkeypatch.setattr("showcov.core.determine_xml_file", lambda _args: fake_path)
 
     def fake_parse_large_xml(_):
         msg = "simulated parse error"
         raise ElementTree.ParseError(msg)
 
-    monkeypatch.setattr("showcov.main.parse_large_xml", fake_parse_large_xml)
+    monkeypatch.setattr("showcov.core.parse_large_xml", fake_parse_large_xml)
     with pytest.raises(SystemExit) as exc_info:
         main()
     assert isinstance(exc_info.value, SystemExit)
@@ -439,13 +446,13 @@ def test_main_os_error(monkeypatch):
     # Force parse_large_xml to raise an OSError and verify that main() calls sys.exit(1).
     fake_path = Path("dummy.xml")
     monkeypatch.setattr(sys, "argv", ["prog"])
-    monkeypatch.setattr("showcov.main.determine_xml_file", lambda _args: fake_path)
+    monkeypatch.setattr("showcov.core.determine_xml_file", lambda _args: fake_path)
 
     def fake_parse_large_xml(_):
         msg = "simulated OS error"
         raise OSError(msg)
 
-    monkeypatch.setattr("showcov.main.parse_large_xml", fake_parse_large_xml)
+    monkeypatch.setattr("showcov.core.parse_large_xml", fake_parse_large_xml)
     with pytest.raises(SystemExit) as exc_info:
         main()
     assert isinstance(exc_info.value, SystemExit)

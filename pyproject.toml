@@ -23,7 +23,7 @@
   ]
 
   [project.scripts]
-    showcov = "showcov.main:main"
+    showcov = "showcov.cli:main"
 
 [dependency-groups]
   dev = [

@@ -5,34 +5,19 @@ If no XML filename is given as a command-line argument, the script will try to r
 a configuration file (pyproject.toml, .coveragerc, or setup.cfg).
 """
 
-import argparse
 import logging
-import operator
-import sys
 import tomllib
+from argparse import Namespace
 from configparser import ConfigParser
 from configparser import Error as ConfigError
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional, cast
+from typing import TYPE_CHECKING, Optional
 
-from colorama import Fore, Style
-from colorama import init as colorama_init
 from defusedxml import ElementTree
-
-# Initialize colorama
-colorama_init(autoreset=True)
 
 if TYPE_CHECKING:
     from xml.etree.ElementTree import Element  # noqa: S405
 
-# ANSI color codes (cross-platform)
-RESET = Style.RESET_ALL
-BOLD = Style.BRIGHT
-YELLOW = Fore.YELLOW
-CYAN = Fore.CYAN
-MAGENTA = Fore.MAGENTA
-GREEN = Fore.GREEN
-RED = Fore.RED
 
 # Constants
 CONSECUTIVE_STEP = 1
@@ -40,12 +25,6 @@ CONSECUTIVE_STEP = 1
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
-
-
-def disable_colors() -> None:
-    """Disable ANSI color codes."""
-    global RESET, BOLD, YELLOW, CYAN, MAGENTA, GREEN, RED  # noqa: PLW0603
-    RESET = BOLD = YELLOW = CYAN = MAGENTA = GREEN = RED = ""
 
 
 class CoverageXMLNotFoundError(Exception):
@@ -100,24 +79,17 @@ def get_config_xml_file() -> str | None:
     return None
 
 
-def parse_args() -> argparse.Namespace:
-    """Parse command-line arguments."""
-    parser = argparse.ArgumentParser(description="Show uncovered lines from a coverage XML report.")
-    parser.add_argument("xml_file", nargs="?", help="Path to coverage XML file")
-    parser.add_argument(
-        "--no-color",
-        action="store_true",
-        help="Disable ANSI color codes in output",
-    )
-    return parser.parse_args()
+def determine_xml_file(xml_file: Namespace | None = None) -> Path:
+    """Determine the coverage XML file path from arguments or config.
 
+    Accepts either a Namespace with attribute `xml_file` or a raw path string/None.
+    """
+    # Normalize input: allow passing argparse.Namespace or raw string/None.
+    if hasattr(xml_file, "xml_file"):
+        xml_file = xml_file.xml_file
 
-def determine_xml_file(args: argparse.Namespace | None = None) -> Path:
-    """Determine the coverage XML file path from arguments or config."""
-    if args is None:
-        args = parse_args()
-    if args.xml_file:
-        return Path(args.xml_file)
+    if xml_file:
+        return Path(xml_file)
 
     config_xml = get_config_xml_file()
     if config_xml:
@@ -162,44 +134,7 @@ def merge_blank_gap_groups(groups: list[list[int]], file_lines: list[str]) -> li
     return merged
 
 
-def print_uncovered_sections(uncovered: dict[Path, list[int]]) -> None:
-    """Print uncovered sections from files."""
-    for filename in sorted(uncovered.keys(), key=lambda p: p.as_posix()):
-        lines_sorted = sorted(uncovered[filename])
-        groups = group_consecutive_numbers(lines_sorted)
-        groups = sorted(groups, key=operator.itemgetter(0))
-        print(f"\n{BOLD}{YELLOW}Uncovered sections in {filename.as_posix()}:{RESET}")
-
-        try:
-            with filename.open(encoding="utf-8") as f:
-                file_lines = f.readlines()
-            groups = merge_blank_gap_groups(groups, file_lines)
-        except OSError:
-            logger.exception("Could not open %s", filename)
-            for grp in groups:
-                print(
-                    f"  {CYAN}Lines {grp[0]}-{grp[-1]}{RESET}"
-                    if len(grp) > 1
-                    else f"  {CYAN}Line {grp[0]}{RESET}"
-                )
-            continue
-
-        for grp in groups:
-            header = (
-                f"  {BOLD}{CYAN}Lines {grp[0]}-{grp[-1]}:{RESET}"
-                if len(grp) > 1
-                else f"  {BOLD}{CYAN}Line {grp[0]}:{RESET}"
-            )
-            print(header)
-            for ln in grp:
-                content = (
-                    file_lines[ln - 1].rstrip("\n") if 1 <= ln <= len(file_lines) else "<line not found>"
-                )
-                print(f"    {MAGENTA}{ln:4d}{RESET}: {content}")
-            print()
-
-
-def _gather_uncovered_lines(root: "Element") -> dict[Path, list[int]]:
+def gather_uncovered_lines(root: "Element") -> dict[Path, list[int]]:
     """Gather uncovered lines per file from the parsed XML tree."""
     uncovered: dict[Path, list[int]] = {}
 
@@ -239,38 +174,3 @@ def parse_large_xml(file_path: Path) -> Optional["Element"]:
         if event == "end" and elem.tag == "coverage":
             return elem  # Return root element early to save memory
     return None
-
-
-def main() -> None:
-    """Entry point for the script."""
-    args = parse_args()
-    if args.no_color:
-        disable_colors()
-    try:
-        xml_file: Path = determine_xml_file(args)
-    except CoverageXMLNotFoundError:
-        sys.exit(1)
-
-    try:
-        root = parse_large_xml(xml_file)
-        if root is None:
-            logger.error("Failed to parse coverage XML file: %s", xml_file)
-            sys.exit(1)
-    except ElementTree.ParseError:
-        logger.exception("Error parsing XML file %s", xml_file)
-        sys.exit(1)
-    except OSError:
-        logger.exception("Error opening XML file %s", xml_file)
-        sys.exit(1)
-
-    uncovered = _gather_uncovered_lines(cast("Element", root))
-
-    if not uncovered:
-        print(f"{GREEN}{BOLD}No uncovered lines found!{RESET}")
-        return
-
-    print_uncovered_sections(uncovered)
-
-
-if __name__ == "__main__":
-    main()

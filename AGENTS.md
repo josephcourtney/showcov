@@ -45,7 +45,7 @@ You must use the following tools for validation and conformance before proposing
 - **Path normalization**: always use POSIX-style (`/`) paths in output and JSON.
 - **Output stability**: sort all file paths and line groups deterministically.
 - **No ANSI styling** in non-human formats (e.g., JSON).
-- **No I/O outside of `src/` or `tests/`** unless instructed.
+- **No I/O outside of `src/`, `tests/`, or `TODO.md`** unless instructed.
 
 ## Commit Standards
 
