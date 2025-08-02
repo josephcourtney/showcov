@@ -7,12 +7,13 @@ a configuration file (pyproject.toml, .coveragerc, or setup.cfg).
 
 import argparse
 import logging
+import operator
 import sys
 import tomllib
 from configparser import ConfigParser
 from configparser import Error as ConfigError
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, cast
 
 from colorama import Fore, Style
 from colorama import init as colorama_init
@@ -39,6 +40,12 @@ CONSECUTIVE_STEP = 1
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
+
+
+def disable_colors() -> None:
+    """Disable ANSI color codes."""
+    global RESET, BOLD, YELLOW, CYAN, MAGENTA, GREEN, RED  # noqa: PLW0603
+    RESET = BOLD = YELLOW = CYAN = MAGENTA = GREEN = RED = ""
 
 
 class CoverageXMLNotFoundError(Exception):
@@ -97,12 +104,18 @@ def parse_args() -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(description="Show uncovered lines from a coverage XML report.")
     parser.add_argument("xml_file", nargs="?", help="Path to coverage XML file")
+    parser.add_argument(
+        "--no-color",
+        action="store_true",
+        help="Disable ANSI color codes in output",
+    )
     return parser.parse_args()
 
 
-def determine_xml_file() -> Path:
+def determine_xml_file(args: argparse.Namespace | None = None) -> Path:
     """Determine the coverage XML file path from arguments or config."""
-    args = parse_args()
+    if args is None:
+        args = parse_args()
     if args.xml_file:
         return Path(args.xml_file)
 
@@ -151,10 +164,11 @@ def merge_blank_gap_groups(groups: list[list[int]], file_lines: list[str]) -> li
 
 def print_uncovered_sections(uncovered: dict[Path, list[int]]) -> None:
     """Print uncovered sections from files."""
-    for filename, lines in uncovered.items():
-        lines_sorted = sorted(lines)
+    for filename in sorted(uncovered.keys(), key=lambda p: p.as_posix()):
+        lines_sorted = sorted(uncovered[filename])
         groups = group_consecutive_numbers(lines_sorted)
-        print(f"\n{BOLD}{YELLOW}Uncovered sections in {filename}:{RESET}")
+        groups = sorted(groups, key=operator.itemgetter(0))
+        print(f"\n{BOLD}{YELLOW}Uncovered sections in {filename.as_posix()}:{RESET}")
 
         try:
             with filename.open(encoding="utf-8") as f:
@@ -203,7 +217,7 @@ def _gather_uncovered_lines(root: "Element") -> dict[Path, list[int]]:
         resolved_path = next(
             (src / filename for src in source_roots if (src / filename).exists()),
             filename,  # fallback to relative path if none match
-        )
+        ).resolve()
 
         for line in cls.findall("lines/line"):
             try:
@@ -229,8 +243,11 @@ def parse_large_xml(file_path: Path) -> Optional["Element"]:
 
 def main() -> None:
     """Entry point for the script."""
+    args = parse_args()
+    if args.no_color:
+        disable_colors()
     try:
-        xml_file: Path = determine_xml_file()
+        xml_file: Path = determine_xml_file(args)
     except CoverageXMLNotFoundError:
         sys.exit(1)
 
@@ -246,7 +263,7 @@ def main() -> None:
         logger.exception("Error opening XML file %s", xml_file)
         sys.exit(1)
 
-    uncovered = _gather_uncovered_lines(root)
+    uncovered = _gather_uncovered_lines(cast("Element", root))
 
     if not uncovered:
         print(f"{GREEN}{BOLD}No uncovered lines found!{RESET}")
