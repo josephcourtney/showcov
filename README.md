@@ -2,6 +2,21 @@
 
 showcov is a command-line utility that prints uncovered lines of code—grouped into contiguous sections—from a coverage XML report.
 
+## Features
+
+- Human-readable report of uncovered lines with optional surrounding context.  
+- Structured JSON output conforming to a published schema.  
+- Option to include source code snippets around uncovered ranges.  
+- Deterministic ordering of files and ranges for reliable diffing and automation.  
+- Environment metadata embedded in JSON (coverage file, context settings, inclusion flags).  
+- Automatic resolution of the coverage XML file from argument or common config files.  
+- Snapshot-ready output for integration with LLMs or CI.  
+- Round-trip fidelity: JSON can be parsed back into the same coverage sections.  
+- Validation of JSON output against the schema to catch regressions.  
+- CLI flags: format selection, code embedding, context control, and disabling ANSI color.  
+- Graceful handling of common edge cases (missing source, invalid context, no uncovered lines).  
+- Programmatic API for consuming uncovered-section data in other tools or scripts.  
+
 ## Installation
 
 ```bash
@@ -79,4 +94,4 @@ Use this format for toolchain integration with LLMs, CI pipelines, or coverage d
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
+This project is licensed under the [GPL v3.0 License](LICENSE).
