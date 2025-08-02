@@ -22,6 +22,7 @@ from showcov.core import (
     CoverageXMLNotFoundError,
     _get_xml_from_config,
     _get_xml_from_pyproject,
+    build_sections,
     determine_xml_file,
     gather_uncovered_lines,
     get_config_xml_file,
@@ -130,8 +131,8 @@ def test_parse_args_format_json(monkeypatch: MonkeyPatch) -> None:
 def test_print_uncovered_sections(tmp_path: Path, capsys: CaptureFixture) -> None:
     source_file = tmp_path / "dummy.py"
     source_file.write_text("def foo():\n    pass\n\ndef bar():\n    return 42")
-    uncovered = {source_file: [2, 4, 5]}
-    print_uncovered_sections(uncovered)
+    sections = build_sections({source_file: [2, 4, 5]})
+    print_uncovered_sections(sections, context_lines=0)
     captured = capsys.readouterr().out
     assert "Uncovered sections in" in captured
     assert "Line" in captured
@@ -143,9 +144,9 @@ def test_print_uncovered_sections(tmp_path: Path, capsys: CaptureFixture) -> Non
 def test_print_uncovered_sections_no_color(tmp_path: Path, capsys: CaptureFixture) -> None:
     source_file = tmp_path / "dummy.py"
     source_file.write_text("print('hi')\n")
-    uncovered = {source_file: [1]}
+    sections = build_sections({source_file: [1]})
     disable_colors()
-    print_uncovered_sections(uncovered)
+    print_uncovered_sections(sections, context_lines=0)
     captured = capsys.readouterr().out
     assert "\x1b" not in captured
 
@@ -155,8 +156,8 @@ def test_print_uncovered_sections_sorted_files(tmp_path: Path, capsys: CaptureFi
     file_a = tmp_path / "a.py"
     file_a.write_text("a=1\n")
     file_b.write_text("b=1\n")
-    uncovered = {file_b: [1], file_a: [1]}
-    print_uncovered_sections(uncovered)
+    sections = build_sections({file_b: [1], file_a: [1]})
+    print_uncovered_sections(sections, context_lines=0)
     captured = capsys.readouterr().out
     first = captured.find(file_a.as_posix())
     second = captured.find(file_b.as_posix())
@@ -387,19 +388,10 @@ def test_merge_blank_gap_groups_no_merge():
 # --- Test for print_uncovered_sections exception branch (lines 163-166, 171) ---
 
 
-def test_print_uncovered_sections_file_open_error(monkeypatch, capsys, tmp_path):
+def test_print_uncovered_sections_file_open_error(capsys, tmp_path):
     fake_file = tmp_path / "nonexistent.py"
-    uncovered = {fake_file: [1, 2]}
-
-    # Simulate an OSError when trying to open a source file. The function should catch the exception,
-    # log the error, and still print the grouped line numbers.
-    def fake_open(*args, **kwargs):
-        msg = "simulated file open error"
-        raise OSError(msg)
-
-    # Monkey-patch the open() method on the Path object.
-    monkeypatch.setattr(Path, "open", fake_open)
-    print_uncovered_sections(uncovered)
+    sections = build_sections({fake_file: [1, 2]})
+    print_uncovered_sections(sections, context_lines=0)
     captured = capsys.readouterr().out
     assert "Uncovered sections in" in captured
     assert "Line" in captured
