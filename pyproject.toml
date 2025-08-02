@@ -1,7 +1,7 @@
 # =================================== project ====================================
 [project]
   name = "showcov"
-  version = "0.0.5"
+  version = "0.0.6"
   description = "Print out uncovered code."
   readme = "README.md"
   authors = [

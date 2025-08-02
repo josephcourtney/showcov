@@ -5,3 +5,12 @@
 - ran `.venv/bin/ruff check src/ tests/`
 - ran `.venv/bin/ty check src/ tests/`
 - ran `.venv/bin/pytest`
+
+## 2025-08-02T21:37Z
+- start Phase 4 tasks: round-trip validation, snapshots, edge-case tests
+
+## 2025-08-02T21:41Z
+- ran `.venv/bin/ruff format src/ tests/`
+- ran `.venv/bin/ruff check src/ tests/`
+- ran `.venv/bin/ty check src/ tests/`
+- ran `.venv/bin/pytest`

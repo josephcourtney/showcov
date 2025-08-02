@@ -1,3 +1,15 @@
+## [0.0.6] - 2025-08-02
+
+### Added
+- add JSON round-trip parsing via `parse_json_output` and `UncoveredSection.from_dict`
+- add snapshot tests for JSON output and LLM prompts
+- add edge-case tests for missing source files and context line handling
+
+### Fixed
+- handle negative context-line values without crashing
+
+---
+
 ## [0.0.4] - 2025-08-02
 
 ### Added
