@@ -37,9 +37,9 @@
 
 ### Phase 4: Testing Enhancements beyond Basic Correctness
 
-* [ ] Add round-trip validation: uncovered → JSON → parsed → == original model instances.
-* [ ] Add snapshot tests of JSON output and sample prompts to LLMs for smoke-checking usability.
-* [ ] Expand coverage for edge/corner cases introduced by new features (missing source files when embedding, invalid context ranges, etc.).
+* [x] Add round-trip validation: uncovered → JSON → parsed → == original model instances.
+* [x] Add snapshot tests of JSON output and sample prompts to LLMs for smoke-checking usability.
+* [x] Expand coverage for edge/corner cases introduced by new features (missing source files when embedding, invalid context ranges, etc.).
 
 ### Phase 5: Protocol/tooling Integration Readiness
 
