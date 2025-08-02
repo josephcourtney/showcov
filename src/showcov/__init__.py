@@ -1,5 +1,8 @@
-from importlib.metadata import version
+from importlib.metadata import PackageNotFoundError, version
 
 __all__ = ["__version__"]
 
-__version__ = version("showcov")
+try:
+    __version__ = version("showcov")
+except PackageNotFoundError:  # pragma: no cover - fallback for src layout
+    __version__ = "0.0.0"
