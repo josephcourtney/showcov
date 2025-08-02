@@ -160,14 +160,14 @@ def get_config_xml_file() -> str | None:
     return None
 
 
-def determine_xml_file(xml_file: Namespace | None = None) -> Path:
+def determine_xml_file(xml_file: Namespace | str | None = None) -> Path:
     """Determine the coverage XML file path from arguments or config.
 
-    Accepts either a Namespace with attribute `xml_file` or a raw path string/None.
+    Accepts either a Namespace with attribute `xml_file`, a raw path string, or ``None``.
     """
     # Normalize input: allow passing argparse.Namespace or raw string/None.
     if hasattr(xml_file, "xml_file"):
-        xml_file = xml_file.xml_file
+        xml_file = cast("str | None", xml_file.xml_file)
 
     if xml_file:
         path = Path(xml_file).resolve()
