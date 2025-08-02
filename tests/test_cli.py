@@ -1,18 +1,23 @@
 import json
 import sys
+from importlib import resources
 from pathlib import Path
 
+import pytest
 from _pytest.capture import CaptureFixture
 from _pytest.monkeypatch import MonkeyPatch
+from jsonschema import ValidationError, validate
 
+from showcov import __version__
 from showcov.cli import main, print_json_output
+from showcov.core import build_sections
 
 
 def test_print_json_output(tmp_path: Path, capsys: CaptureFixture) -> None:
     source_file = tmp_path / "dummy.py"
     source_file.write_text("print('hi')\n")
-    uncovered = {source_file: [1, 2, 4]}
-    print_json_output(uncovered)
+    sections = build_sections({source_file: [1, 2, 4]})
+    print_json_output(sections, with_code=False, context_lines=0)
     captured = capsys.readouterr().out
     assert "\x1b" not in captured
     data = json.loads(captured)
@@ -77,3 +82,37 @@ def test_main_json_output_no_uncovered(
     captured = capsys.readouterr().out
     data = json.loads(captured)
     assert data["files"] == []
+
+
+def test_print_json_output_with_code_and_context(tmp_path: Path, capsys: CaptureFixture) -> None:
+    source_file = tmp_path / "dummy.py"
+    source_file.write_text("a\nb\nc\n")
+    sections = build_sections({source_file: [2]})
+    print_json_output(sections, with_code=True, context_lines=1)
+    data = json.loads(capsys.readouterr().out)
+    assert data["files"][0]["uncovered"][0]["lines"] == ["a", "b", "c"]
+
+
+def test_json_schema_validation(tmp_path: Path, capsys: CaptureFixture) -> None:
+    source_file = tmp_path / "dummy.py"
+    source_file.write_text("print('hi')\n")
+    sections = build_sections({source_file: [1]})
+    print_json_output(sections, with_code=True, context_lines=0)
+    data = json.loads(capsys.readouterr().out)
+    schema = json.loads(resources.files("showcov.data").joinpath("schema.json").read_text(encoding="utf-8"))
+    validate(data, schema)
+    bad = {"version": __version__, "files": [{"file": "x", "uncovered": [{"start": "a", "end": 2}]}]}
+    with pytest.raises(ValidationError):
+        validate(bad, schema)
+
+
+def test_print_json_output_relative_path(
+    tmp_path: Path, capsys: CaptureFixture, monkeypatch: MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    source_file = Path("dummy.py")
+    source_file.write_text("print('hi')\n", encoding="utf-8")
+    sections = build_sections({source_file: [1]})
+    print_json_output(sections, with_code=False, context_lines=0)
+    data = json.loads(capsys.readouterr().out)
+    assert data["files"][0]["file"] == "dummy.py"
