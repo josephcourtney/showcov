@@ -33,9 +33,9 @@ def parse_args() -> argparse.Namespace:
         help="Disable ANSI color codes in output",
     )
     parser.add_argument(
-        "--with-code",
+        "--embed-source",
         action="store_true",
-        help="Include source code lines in JSON output",
+        help="Embed raw source lines for uncovered ranges in JSON output",
     )
     parser.add_argument(
         "--context-lines",
@@ -79,7 +79,7 @@ def main() -> None:
     output = formatter(
         sections,
         context_lines=args.context_lines,
-        with_code=args.with_code,
+        embed_source=args.embed_source,
         coverage_xml=xml_file,
         color=not args.no_color,
     )
