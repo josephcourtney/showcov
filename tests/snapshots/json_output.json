@@ -1,0 +1,45 @@
+{
+  "environment": {
+    "context_lines": 1,
+    "coverage_xml": "coverage.xml",
+    "with_code": true
+  },
+  "files": [
+    {
+      "file": "tests/data/sample.py",
+      "uncovered": [
+        {
+          "end": 5,
+          "source": [
+            {
+              "code": "def foo() -> None:",
+              "line": 1
+            },
+            {
+              "code": "    pass",
+              "line": 2
+            },
+            {
+              "code": "",
+              "line": 3
+            },
+            {
+              "code": "",
+              "line": 4
+            },
+            {
+              "code": "def bar() -> int:",
+              "line": 5
+            },
+            {
+              "code": "    return 42",
+              "line": 6
+            }
+          ],
+          "start": 2
+        }
+      ]
+    }
+  ],
+  "version": "0.0.5"
+}
