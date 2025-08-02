@@ -5,6 +5,8 @@
 - ran `.venv/bin/ruff check src/ tests/`
 - ran `.venv/bin/ty check src/ tests/`
 - ran `.venv/bin/pytest`
+- ran `.venv/bin/ty check src/ tests/`
+- ran `.venv/bin/pytest`
 
 ## 2025-08-02T21:37Z
 - start Phase 4 tasks: round-trip validation, snapshots, edge-case tests
@@ -14,3 +16,8 @@
 - ran `.venv/bin/ruff check src/ tests/`
 - ran `.venv/bin/ty check src/ tests/`
 - ran `.venv/bin/pytest`
+
+## 2025-08-02T22:10Z
+- start implementing streaming XML parsing, file line caching, and input validation
+- ran `.venv/bin/ruff format src/ tests/`
+- ran `.venv/bin/ruff check src/ tests/`
