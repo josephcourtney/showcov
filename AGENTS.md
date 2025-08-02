@@ -1,75 +1,179 @@
+# AGENTS.md
+
 ## Purpose
 
-This file defines how coding agents (LLMs, autonomous dev tools, etc.) should operate when contributing to this project.
+This file defines how You, an AI coding agent (LLMs, autonomous dev tools, etc.), must operate when contributing to this project.
+
+## Project Context
+
+You are contributing to `showcov`, a CLI tool that identifies uncovered lines in Python source files from a coverage XML report.
 
 ## Role
 
-You are an assistant contributing to `showcov`, a CLI tool that identifies uncovered lines in Python source files from a coverage XML report.
 
 Your responsibilities include:
-- Editing Python source files under `src/showcov/`
-- Editing or creating test files under `tests/`
-- Maintaining output determinism, testability, and format extensibility
-- Respecting existing CLI design and internal architecture
 
-## Directories
+* Editing Python source files under `src/showcov/`
+* Creating or editing test files under `tests/`
+* Preserving output determinism, testability, and extensibility
+* Respecting existing CLI conventions and internal architecture
 
-- Source code: `src/showcov/`
-- Tests: `tests/`
-- Do not create or modify files outside these directories unless explicitly instructed.
+## Directory Constraints
+
+
+
+* Source code: `src/showcov/`
+* Tests: `tests/`
+* Do not write, or create files outside these directories unless explicitly instructed.
 
 ## Tooling Requirements
 
-You must use the following tools for validation and conformance before proposing code:
+Before proposing code, validate all changes using the tools below.
+
+If any command fails due to missing executables or environment configuration, emit a diagnostic message in `LIVE_LOG.md` and request clarification from the user.
 
 ### Linting
-- Run: `ruff check src/ tests/`
-- Use rules defined in `pyproject.toml` and any referenced `ruff.default.toml`
+
+* Command: `.venv/bin/ruff check src/ tests/`
+* Rules: Defined in `pyproject.toml` and any referenced config files
 
 ### Formatting
-- Run: `ruff format src/ tests/`
+
+* Command: `.venv/bin/ruff format src/ tests/`
 
 ### Static Typing
-- Run: `ty check src/ tests/`
-- Use Python 3.13–compatible type syntax.
-- Respect constraints in `pyproject.toml`
+
+* Command: `.venv/bin/ty check src/ tests/`
+* Syntax: Use Python 3.13–compatible type annotations
+* Constraints: Must follow `pyproject.toml` settings
+
+> If `ty` is not available in `.venv/bin/`, log a failure notice in `LIVE_LOG.md`, emit proposed code as a Markdown patch, and halt execution.
 
 ### Testing
-- Run: `pytest`
-- `pytest` should follow the settings in `pyproject.toml`
-- Add test coverage for new features or regression paths.
-- Use deterministic test data and avoid system-dependent values (e.g., timestamps, absolute paths).
+
+* Command: `.venv/bin/pytest`
+* Coverage: Add tests for new features and regression paths
+* Constraints:
+  * Use deterministic data
+  * Avoid system-dependent values (e.g., timestamps, user paths)
+  * Use `.venv/bin/pytest` to generate coverage
+
+> If coverage decreases from the baseline in `coverage.xml`, log a warning and request user confirmation before submitting code.
 
 ## Behavior Constraints
 
-- **Path normalization**: always use POSIX-style (`/`) paths in output and JSON.
-- **Output stability**: sort all file paths and line groups deterministically.
-- **No ANSI styling** in non-human formats (e.g., JSON).
-- **No I/O outside of `src/`, `tests/`, or `TODO.md`** unless instructed.
-- **Maintain Code Quality During Development**: run linter, formatter, and type checker after editing code.
-- **Keep the User Updated**: While performing edits, if you have chat capability, write out status updates prefixed with "WORK STATUS: "
-- **Keep to do list up to date**: as items on the TODO.md list are finished, mark them as complete.
+* Use POSIX-style paths (`/`) in output and JSON
+* Sort file paths and line groups deterministically
+* Omit ANSI styling in non-human formats (e.g., JSON)
+* No I/O outside `src/`, `tests/`, or `TODO.md` unless instructed
+* Maintain internal consistency across toolchain and file states
+
+## Logging and Progress Tracking
+
+### Live Log
+
+
+Maintain a `LIVE_LOG.md` file at the project root.
+Each entry must:
+
+* Be timestamped (`YYYY-MM-DDTHH:MMZ`) in ISO8601 format
+* Use readable Markdown headings and bullet points
+* Record major actions, decisions, errors, and state changes
+
+Example:
+
+```markdown
+## 2025-08-02T14:20Z
+
+- ran `.venv/bin/ruff check` with 0 errors
+- static typing failed: `ty` not found in `.venv/bin/`
+- emitted patch instead of direct code write
+````
+
+### To-Do List Maintenance
+
+* As you complete items from `TODO.md`, mark them as complete
+* Do not delete or rewrite historical entries
+* If `TODO.md` is missing, create a new file and notify the user in `LIVE_LOG.md`
+
+## Changelog Maintenance
+
+
+Follow [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format:
+
+* Example heading: `## [1.2.3] - 2025-08-02`
+* Allowed sections: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`
+* Each bullet must:
+
+  * Begin with a lowercase imperative verb (e.g., “add”, “fix”)
+  * Follow Markdown syntax
+
+Ensure:
+
+* Changelog matches the actual code changes
+* Version in `pyproject.toml` is updated
+* Historical entries are never modified
+* If `CHANGELOG.md` is missing, create a stub file and note this in `LIVE_LOG.md`
+
+Example:
+
+```markdown
+## [1.4.0] - 2025-08-02
+
+### Added
+- add `--format json` CLI option for machine-readable output
+
+### Fixed
+- fix incorrect grouping of adjacent blank lines in coverage reports
+```
 
 ## Commit Standards
 
-- Each commit should pass:  
-  - `ruff check && ruff format`  
-  - `ty check`  
-  - `pytest`
+Each commit must pass:
 
-- Prefer conventional commit messages:
-  - `feat: add --format json`
-  - `fix: handle missing <class> tag in coverage XML`
-  - `test: add tests for merge_blank_gap_groups`
+* `.venv/bin/ruff check && .venv/bin/ruff format`
+* `.venv/bin/ty check`
+* `.venv/bin/pytest`
 
-- Bump the version in `pyproject.toml` as appropriate before pull requests.
+Use conventional commit messages:
 
-## Prohibited
+* `feat: add --format json`
+* `fix: handle missing <class> tag in coverage XML`
+* `test: add tests for merge_blank_gap_groups`
 
-- Do not introduce new dependencies without justification in a comment.
-- Do not remove test coverage.
-- Do not introduce non-deterministic behavior.
+Before submitting a pull request:
+
+* Bump the version in `pyproject.toml` if relevant
+* Update `CHANGELOG.md` accordingly
+
+## Prohibited Behavior
+
+* Do not add new dependencies without an inline comment justifying the change
+* Do not reduce test coverage unless explicitly approved
+* Do not introduce non-determinism (e.g., random output, time-dependent data)
+* Do not write outside `src/`, `tests/`, `LIVE_LOG.md`, `CHANGELOG.md`, or `TODO.md` unless instructed
+
+## Assumptions and Capabilities
+
+You must assume:
+
+* No access to long-term memory
+* Each task starts with only the current file state
+* You must re-read `LIVE_LOG.md`, `TODO.md`, and `CHANGELOG.md` before taking action on historical items
+
+If lacking access to shell or file I/O:
+
+* Emit a Markdown-formatted patch containing proposed edits
+* Describe expected outputs of toolchain commands
+* Wait for user confirmation before proceeding
 
 ## Compliance
 
-All contributions must adhere to this protocol unless overridden by a specific user instruction or documented exception.
+All actions must follow this protocol unless:
+
+* Overridden by an explicit user instruction
+* Covered by a documented exception in this file
+
+```
+```
+
