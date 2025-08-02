@@ -1,5 +1,6 @@
 {
   "exclude_tree": [
+    "__pycache__/",
     "*.egg-info",
     "*.ipynb",
     ".git/",
