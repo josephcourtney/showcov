@@ -8,9 +8,10 @@
 
 #### Implement JSON Output
 
-* [ ] Assess the proposed JSON schema in the appendix for suitability.
 * [x] Write `print_json_output(uncovered_data: dict[Path, list[int]]) -> None`.
+* [ ] Add `--with-code` (optional): include source lines in the output.
 * [ ] Add `--context-lines=N` (optional): include source lines ±N around each uncovered section.
+* [ ] Assess the JSON schema and update it as necessary.
 * [ ] Validate generated JSON matches schema using a static schema or runtime validator.
 
 ### II. LLM-Focused Enhancements
