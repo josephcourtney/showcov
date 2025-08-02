@@ -20,13 +20,13 @@
 
 ### Phase 2: Decouple formatting/output from Logic
 
-* [ ] Add an item to the JSON output (and update the schema) to indicate the "environment" like what coverage file was run, and other important details.
-* [ ] Make the behavior with respect to different command line flags consistent across output formats.
-* [ ] Move all printing/formatting into dedicated module: `showcov/output.py`.
-* [ ] Introduce output selection via a registry or strategy pattern so `--format` selects formatter.
-* [ ] Update `main()` to call into the new output layer via a clean API, passing model instances.
-* [ ] Ensure the human formatter still honors `--no-color` and that JSON formatter remains colorless.
-* [ ] Add tests for the new output module (unit tests invoking formatters with deterministic input).
+* [x] Add an item to the JSON output (and update the schema) to indicate the "environment" like what coverage file was run, and other important details.
+* [x] Make the behavior with respect to different command line flags consistent across output formats.
+* [x] Move all printing/formatting into dedicated module: `showcov/output.py`.
+* [x] Introduce output selection via a registry or strategy pattern so `--format` selects formatter.
+* [x] Update `main()` to call into the new output layer via a clean API, passing model instances.
+* [x] Ensure the human formatter still honors `--no-color` and that JSON formatter remains colorless.
+* [x] Add tests for the new output module (unit tests invoking formatters with deterministic input).
 
 ### Phase 3: Feature Completion and Determinism Guarantees (LLM Usability focus)
 
