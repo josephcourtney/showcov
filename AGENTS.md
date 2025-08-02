@@ -46,6 +46,9 @@ You must use the following tools for validation and conformance before proposing
 - **Output stability**: sort all file paths and line groups deterministically.
 - **No ANSI styling** in non-human formats (e.g., JSON).
 - **No I/O outside of `src/`, `tests/`, or `TODO.md`** unless instructed.
+- **Maintain Code Quality During Development**: run linter, formatter, and type checker after editing code.
+- **Keep the User Updated**: While performing edits, if you have chat capability, write out status updates prefixed with "WORK STATUS: "
+- **Keep to do list up to date**: as items on the TODO.md list are finished, mark them as complete.
 
 ## Commit Standards
 
@@ -58,6 +61,8 @@ You must use the following tools for validation and conformance before proposing
   - `feat: add --format json`
   - `fix: handle missing <class> tag in coverage XML`
   - `test: add tests for merge_blank_gap_groups`
+
+- Bump the version in `pyproject.toml` as appropriate before pull requests.
 
 ## Prohibited
 
