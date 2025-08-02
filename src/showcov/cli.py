@@ -1,4 +1,5 @@
 import argparse
+import json
 import logging
 import operator
 import sys
@@ -9,6 +10,7 @@ from colorama import Fore, Style
 from colorama import init as colorama_init
 from defusedxml import ElementTree
 
+from . import __version__
 from .core import (
     CoverageXMLNotFoundError,
     determine_xml_file,
@@ -56,6 +58,12 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Disable ANSI color codes in output",
     )
+    parser.add_argument(
+        "--format",
+        choices=("human", "json"),
+        default="human",
+        help="Output format",
+    )
     return parser.parse_args()
 
 
@@ -96,10 +104,25 @@ def print_uncovered_sections(uncovered: dict[Path, list[int]]) -> None:
             print()
 
 
+def print_json_output(uncovered: dict[Path, list[int]]) -> None:
+    """Print uncovered sections in JSON format."""
+    data: dict[str, object] = {"version": __version__, "files": []}
+    files: list[dict[str, object]] = []
+    for filename in sorted(uncovered.keys(), key=lambda p: p.resolve().as_posix()):
+        normalized = filename.resolve().as_posix()
+        lines_sorted = sorted(uncovered[filename])
+        groups = group_consecutive_numbers(lines_sorted)
+        groups = sorted(groups, key=operator.itemgetter(0))
+        ranges = [{"start": grp[0], "end": grp[-1]} for grp in groups]
+        files.append({"file": normalized, "uncovered": ranges})
+    data["files"] = files
+    print(json.dumps(data, indent=2, sort_keys=True))
+
+
 def main() -> None:
     """Entry point for the script."""
     args = parse_args()
-    if args.no_color:
+    if args.no_color or args.format == "json":
         disable_colors()
     try:
         xml_file: Path = determine_xml_file(args.xml_file)
@@ -121,10 +144,16 @@ def main() -> None:
     uncovered = gather_uncovered_lines(cast("Element", root))
 
     if not uncovered:
-        print(f"{GREEN}{BOLD}No uncovered lines found!{RESET}")
+        if args.format == "json":
+            print_json_output({})
+        else:
+            print(f"{GREEN}{BOLD}No uncovered lines found!{RESET}")
         return
 
-    print_uncovered_sections(uncovered)
+    if args.format == "json":
+        print_json_output(uncovered)
+    else:
+        print_uncovered_sections(uncovered)
 
 
 if __name__ == "__main__":

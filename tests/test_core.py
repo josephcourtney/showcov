@@ -71,14 +71,14 @@ def test_get_config_xml_file_pyproject(monkeypatch: MonkeyPatch, tmp_path: Path)
 def test_determine_xml_file_argument(monkeypatch: MonkeyPatch) -> None:
     test_args = ["prog", "coverage.xml"]
     monkeypatch.setattr(sys, "argv", test_args)
-    assert determine_xml_file(argparse.Namespace(xml_file="coverage.xml")) == Path("coverage.xml")
+    assert determine_xml_file(argparse.Namespace(xml_file="coverage.xml")) == Path("coverage.xml").resolve()
 
 
 def test_determine_xml_file_from_config(monkeypatch: MonkeyPatch) -> None:
     test_args = ["prog"]
     monkeypatch.setattr(sys, "argv", test_args)
     monkeypatch.setattr("showcov.core.get_config_xml_file", lambda: "coverage.xml")
-    assert determine_xml_file(argparse.Namespace(xml_file="coverage.xml")) == Path("coverage.xml")
+    assert determine_xml_file(argparse.Namespace(xml_file="coverage.xml")) == Path("coverage.xml").resolve()
 
 
 def test_determine_xml_file_no_args(monkeypatch: MonkeyPatch) -> None:
@@ -97,6 +97,7 @@ def test_parse_args_no_file(monkeypatch: MonkeyPatch) -> None:
     args = parse_args()
     assert args.xml_file is None
     assert args.no_color is False
+    assert args.format == "human"
 
 
 def test_parse_args_with_file(monkeypatch: MonkeyPatch) -> None:
@@ -105,6 +106,7 @@ def test_parse_args_with_file(monkeypatch: MonkeyPatch) -> None:
     args = parse_args()
     assert args.xml_file == "coverage.xml"
     assert args.no_color is False
+    assert args.format == "human"
 
 
 def test_parse_args_no_color_flag(monkeypatch: MonkeyPatch) -> None:
@@ -112,6 +114,14 @@ def test_parse_args_no_color_flag(monkeypatch: MonkeyPatch) -> None:
     monkeypatch.setattr(sys, "argv", test_args)
     args = parse_args()
     assert args.no_color is True
+    assert args.format == "human"
+
+
+def test_parse_args_format_json(monkeypatch: MonkeyPatch) -> None:
+    test_args = ["prog", "--format", "json"]
+    monkeypatch.setattr(sys, "argv", test_args)
+    args = parse_args()
+    assert args.format == "json"
 
 
 # --- Tests for `print_uncovered_sections` ---
