@@ -9,6 +9,17 @@
       "type": "string",
       "pattern": "^\\d+\\.\\d+\\.\\d+$"
     },
+    "environment": {
+      "description": "Execution environment details.",
+      "type": "object",
+      "properties": {
+        "coverage_xml": {"type": "string"},
+        "context_lines": {"type": "integer", "minimum": 0},
+        "with_code": {"type": "boolean"}
+      },
+      "required": ["coverage_xml", "context_lines", "with_code"],
+      "additionalProperties": false
+    },
     "files": {
       "description": "List of source files with uncovered code sections.",
       "type": "array",
@@ -60,6 +71,7 @@
   },
   "required": [
     "version",
+    "environment",
     "files"
   ],
   "additionalProperties": false

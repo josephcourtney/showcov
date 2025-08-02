@@ -10,12 +10,8 @@ from _pytest.capture import CaptureFixture
 from _pytest.monkeypatch import MonkeyPatch
 from defusedxml import ElementTree
 
-from showcov.cli import (
-    disable_colors,
-    main,
-    parse_args,
-    print_uncovered_sections,
-)
+from showcov.cli import main, parse_args
+from showcov.output import format_human
 
 # Import functions and exceptions from your module.
 from showcov.core import (
@@ -128,39 +124,53 @@ def test_parse_args_format_json(monkeypatch: MonkeyPatch) -> None:
 # --- Tests for `print_uncovered_sections` ---
 
 
-def test_print_uncovered_sections(tmp_path: Path, capsys: CaptureFixture) -> None:
+def test_format_human(tmp_path: Path) -> None:
     source_file = tmp_path / "dummy.py"
     source_file.write_text("def foo():\n    pass\n\ndef bar():\n    return 42")
     sections = build_sections({source_file: [2, 4, 5]})
-    print_uncovered_sections(sections, context_lines=0)
-    captured = capsys.readouterr().out
-    assert "Uncovered sections in" in captured
-    assert "Line" in captured
-    assert "2" in captured
-    assert "4" in captured
-    assert "5" in captured
+    out = format_human(
+        sections,
+        context_lines=0,
+        with_code=False,
+        coverage_xml=tmp_path / "cov.xml",
+        color=True,
+    )
+    assert "Uncovered sections in" in out
+    assert "Line" in out
+    assert "2" in out
+    assert "4" in out
+    assert "5" in out
 
 
-def test_print_uncovered_sections_no_color(tmp_path: Path, capsys: CaptureFixture) -> None:
+def test_format_human_no_color(tmp_path: Path) -> None:
     source_file = tmp_path / "dummy.py"
     source_file.write_text("print('hi')\n")
     sections = build_sections({source_file: [1]})
-    disable_colors()
-    print_uncovered_sections(sections, context_lines=0)
-    captured = capsys.readouterr().out
-    assert "\x1b" not in captured
+    out = format_human(
+        sections,
+        context_lines=0,
+        with_code=False,
+        coverage_xml=tmp_path / "cov.xml",
+        color=False,
+    )
+    assert "\x1b" not in out
 
 
-def test_print_uncovered_sections_sorted_files(tmp_path: Path, capsys: CaptureFixture) -> None:
+def test_format_human_sorted_files(tmp_path: Path) -> None:
     file_b = tmp_path / "b.py"
     file_a = tmp_path / "a.py"
     file_a.write_text("a=1\n")
     file_b.write_text("b=1\n")
     sections = build_sections({file_b: [1], file_a: [1]})
-    print_uncovered_sections(sections, context_lines=0)
-    captured = capsys.readouterr().out
-    first = captured.find(file_a.as_posix())
-    second = captured.find(file_b.as_posix())
+    out = format_human(
+        sections,
+        context_lines=0,
+        with_code=False,
+        coverage_xml=tmp_path / "cov.xml",
+        color=True,
+    )
+    first = out.find(file_a.as_posix())
+    second = out.find(file_b.as_posix())
     assert first < second
 
 
@@ -388,13 +398,18 @@ def test_merge_blank_gap_groups_no_merge():
 # --- Test for print_uncovered_sections exception branch (lines 163-166, 171) ---
 
 
-def test_print_uncovered_sections_file_open_error(capsys, tmp_path):
+def test_format_human_file_open_error(tmp_path: Path) -> None:
     fake_file = tmp_path / "nonexistent.py"
     sections = build_sections({fake_file: [1, 2]})
-    print_uncovered_sections(sections, context_lines=0)
-    captured = capsys.readouterr().out
-    assert "Uncovered sections in" in captured
-    assert "Line" in captured
+    out = format_human(
+        sections,
+        context_lines=0,
+        with_code=False,
+        coverage_xml=tmp_path / "cov.xml",
+        color=True,
+    )
+    assert "Uncovered sections in" in out
+    assert "Line" in out
 
 
 # --- Test for parse_large_xml fallback (line 218) ---
