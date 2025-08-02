@@ -19,7 +19,6 @@
     "yarn.lock"
   ],
   "exclude_print": [
-    "*.json",
     "*.html"
   ],
   "include_tree_tags": "tree",
