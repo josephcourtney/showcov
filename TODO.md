@@ -44,7 +44,7 @@
 
 ### Phase 5: Protocol/tooling Integration Readiness
 
-* [ ] Ensure output JSON is valid with `application/json` MIME type, no extra preamble or wrapper.
-* [ ] Expose main logic as a function callable via API: `get_coverage_data(xml_path: Path) -> list[UncoveredSection]` (already done but ensure documentation and tests).
-* [ ] Annotate output functions with complete type hints using `TypedDict` or `pydantic.BaseModel`.
+* [x] Ensure output JSON is valid with `application/json` MIME type, no extra preamble or wrapper.
+* [x] Expose main logic as a function callable via API: `get_coverage_data(xml_path: Path) -> list[UncoveredSection]` (already done but ensure documentation and tests).
+* [x] Annotate output functions with complete type hints using `TypedDict` or `pydantic.BaseModel`.
 * [ ] Ensure public API and output are documented for CLI/API parity and external tooling consumption.
