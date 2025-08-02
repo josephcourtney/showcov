@@ -1,38 +1,38 @@
 # =================================== project ====================================
 [project]
   name = "showcov"
-  dynamic = ["version"]
+  version = "0.0.1"
   description = "Print out uncovered code."
   readme = "README.md"
   authors = [
-    { name = "Joseph M. Courtney", email = "joseph.m.courtney@gmail.com" },
+    { name = "Joseph M Courtney", email = "Joseph.M.Courtney@gmail.com" },
   ]
   urls = { "Homepage" = "https://github.com/josephcourtney/showcov", "Bug Tracker" = "https://github.com/josephcourtney/showcov/issues" }
-  license = { text = "MIT License" }
+  license = { text = "GPL-3.0-only" }
   classifiers = [
     "Development Status :: 3 - Alpha",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: GNU General Public License (GPL)",
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
   ]
-  requires-python = ">=3.12"
+  requires-python = ">=3.13"
   dependencies = [
     "colorama>=0.4.6",
     "configparser>=7.1.0",
     "defusedxml>=0.7.1",
-  ]
+    "ty>=0.0.1a16",
+]
 
   [project.scripts]
     showcov = "showcov.main:main"
 
 [dependency-groups]
   dev = [
-    "basedpyright>=1.28.1",
-    "coverage>=7.6.10",
+    "ruff>=0.11.0",
+    "coverage>=7.7.0",
     "pytest-cov>=6.0.0",
-    "pytest-randomly>=3.16.0",
     "pytest>=8.3.5",
-    "ruff>=0.9.4",
+    "pytest-randomly>=3.16.0",
     "types-colorama>=0.4.15.20240311",
     "types-defusedxml>=0.7.0.20240218",
     "types-toml>=0.10.8.20240310",
@@ -40,22 +40,20 @@
 
 # =================================== build ====================================
 [build-system]
-  requires      = ["hatchling"]
-  build-backend = "hatchling.build"
+  requires      = ["uv_build>=0.6,<0.7"]
+  build-backend = "uv_build"
 
-
-[tool.hatch.build]
-  includes = ["src/showcov/**"]
-
-[tool.hatch.version]
-  path = "src/showcov/__version__.py"
 
 # ==================================== lint ====================================
 [tool.ruff]
   extend = "./ruff.default.toml"
 
   [tool.ruff.lint]
-    ignore = []
+    ignore = [
+      # "TD002",  # Missing author in TODO; try: `# TODO(<author_name>): ...` or `# TODO @<author_name>: ...`
+      # "TD003",  # Missing issue link for this TODO
+      # "FIX002", # Line contains TODO, consider resolving the issue
+    ]
 
 # =================================== typecheck ===================================
 [tool.basedpyright]
@@ -71,7 +69,6 @@
 
 
   # =================================== test ===================================
-
 [tool.pytest.ini_options]
   addopts = [
     "--cov=showcov",
@@ -82,7 +79,7 @@
 
 # =================================== test:coverage ===================================
 [tool.coverage.run]
-  source   = ["."]
+  source   = ["src/showcov"]
   branch   = true
   parallel = true
 
