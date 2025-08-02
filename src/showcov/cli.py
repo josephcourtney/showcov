@@ -1,6 +1,6 @@
 import argparse
 import sys
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 from defusedxml import ElementTree
 
@@ -9,14 +9,20 @@ from showcov.core import (
     CoverageXMLNotFoundError,
     build_sections,
     determine_xml_file,
-    gather_uncovered_lines,
-    parse_large_xml,
+    gather_uncovered_lines_from_xml,
 )
 from showcov.output import get_formatter
 
 if TYPE_CHECKING:
     from pathlib import Path
-    from xml.etree.ElementTree import Element  # noqa: S405
+
+
+def non_negative_int(value: str) -> int:
+    ivalue = int(value)
+    if ivalue < 0:
+        msg = "context-lines must be non-negative"
+        raise argparse.ArgumentTypeError(msg)
+    return ivalue
 
 
 def parse_args() -> argparse.Namespace:
@@ -35,7 +41,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--context-lines",
-        type=int,
+        type=non_negative_int,
         default=0,
         help="Number of context lines to include around uncovered sections",
     )
@@ -57,18 +63,13 @@ def main() -> None:
         sys.exit(1)
 
     try:
-        root = parse_large_xml(xml_file)
-        if root is None:
-            logger.error("Failed to parse coverage XML file: %s", xml_file)
-            sys.exit(1)
+        uncovered = gather_uncovered_lines_from_xml(xml_file)
     except ElementTree.ParseError:
         logger.exception("Error parsing XML file %s", xml_file)
         sys.exit(1)
     except OSError:
         logger.exception("Error opening XML file %s", xml_file)
         sys.exit(1)
-
-    uncovered = gather_uncovered_lines(cast("Element", root))
     sections = build_sections(uncovered)
 
     formatter = get_formatter(args.format)

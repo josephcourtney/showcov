@@ -11,6 +11,7 @@ from argparse import Namespace
 from configparser import ConfigParser
 from configparser import Error as ConfigError
 from dataclasses import dataclass
+from functools import cache
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional, cast
 
@@ -28,6 +29,20 @@ CONSECUTIVE_STEP = 1
 
 class CoverageXMLNotFoundError(Exception):
     """Coverage XML file not found."""
+
+
+@cache
+def _read_file_lines(path: Path) -> list[str]:
+    """Read a file and cache its lines.
+
+    Returns an empty list if the file cannot be read or contains invalid
+    UTF-8 sequences.
+    """
+    try:
+        with path.open(encoding="utf-8") as f:
+            return [ln.rstrip("\n") for ln in f.readlines()]
+    except (OSError, UnicodeDecodeError):
+        return []
 
 
 @dataclass(slots=True)
@@ -69,13 +84,7 @@ class UncoveredSection:
 
         uncovered_entries: list[dict[str, object]] = []
 
-        file_lines: list[str] = []
-        if with_code:
-            try:
-                with self.file.open(encoding="utf-8") as f:
-                    file_lines = [ln.rstrip("\n") for ln in f.readlines()]
-            except OSError:
-                file_lines = []
+        file_lines: list[str] = _read_file_lines(self.file) if with_code else []
 
         for start, end in self.ranges:
             entry: dict[str, object] = {"start": start, "end": end}
@@ -161,11 +170,19 @@ def determine_xml_file(xml_file: Namespace | None = None) -> Path:
         xml_file = xml_file.xml_file
 
     if xml_file:
-        return Path(xml_file).resolve()
+        path = Path(xml_file).resolve()
+        if not path.is_file():
+            msg = f"Coverage XML file not found: {path}"
+            raise CoverageXMLNotFoundError(msg)
+        return path
 
     config_xml = get_config_xml_file()
     if config_xml:
-        return Path(config_xml).resolve()
+        path = Path(config_xml).resolve()
+        if not path.is_file():
+            msg = f"Coverage XML file not found: {path}"
+            raise CoverageXMLNotFoundError(msg)
+        return path
 
     msg = "No coverage XML file specified or found in configuration."
     raise CoverageXMLNotFoundError(msg)
@@ -247,15 +264,44 @@ def build_sections(uncovered: dict[Path, list[int]]) -> list[UncoveredSection]:
     for filename in sorted(uncovered.keys(), key=lambda p: p.as_posix()):
         lines_sorted = sorted(uncovered[filename])
         groups = group_consecutive_numbers(lines_sorted)
-        try:
-            with filename.open(encoding="utf-8") as f:
-                file_lines = f.readlines()
+        file_lines = _read_file_lines(filename)
+        if file_lines:
             groups = merge_blank_gap_groups(groups, file_lines)
-        except OSError:
-            pass
         ranges = [(grp[0], grp[-1]) for grp in sorted(groups, key=operator.itemgetter(0))]
         sections.append(UncoveredSection(filename, ranges))
     return sections
+
+
+def gather_uncovered_lines_from_xml(file_path: Path) -> dict[Path, list[int]]:
+    """Gather uncovered lines per file by streaming the XML file."""
+    uncovered: dict[Path, list[int]] = {}
+    source_roots: list[Path] = []
+
+    context = ElementTree.iterparse(file_path, events=("start", "end"))
+    for event, elem in context:
+        if event != "end":
+            continue
+        if elem.tag == "source" and elem.text:
+            source_roots.append(Path(elem.text).resolve())
+            elem.clear()
+        elif elem.tag == "class":
+            filename_str = elem.get("filename")
+            if filename_str:
+                filename = Path(filename_str)
+                resolved_path = next(
+                    (src / filename for src in source_roots if (src / filename).exists()),
+                    filename,
+                ).resolve()
+                for line in elem.findall("lines/line"):
+                    try:
+                        hits = int(line.get("hits", "0"))
+                        line_no = int(line.get("number", "0"))
+                    except (TypeError, ValueError):
+                        continue
+                    if hits == 0:
+                        uncovered.setdefault(resolved_path, []).append(line_no)
+            elem.clear()
+    return uncovered
 
 
 def parse_large_xml(file_path: Path) -> Optional["Element"]:
