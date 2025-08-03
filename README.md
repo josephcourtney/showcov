@@ -80,9 +80,10 @@ sections = build_sections(uncovered)
 This returns a list of `UncoveredSection` instances, which can be serialized to JSON using:
 
 ```python
-from showcov.output import format_json
+from showcov.output import OutputMeta, format_json
 
-output = format_json(sections, context_lines=1, with_code=True, coverage_xml=xml_path, color=False)
+meta = OutputMeta(context_lines=1, with_code=True, coverage_xml=xml_path, color=False)
+output = format_json(sections, meta)
 print(output)
 ```
 

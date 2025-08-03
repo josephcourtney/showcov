@@ -16,7 +16,7 @@ from showcov.core import (
     determine_xml_file,
     gather_uncovered_lines_from_xml,
 )
-from showcov.output import get_formatter
+from showcov.output import Format, OutputMeta, get_formatter
 from showcov.path_filter import PathFilter
 
 
@@ -31,8 +31,8 @@ from showcov.path_filter import PathFilter
 @click.option(
     "--format",
     "format_",
-    type=click.Choice(["human", "json", "markdown", "sarif"]),
-    default="human",
+    type=click.Choice([fmt.value for fmt in Format]),
+    default=Format.HUMAN.value,
     help="Output format",
 )
 @click.option("--exclude", multiple=True, help="Glob pattern to exclude from output")
@@ -44,7 +44,7 @@ def main(
     no_color: bool = False,
     with_code: bool = False,
     context_lines: int = 0,
-    format_: str = "human",
+    format_: str = Format.HUMAN.value,
     exclude: tuple[str, ...] = (),
     output: Path | None = None,
 ) -> None:
@@ -61,14 +61,14 @@ def main(
     sections = build_sections(uncovered)
     path_filter = PathFilter(paths, exclude)
     sections = path_filter.filter(sections)
-    formatter = get_formatter(format_)
-    output_text = formatter(
-        sections,
+    formatter = get_formatter(Format.from_str(format_))
+    meta = OutputMeta(
         context_lines=context_lines,
         with_code=with_code,
         coverage_xml=resolved_xml,
         color=not no_color,
     )
+    output_text = formatter(sections, meta)
     if output:
         output.write_text(output_text, encoding="utf-8")
     else:
