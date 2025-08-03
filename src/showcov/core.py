@@ -7,12 +7,12 @@ a configuration file (pyproject.toml, .coveragerc, or setup.cfg).
 
 import operator
 import tomllib
-from argparse import Namespace
 from configparser import ConfigParser
 from configparser import Error as ConfigError
 from dataclasses import dataclass
 from functools import cache
 from pathlib import Path
+from types import SimpleNamespace
 from typing import TYPE_CHECKING, Optional, cast
 
 from defusedxml import ElementTree
@@ -160,12 +160,12 @@ def get_config_xml_file() -> str | None:
     return None
 
 
-def determine_xml_file(xml_file: Namespace | str | None = None) -> Path:
+def determine_xml_file(xml_file: SimpleNamespace | str | None = None) -> Path:
     """Determine the coverage XML file path from arguments or config.
 
-    Accepts either a Namespace with attribute `xml_file`, a raw path string, or ``None``.
+    Accepts either a SimpleNamespace with attribute `xml_file`, a raw path string, or ``None``.
     """
-    # Normalize input: allow passing argparse.Namespace or raw string/None.
+    # Normalize input: allow passing types.SimpleNamespace or raw string/None.
     if hasattr(xml_file, "xml_file"):
         xml_file = cast("str | None", xml_file.xml_file)
 

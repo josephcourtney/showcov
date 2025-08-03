@@ -1,20 +1,65 @@
-## features
-- [x] reimplement CLI with `click`
-- [x] add input handling similar to ruff, allowing the user to specify a list of files, folders, or globs specifying the source files to process
-- [x] add an `--exclude` flag that accepts glob patterns to remove some files from the ouptut
-- [x] Add `--output FILE` and write JSON directly
-- [x] Add a 'markdown' output format option that outputs collapsible code blocks for easy pasting into pull-request comments
-- [x] add an option to emit SARIF so GitHub Advanced Security can annotate lines inline.
+## Group A: schema packaging and config constants
 
-## internal details
 - [ ] Embed schema.json via importlib.resources.files("showcov.data") at build time and list it under [tool.uv_build].resources to avoid runtime FileNotFoundError when installed as a wheel.
+- [ ] Move `CONSECUTIVE_STEP` and other constants to `src/showcov/config.py`
 - [ ] enumerate and eliminate module-level side effects
-- [ ] move `CONSECUTIVE_STEP` and any other constants or default values into a config files
 
-## testing
+---
+
+## Group B: performance and stability enhancements
+
+- [ ] Limit `_read_file_lines` cache size with `@lru_cache(maxsize=256)`
+  - Avoid unbounded memory use for large repositories
+
+---
+
+## Group C: improved testing infrastructure
+
+- [ ] Replace inline XML strings in tests with reusable fixture factories
+  - Move to `conftest.py` or shared `test_utils.py`
+- [ ] Define a reusable test fixture for `CliRunner`
+- [ ] Parameterize tests with `pytest.mark.parametrize` where appropriate
 - [ ] Improve tests using parameterization, reusable mocks and fixtures, and make them more consistent with idiomatic pytest usage
+
+---
+
+## Group D: hypothesis property-based testing
+
 - [ ] Add property-based tests with `hypothesis`
 
-## dev ops
-- [ ] implement version bump automation by adding a `pre-commit` hook that checks `CHANGELOG.md` against `pyproject.toml`.
+---
 
+## Group E: CLI and path-filtering improvements
+
+- [ ] Create a `PathFilter` utility class for include/exclude logic
+  - Encapsulate `_expand_paths()` and `_filter_sections()` into a reusable and testable component
+- [ ] Consolidate CLI error handling for `CoverageXMLNotFoundError`, `ElementTree.ParseError`, and `OSError`
+- [ ] Validate CLI input types with Click `Path(..., exists=True)` and `IntRange(min=0)`
+- [ ] Fail early on negative `context_lines` in non-CLI contexts
+  - Raise `ValueError` in `UncoveredSection.to_dict()` if violated
+
+---
+
+## Group F: formatter API refactor and Enum cleanup
+
+- [ ] Replace `--format` string flags with a `Format` Enum
+  - Define `Format(str, Enum)` in `output.py`
+  - Use Enum in `get_formatter()` and `click.Choice`
+- [ ] Introduce `OutputMeta` dataclass to consolidate formatter options
+  - Replace `context_lines`, `with_code`, `coverage_xml`, and `color` params with a single object
+- [ ] Replace format string literals in `FORMATTERS` with an Enum-based registry
+  - Add `.from_str()` helper if needed for CLI compatibility
+
+---
+
+## Group G: XML logic modularization
+
+- [ ] Extract XML parsing and discovery logic from `core.py` into a new `src/showcov/xml.py` module
+  - Move `gather_uncovered_lines_from_xml`, `parse_large_xml`, and `get_config_xml_file` and its helpers
+  - Provide `discover_xml_path()` and `stream_coverage()` for reuse
+  - Keep `core.py` focused only on grouping logic
+
+---
+
+## Group H: dev ops
+- [ ] implement version bump automation by adding a `pre-commit` hook that checks `CHANGELOG.md` against `pyproject.toml`
