@@ -1,7 +1,7 @@
 # =================================== project ====================================
 [project]
   name = "showcov"
-  version = "0.0.14"
+  version = "0.0.15"
   description = "Print out uncovered code."
   readme = "README.md"
   authors = [
@@ -20,8 +20,9 @@
     "colorama>=0.4.6",
     "configparser>=7.1.0",
     "defusedxml>=0.7.1",
-    "jsonschema>=4.23.0",  # Runtime JSON schema validation
-    "click>=8.1.7",  # CLI framework
+    "jsonschema>=4.23.0",      # Runtime JSON schema validation
+    "click>=8.1.7",            # CLI framework
+    "click-completion>=0.5.2",
   ]
 
   [project.scripts]
@@ -40,7 +41,7 @@
     "types-toml>=0.10.8.20240310",
     "types-jsonschema>=4.23.0.20240712",
     "pre-commit>=4.2.0",
-]
+  ]
 
 # =================================== build ====================================
 [build-system]
