@@ -15,11 +15,11 @@
 
 ## Group C: improved testing infrastructure
 
-- [ ] Replace inline XML strings in tests with reusable fixture factories
+- [x] Replace inline XML strings in tests with reusable fixture factories
   - Move to `conftest.py` or shared `test_utils.py`
-- [ ] Define a reusable test fixture for `CliRunner`
-- [ ] Parameterize tests with `pytest.mark.parametrize` where appropriate
-- [ ] Improve tests using parameterization, reusable mocks and fixtures, and make them more consistent with idiomatic pytest usage
+- [x] Define a reusable test fixture for `CliRunner`
+- [x] Parameterize tests with `pytest.mark.parametrize` where appropriate
+- [x] Improve tests using parameterization, reusable mocks and fixtures, and make them more consistent with idiomatic pytest usage
 
 ---
 
