@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from difflib import get_close_matches
 from enum import StrEnum
 from pathlib import Path
 from typing import Protocol
@@ -23,6 +24,7 @@ class Format(StrEnum):
     JSON = "json"
     MARKDOWN = "markdown"
     SARIF = "sarif"
+    AUTO = "auto"
 
     @classmethod
     def from_str(cls, value: str) -> Format:
@@ -41,7 +43,12 @@ class Format(StrEnum):
         try:
             return cls(value)
         except ValueError as e:  # pragma: no cover - defensive
-            msg = f"Unsupported format: {value!r}"
+            choices = [fmt.value for fmt in cls]
+            suggestion = get_close_matches(value, choices, n=1)
+            if suggestion:
+                msg = f"Unsupported format: {value!r}. Did you mean {suggestion[0]!r}?"
+            else:
+                msg = f"Unsupported format: {value!r}"
             raise ValueError(msg) from e
 
 
@@ -77,7 +84,7 @@ def format_human(sections: list[UncoveredSection], meta: OutputMeta) -> str:
     context_lines = max(0, meta.context_lines)
     colors = _colors(enabled=meta.color)
     if not sections:
-        return f"{colors['GREEN']}{colors['BOLD']}No uncovered lines found!{colors['RESET']}"
+        return ""
 
     root = Path.cwd().resolve()
     parts: list[str] = []
