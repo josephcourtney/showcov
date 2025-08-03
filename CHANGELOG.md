@@ -1,3 +1,10 @@
+## [0.0.10] - 2025-08-03
+
+### Changed
+- limit source line cache to 256 entries to bound memory usage
+
+---
+
 ## [0.0.9] - 2025-08-02
 
 ### Changed

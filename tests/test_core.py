@@ -280,6 +280,35 @@ def test_read_file_lines_caches(monkeypatch: MonkeyPatch, tmp_path: Path) -> Non
     assert _read_file_lines(file) == ["print(1)"]
 
 
+def test_read_file_lines_cache_evicted(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
+    files = [tmp_path / f"{i}.py" for i in range(260)]
+    for f in files:
+        f.write_text("print(1)\n")
+    _read_file_lines.cache_clear()
+    first = files[0]
+
+    open_count = 0
+    orig_open = Path.open
+
+    def wrapper(self, *args, **kwargs):
+        nonlocal open_count
+        if self == first:
+            open_count += 1
+        return orig_open(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", wrapper)
+    assert _read_file_lines.cache_info().maxsize == 256
+    assert _read_file_lines(first) == ["print(1)"]
+    assert open_count == 1
+
+    for f in files[1:]:
+        _read_file_lines(f)
+
+    assert _read_file_lines(first) == ["print(1)"]
+    assert open_count == 2
+    _read_file_lines.cache_clear()
+
+
 # --- Tests for `main()` ---
 # --- Tests for _get_xml_from_config exception branch (lines 53-55) ---
 

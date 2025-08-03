@@ -10,7 +10,7 @@ import tomllib
 from configparser import ConfigParser
 from configparser import Error as ConfigError
 from dataclasses import dataclass
-from functools import cache
+from functools import lru_cache
 from pathlib import Path
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Optional, cast
@@ -28,7 +28,7 @@ class CoverageXMLNotFoundError(Exception):
     """Coverage XML file not found."""
 
 
-@cache
+@lru_cache(maxsize=256)
 def _read_file_lines(path: Path) -> list[str]:
     """Read a file and cache its lines.
 
