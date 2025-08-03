@@ -1,6 +1,8 @@
 from pathlib import Path
 from typing import cast
 
+import pytest
+
 from showcov.core import UncoveredSection, build_sections
 from showcov.output import FORMATTERS, parse_json_output
 
@@ -33,11 +35,8 @@ def test_negative_context_lines(tmp_path: Path) -> None:
     src = tmp_path / "a.py"
     src.write_text("a\nb\n")
     section = UncoveredSection(src, [(1, 1)])
-    out = section.to_dict(with_code=True, context_lines=-5)
-    uncovered = cast("list[dict[str, object]]", out["uncovered"])
-    source = cast("list[dict[str, object]]", uncovered[0]["source"])
-    lines = [cast("int", s["line"]) for s in source]
-    assert lines == [1]
+    with pytest.raises(ValueError, match="context_lines must be non-negative"):
+        section.to_dict(with_code=True, context_lines=-5)
 
 
 def test_context_lines_exceed_file(tmp_path: Path) -> None:
