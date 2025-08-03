@@ -1,3 +1,11 @@
+## [0.0.9] - 2025-08-02
+
+### Changed
+- centralize configuration constants in `config.py`
+- remove module-level side effects and load schema via package resources
+
+---
+
 ## [0.0.8] - 2025-08-02
 
 ### Added
