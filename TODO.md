@@ -31,11 +31,11 @@
 
 ## Group E: CLI and path-filtering improvements
 
-- [ ] Create a `PathFilter` utility class for include/exclude logic
+- [x] Create a `PathFilter` utility class for include/exclude logic
   - Encapsulate `_expand_paths()` and `_filter_sections()` into a reusable and testable component
-- [ ] Consolidate CLI error handling for `CoverageXMLNotFoundError`, `ElementTree.ParseError`, and `OSError`
-- [ ] Validate CLI input types with Click `Path(..., exists=True)` and `IntRange(min=0)`
-- [ ] Fail early on negative `context_lines` in non-CLI contexts
+- [x] Consolidate CLI error handling for `CoverageXMLNotFoundError`, `ElementTree.ParseError`, and `OSError`
+- [x] Validate CLI input types with Click `Path(..., exists=True)` and `IntRange(min=0)`
+- [x] Fail early on negative `context_lines` in non-CLI contexts
   - Raise `ValueError` in `UncoveredSection.to_dict()` if violated
 
 ---
