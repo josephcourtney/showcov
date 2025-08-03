@@ -48,7 +48,7 @@ def test_format_registry() -> None:
 
 def test_format_from_str() -> None:
     assert Format.from_str("json") is Format.JSON
-    with pytest.raises(ValueError, match="Unsupported format"):
+    with pytest.raises(ValueError, match="Unsupported format: 'bogus'"):
         Format.from_str("bogus")
 
 

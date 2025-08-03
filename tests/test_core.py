@@ -352,37 +352,39 @@ def test_main_coverage_xml_not_found(monkeypatch):
     with pytest.raises(SystemExit) as exc_info:
         main()
     assert isinstance(exc_info.value, SystemExit)
-    assert exc_info.value.code == 1
+    assert exc_info.value.code == 66
 
 
-def test_main_parse_error(monkeypatch):
-    # Force gather_uncovered_lines_from_xml to raise an ElementTree.ParseError and verify exit code 1.
-    fake_path = Path("dummy.xml")
+def test_main_parse_error(monkeypatch, tmp_path):
+    # Force gather_uncovered_lines_from_xml to raise an ElementTree.ParseError and verify exit code 65.
+    fake_path = tmp_path / "dummy.xml"
+    fake_path.write_text("<coverage>", encoding="utf-8")
     monkeypatch.setattr(sys, "argv", ["prog"])
-    monkeypatch.setattr("showcov.core.determine_xml_file", lambda _args: fake_path)
+    monkeypatch.setattr("showcov.cli.determine_xml_file", lambda _args: fake_path)
 
     def fake_gather(_):
         msg = "simulated parse error"
         raise ElementTree.ParseError(msg)
 
-    monkeypatch.setattr("showcov.core.gather_uncovered_lines_from_xml", fake_gather)
+    monkeypatch.setattr("showcov.cli.gather_uncovered_lines_from_xml", fake_gather)
     with pytest.raises(SystemExit) as exc_info:
         main()
     assert isinstance(exc_info.value, SystemExit)
-    assert exc_info.value.code == 1
+    assert exc_info.value.code == 65
 
 
-def test_main_os_error(monkeypatch):
+def test_main_os_error(monkeypatch, tmp_path):
     # Force gather_uncovered_lines_from_xml to raise an OSError and verify exit code 1.
-    fake_path = Path("dummy.xml")
+    fake_path = tmp_path / "dummy.xml"
+    fake_path.write_text("<coverage></coverage>", encoding="utf-8")
     monkeypatch.setattr(sys, "argv", ["prog"])
-    monkeypatch.setattr("showcov.core.determine_xml_file", lambda _args: fake_path)
+    monkeypatch.setattr("showcov.cli.determine_xml_file", lambda _args: fake_path)
 
     def fake_gather(_):
         msg = "simulated OS error"
         raise OSError(msg)
 
-    monkeypatch.setattr("showcov.core.gather_uncovered_lines_from_xml", fake_gather)
+    monkeypatch.setattr("showcov.cli.gather_uncovered_lines_from_xml", fake_gather)
     with pytest.raises(SystemExit) as exc_info:
         main()
     assert isinstance(exc_info.value, SystemExit)

@@ -1,3 +1,15 @@
+## [0.0.14] - 2025-08-03
+
+### Added
+- add CLI flags for `--quiet`, `--verbose`, `--summary-only`, `--stats`, `--pager`, and `--list-files`
+- add automatic format detection and improved invalid format suggestions
+- emit coverage statistics footer and enhanced fallback messages
+
+### Changed
+- refine exit codes and logging diagnostics
+
+---
+
 ## [0.0.13] - 2025-08-03
 
 ### Changed
