@@ -18,13 +18,10 @@ from typing import TYPE_CHECKING, Optional, cast
 from defusedxml import ElementTree
 
 from showcov import logger
+from showcov.config import CONSECUTIVE_STEP
 
 if TYPE_CHECKING:
     from xml.etree.ElementTree import Element  # noqa: S405
-
-
-# Constants
-CONSECUTIVE_STEP = 1
 
 
 class CoverageXMLNotFoundError(Exception):

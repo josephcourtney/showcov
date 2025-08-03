@@ -1,8 +1,8 @@
 ## Group A: schema packaging and config constants
 
-- [ ] Embed schema.json via importlib.resources.files("showcov.data") at build time and list it under [tool.uv_build].resources to avoid runtime FileNotFoundError when installed as a wheel.
-- [ ] Move `CONSECUTIVE_STEP` and other constants to `src/showcov/config.py`
-- [ ] enumerate and eliminate module-level side effects
+- [x] Embed schema.json via importlib.resources.files("showcov.data") at build time and list it under [tool.uv_build].resources to avoid runtime FileNotFoundError when installed as a wheel.
+- [x] Move `CONSECUTIVE_STEP` and other constants to `src/showcov/config.py`
+- [x] enumerate and eliminate module-level side effects
 
 ---
 
