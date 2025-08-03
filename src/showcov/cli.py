@@ -84,7 +84,7 @@ class Runtime:
     debug: bool
 
 
-def _configure_runtime(*, quiet: bool, verbose: bool, no_color: bool) -> Runtime:
+def _configure_runtime(*, quiet: bool, verbose: bool, no_color: bool, debug: bool) -> Runtime:
     """Set up logging + colorama and return a runtime descriptor."""
     level = logging.ERROR if quiet else (logging.DEBUG if verbose else logging.INFO)
     logging.basicConfig(level=level, format=LOG_FORMAT)
@@ -93,7 +93,7 @@ def _configure_runtime(*, quiet: bool, verbose: bool, no_color: bool) -> Runtime
     click_completion.init()
 
     is_tty = sys.stdout.isatty()
-    return Runtime(is_tty=is_tty, use_color=is_tty and not no_color, debug=verbose)
+    return Runtime(is_tty=is_tty, use_color=is_tty and not no_color, debug=debug)
 
 
 # --------------------------------------------------------------------------- #
@@ -172,8 +172,12 @@ def main(
     output: Path | None,
 ) -> None:
     """Show uncovered lines from a coverage XML report."""
-    rt = _configure_runtime(quiet=quiet, verbose=verbose, no_color=no_color)
+    rt = _configure_runtime(quiet=quiet, verbose=verbose, no_color=no_color, debug=debug)
 
+    if pager and no_pager:
+        # Use BadOptionUsage so Click prints a helpful message
+        msg = "--no-pager"
+        raise click.BadOptionUsage(msg, "Cannot use --pager and --no-pager together")
     # ------------------------------------------------------------------ #
     # Resolve coverage XML                                               #
     # ------------------------------------------------------------------ #
@@ -273,9 +277,6 @@ def main(
         output.write_text(output_text, encoding="utf-8")
         return
 
-    if pager and no_pager:
-        msg = "Cannot use --pager and --no-pager together"
-        raise click.UsageError(msg)
     use_pager = pager if pager or no_pager else False
 
     click.echo_via_pager(output_text) if use_pager else click.echo(output_text)

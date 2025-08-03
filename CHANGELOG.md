@@ -1,3 +1,11 @@
+## [0.0.16] - 2025-08-03
+
+### Fixed
+- deduplicate uncovered `<line>` elements so repeated line numbers no longer expand ranges or crash grouping
+- `Runtime.debug` now honours `--debug` instead of piggy-backing on `--verbose`
+- mutually-exclusive `--pager` / `--no-pager` conflict is detected immediately
+- `Format.from_str()` is now case-insensitive with better suggestions
+
 ## [0.0.14] - 2025-08-03
 
 ### Added

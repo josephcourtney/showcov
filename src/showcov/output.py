@@ -41,7 +41,7 @@ class Format(StrEnum):
             If ``value`` does not correspond to a known format.
         """
         try:
-            return cls(value)
+            return cls(value.lower())
         except ValueError as e:  # pragma: no cover - defensive
             choices = [fmt.value for fmt in cls]
             suggestion = get_close_matches(value, choices, n=1)
