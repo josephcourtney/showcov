@@ -1,3 +1,17 @@
+## [0.0.12] - 2025-08-03
+
+### Added
+- add `PathFilter` utility for reusable path include/exclude logic
+
+### Changed
+- validate CLI input types with strict path and range checks
+- consolidate CLI error handling for coverage XML failures
+
+### Fixed
+- raise `ValueError` for negative `context_lines` inputs
+
+---
+
 ## [0.0.11] - 2025-08-03
 
 ### Changed

@@ -70,7 +70,9 @@ class UncoveredSection:
             Number of context lines to include before and after each uncovered
             range when ``with_code`` is ``True``.
         """
-        context_lines = max(0, context_lines)
+        if context_lines < 0:
+            msg = "context_lines must be non-negative"
+            raise ValueError(msg)
 
         root = Path.cwd().resolve()
         try:
