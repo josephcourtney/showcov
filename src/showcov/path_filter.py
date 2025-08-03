@@ -20,10 +20,11 @@ class PathFilter:
         expanded: set[Path] = set()
         for pat in patterns:
             pat_str = str(pat)
-            try:
+            path_obj = Path(pat_str)
+            if path_obj.is_absolute():
+                matches = list(path_obj.parent.glob(path_obj.name))
+            else:
                 matches = list(Path().glob(pat_str))
-            except NotImplementedError:
-                matches = []
             if matches:
                 expanded.update(p.resolve() for p in matches)
             else:
