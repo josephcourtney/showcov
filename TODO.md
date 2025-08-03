@@ -1,60 +1,60 @@
 - [ ] Use built-in click functionality to implement the `man` page
 - [ ] Use built-in click functionality to implement the shell completion
-- [ ] Add `--quiet` (`-q`) flags: suppress INFO logs, emit only errors
-- [ ] Add `--verbose` (`-v`) flags: emit diagnostics such as:
+- [x] Add `--quiet` (`-q`) flags: suppress INFO logs, emit only errors
+- [x] Add `--verbose` (`-v`) flags: emit diagnostics such as:
     - number of input files matched
     - number of uncovered files/sections
     - output format and destination path
     - Wire into `logging.basicConfig(level=...)`
-- [ ] Add `--summary-only` flag
+- [x] Add `--summary-only` flag
   - Emit only file paths containing uncovered lines, one per line
   - Suppress section details and formatting
   - Support `--summary-only` in combination with format flags
-- [ ] Add `--stats` flag to emit coverage summary
+- [x] Add `--stats` flag to emit coverage summary
   - Show total uncovered files, sections, and line counts at the end
   - Example output: `5 files with uncovered lines, 14 uncovered regions, 42 total lines`
   - Ensure stats are deterministic and honor path filters
-- [ ] Add `--pager` and `--no-pager` flags
+- [x] Add `--pager` and `--no-pager` flags
   - Default behavior: if `stdout` is a TTY and format is `human`, pipe output through `$PAGER`
   - `--no-pager` disables this
   - `--pager` forces paging even if `stdout` is redirected
   - Fallback to `less -R` if `$PAGER` not set
-- [ ] Improve error diagnostics and logging control
+- [x] Improve error diagnostics and logging control
   - Add `--debug` flag to show full tracebacks for errors
   - Default behavior: truncate tracebacks, emit friendly error message
   - Consistently emit parse/file errors with path and cause:
     - e.g. `ERROR: failed to read coverage XML (invalid format): dummy.xml`
-- [ ] Refine exit codes using `sysexits.h` semantics
+- [x] Refine exit codes using `sysexits.h` semantics
   - Use standard codes:
     - `66` (EXIT_NOINPUT): missing XML file
     - `65` (EXIT_DATAERR): malformed XML
     - `78` (EXIT_CONFIG): invalid config file
     - `1`: generic fallback
   - Update tests to assert on new codes
-- [ ] Add `--format auto` detection mode
+- [x] Add `--format auto` detection mode
   - If `--format=auto` or unset:
     - Use `human` when `stdout.isatty()`
     - Use `json` when writing to pipe or file
   - Preserve deterministic output regardless of terminal
-- [ ] Add support for `--list-files`
+- [x] Add support for `--list-files`
   - Emit list of files with uncovered code, without line/section detail
   - Contrast with `--summary-only` which may include stats
   - Output one file per line in POSIX format
   - Compatible with machine consumption and CI filters
-- [ ] Suggest closest match on invalid `--format` values
+- [x] Suggest closest match on invalid `--format` values
   - On invalid value (e.g. `--format jsn`), emit:
     - `Unsupported format: 'jsn'. Did you mean 'json'?`
   - Use `difflib.get_close_matches()` with Format enum values
   - Override `click.Choice` or handle via `Format.from_str()`
-- [ ] Improve fallback messages when no uncovered lines found
+- [x] Improve fallback messages when no uncovered lines found
   - If no uncovered sections match filters, emit:
     - `No uncovered lines found (0 files matched input paths)`
   - Include filter summary in verbose mode
-- [ ] Allow glob pattern arguments directly
+- [x] Allow glob pattern arguments directly
   - Interpret `paths` arguments as globs if they don’t resolve to existing paths
   - Example: `showcov 'src/**/*.py'` should match recursively
   - Preserve compatibility with Click’s `Path(exists=True)` validation
-- [ ] Emit optional summary footer for human output
+- [x] Emit optional summary footer for human output
   - Controlled by `--stats` flag or `--format human` + TTY
   - Append a footer with file/section/line counts
   - Ensure this is suppressed in JSON/SARIF/Markdown formats
