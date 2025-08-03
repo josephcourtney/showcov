@@ -8,7 +8,7 @@
 
 ## Group B: performance and stability enhancements
 
-- [ ] Limit `_read_file_lines` cache size with `@lru_cache(maxsize=256)`
+- [x] Limit `_read_file_lines` cache size with `@lru_cache(maxsize=256)`
   - Avoid unbounded memory use for large repositories
 
 ---
