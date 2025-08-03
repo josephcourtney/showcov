@@ -252,7 +252,9 @@ def gather_uncovered_lines(root: "Element") -> dict[Path, list[int]]:
                 continue
 
             if hits == 0:
-                uncovered.setdefault(resolved_path, []).append(line_no)
+                lines = uncovered.setdefault(resolved_path, [])
+                if line_no not in lines:
+                    lines.append(line_no)
 
     return uncovered
 
@@ -298,7 +300,9 @@ def gather_uncovered_lines_from_xml(file_path: Path) -> dict[Path, list[int]]:
                     except (TypeError, ValueError):
                         continue
                     if hits == 0:
-                        uncovered.setdefault(resolved_path, []).append(line_no)
+                        lines = uncovered.setdefault(resolved_path, [])
+                        if line_no not in lines:
+                            lines.append(line_no)
             elem.clear()
     return uncovered
 
