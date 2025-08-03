@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+import logging
 import sys
 from fnmatch import fnmatch
 from pathlib import Path
 
 import click
+from colorama import init as colorama_init
 from defusedxml import ElementTree
 
 from showcov import logger
+from showcov.config import LOG_FORMAT
 from showcov.core import (
     CoverageXMLNotFoundError,
     UncoveredSection,
@@ -79,6 +82,8 @@ def main(
     output: Path | None = None,
 ) -> None:
     """Show uncovered lines from a coverage XML report."""
+    logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
+    colorama_init(autoreset=True)
     try:
         resolved_xml = determine_xml_file(str(xml_file) if xml_file else None)
     except CoverageXMLNotFoundError:

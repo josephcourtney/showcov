@@ -3,21 +3,15 @@
 from __future__ import annotations
 
 import json
-from importlib import resources
 from pathlib import Path
 from typing import Protocol
 
 from colorama import Fore, Style
-from colorama import init as colorama_init
 from jsonschema import validate
 
 from showcov import __version__
+from showcov.config import get_schema
 from showcov.core import UncoveredSection
-
-colorama_init(autoreset=True)
-
-# Load JSON schema once
-SCHEMA = json.loads(resources.files("showcov.data").joinpath("schema.json").read_text(encoding="utf-8"))
 
 
 class Formatter(Protocol):
@@ -123,14 +117,14 @@ def format_json(
         },
         "files": [sec.to_dict(with_code=with_code, context_lines=context_lines) for sec in sections],
     }
-    validate(data, SCHEMA)
+    validate(data, get_schema())
     return json.dumps(data, indent=2, sort_keys=True)
 
 
 def parse_json_output(data: str) -> list[UncoveredSection]:
     """Parse JSON coverage data into :class:`UncoveredSection` instances."""
     obj = json.loads(data)
-    validate(obj, SCHEMA)
+    validate(obj, get_schema())
     files = obj.get("files", [])
     return [UncoveredSection.from_dict(f) for f in files]
 
