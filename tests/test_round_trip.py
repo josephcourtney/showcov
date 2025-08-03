@@ -4,20 +4,20 @@ from typing import cast
 import pytest
 
 from showcov.core import UncoveredSection, build_sections
-from showcov.output import FORMATTERS, parse_json_output
+from showcov.output import FORMATTERS, Format, OutputMeta, parse_json_output
 
 
 def test_json_round_trip(tmp_path: Path) -> None:
     src = tmp_path / "x.py"
     src.write_text("a\nb\n")
     sections = build_sections({src: [1, 2]})
-    json_out = FORMATTERS["json"](
-        sections,
+    meta = OutputMeta(
         context_lines=1,
         with_code=True,
         coverage_xml=tmp_path / "cov.xml",
         color=False,
     )
+    json_out = FORMATTERS[Format.JSON](sections, meta)
     parsed = parse_json_output(json_out)
     assert parsed == sections
 

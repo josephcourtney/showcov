@@ -1,3 +1,10 @@
+## [0.0.13] - 2025-08-03
+
+### Changed
+- replace string-based formatter flags with `Format` enum and `OutputMeta` dataclass
+
+---
+
 ## [0.0.12] - 2025-08-03
 
 ### Added
