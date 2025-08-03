@@ -35,3 +35,10 @@
 - ran `.venv/bin/ruff check src/ tests/`
 - ran `.venv/bin/ty check src/ tests/`
 - ran `.venv/bin/pytest`
+## 2025-08-03T00:17Z
+- start implementing Group B tasks: limit cache size
+## 2025-08-03T00:18Z
+- ran `.venv/bin/ruff format src/ tests/`
+- ran `.venv/bin/ruff check src/ tests/`
+- ran `.venv/bin/ty check src/ tests/`
+- ran `.venv/bin/pytest`
