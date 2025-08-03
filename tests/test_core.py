@@ -1,7 +1,7 @@
-import argparse
 import logging
 import sys
 import textwrap
+import types
 from configparser import ConfigParser
 from pathlib import Path
 
@@ -71,7 +71,9 @@ def test_determine_xml_file_argument(monkeypatch: MonkeyPatch, tmp_path: Path) -
     xml.write_text("<coverage/>")
     test_args = ["prog", str(xml)]
     monkeypatch.setattr(sys, "argv", test_args)
-    assert determine_xml_file(argparse.Namespace(xml_file=str(xml))) == xml.resolve()
+
+    ns = types.SimpleNamespace(xml_file=str(xml))
+    assert determine_xml_file(ns) == xml.resolve()
 
 
 def test_determine_xml_file_from_config(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
@@ -80,7 +82,8 @@ def test_determine_xml_file_from_config(monkeypatch: MonkeyPatch, tmp_path: Path
     test_args = ["prog"]
     monkeypatch.setattr(sys, "argv", test_args)
     monkeypatch.setattr("showcov.core.get_config_xml_file", lambda: str(xml))
-    assert determine_xml_file(argparse.Namespace(xml_file=None)) == xml.resolve()
+    ns = types.SimpleNamespace(xml_file=None)
+    assert determine_xml_file(ns) == xml.resolve()
 
 
 def test_determine_xml_file_no_args(monkeypatch: MonkeyPatch) -> None:
