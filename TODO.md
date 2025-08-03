@@ -1,5 +1,5 @@
-- [ ] Use built-in click functionality to implement the `man` page
-- [ ] Use built-in click functionality to implement the shell completion
+- [x] Use built-in click functionality to implement the `man` page
+- [x] Use built-in click functionality to implement the shell completion
 - [x] Add `--quiet` (`-q`) flags: suppress INFO logs, emit only errors
 - [x] Add `--verbose` (`-v`) flags: emit diagnostics such as:
     - number of input files matched

@@ -1,16 +1,20 @@
 from __future__ import annotations
 
+import datetime
 import json
 import logging
 import sys
 from pathlib import Path
+from textwrap import dedent
 from typing import TYPE_CHECKING
 
 import click
+import click_completion
+import click_completion.core
 from colorama import init as colorama_init
 from defusedxml import ElementTree
 
-from showcov import logger
+from showcov import __version__, logger
 from showcov.config import LOG_FORMAT
 from showcov.core import (
     CoverageXMLNotFoundError,
@@ -48,6 +52,12 @@ if TYPE_CHECKING:
 @click.option("--format", "format_", default=Format.AUTO.value, help="Output format")
 @click.option("--exclude", multiple=True, help="Glob pattern to exclude from output")
 @click.option("--output", type=click.Path(path_type=Path), help="Write output to FILE instead of stdout")
+@click.option("--man", is_flag=True, help="Print the manpage and exit")
+@click.option(
+    "--completion",
+    type=click.Choice(["zsh", "bash", "fish"], case_sensitive=False),
+    help="Print shell completion script for supported shells (zsh, bash, fish)",
+)
 def main(  # noqa: C901, PLR0912, PLR0915, PLR0914
     paths: Sequence[Path],
     xml_file: Path | None,
@@ -66,11 +76,36 @@ def main(  # noqa: C901, PLR0912, PLR0915, PLR0914
     format_: str = Format.AUTO.value,
     exclude: Sequence[str] = (),
     output: Path | None = None,
+    man: bool = False,
+    completion: bool = False,
 ) -> None:
     """Show uncovered lines from a coverage XML report."""
     level = logging.ERROR if quiet else (logging.DEBUG if verbose else logging.INFO)
     logging.basicConfig(level=level, format=LOG_FORMAT)
     colorama_init(autoreset=True)
+    click_completion.init()
+
+    if man:
+        ctx = click.get_current_context()
+        help_text = ctx.command.get_help(ctx)
+        today = datetime.datetime.now(datetime.UTC).date().strftime("%Y-%m-%d")
+        prog = "showcov"
+
+        man_text = dedent(rf"""
+            .TH {prog.upper()} 1 "{today}" "{prog} {__version__}" "User Commands"
+            .SH NAME
+            {prog} \- show uncovered lines from a coverage XML report
+            .SH SYNOPSIS
+            {prog} [OPTIONS] [PATHS]...
+            .SH DESCRIPTION
+            {help_text}
+        """)
+        click.echo(man_text.strip())
+        raise SystemExit(0)
+    if completion:
+        script = click_completion.core.get_code(shell=completion, prog_name="showcov")
+        click.echo(script)
+        raise SystemExit(0)
 
     is_tty = sys.stdout.isatty()
     use_color = is_tty and not no_color
@@ -166,5 +201,9 @@ def main(  # noqa: C901, PLR0912, PLR0915, PLR0914
             click.echo(output_text)
 
 
-if __name__ == "__main__":
-    main()
+# @cli.command("completion")
+# @click.argument("shell", required=False, type=click.Choice(["bash", "zsh", "fish"]))
+# def completion(shell: str | None) -> None:
+#     """Print shell completion script for supported shells."""
+#     import click_completion.core
+#
