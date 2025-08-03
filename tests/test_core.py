@@ -26,7 +26,7 @@ from showcov.core import (
     merge_blank_gap_groups,
     parse_large_xml,
 )
-from showcov.output import format_human
+from showcov.output import OutputMeta, format_human
 
 # Set logging level to capture output for tests
 logging.basicConfig(level=logging.INFO)
@@ -99,13 +99,13 @@ def test_format_human(tmp_path: Path, *, color: bool) -> None:
     source_file = tmp_path / "dummy.py"
     source_file.write_text("def foo():\n    pass\n\ndef bar():\n    return 42")
     sections = build_sections({source_file: [2, 4, 5]})
-    out = format_human(
-        sections,
+    meta = OutputMeta(
         context_lines=0,
         with_code=False,
         coverage_xml=tmp_path / "cov.xml",
         color=color,
     )
+    out = format_human(sections, meta)
     assert "Uncovered sections in" in out
     assert "Line" in out
     assert "2" in out
@@ -120,13 +120,13 @@ def test_format_human_sorted_files(tmp_path: Path) -> None:
     file_a.write_text("a=1\n")
     file_b.write_text("b=1\n")
     sections = build_sections({file_b: [1], file_a: [1]})
-    out = format_human(
-        sections,
+    meta = OutputMeta(
         context_lines=0,
         with_code=False,
         coverage_xml=tmp_path / "cov.xml",
         color=True,
     )
+    out = format_human(sections, meta)
     first = out.find(file_a.as_posix())
     second = out.find(file_b.as_posix())
     assert first < second
@@ -314,13 +314,13 @@ def test_merge_blank_gap_groups_no_merge():
 def test_format_human_file_open_error(tmp_path: Path) -> None:
     fake_file = tmp_path / "nonexistent.py"
     sections = build_sections({fake_file: [1, 2]})
-    out = format_human(
-        sections,
+    meta = OutputMeta(
         context_lines=0,
         with_code=False,
         coverage_xml=tmp_path / "cov.xml",
         color=True,
     )
+    out = format_human(sections, meta)
     assert "Uncovered sections in" in out
     assert "Line" in out
 

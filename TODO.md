@@ -42,10 +42,10 @@
 
 ## Group F: formatter API refactor and Enum cleanup
 
-- [ ] Replace `--format` string flags with a `Format` Enum
+- [x] Replace `--format` string flags with a `Format` Enum
   - Define `Format(str, Enum)` in `output.py`
   - Use Enum in `get_formatter()` and `click.Choice`
-- [ ] Introduce `OutputMeta` dataclass to consolidate formatter options
+- [x] Introduce `OutputMeta` dataclass to consolidate formatter options
   - Replace `context_lines`, `with_code`, `coverage_xml`, and `color` params with a single object
-- [ ] Replace format string literals in `FORMATTERS` with an Enum-based registry
+- [x] Replace format string literals in `FORMATTERS` with an Enum-based registry
   - Add `.from_str()` helper if needed for CLI compatibility

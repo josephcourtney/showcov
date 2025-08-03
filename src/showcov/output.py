@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 from typing import Protocol
 
@@ -14,16 +16,47 @@ from showcov.config import get_schema
 from showcov.core import UncoveredSection
 
 
+class Format(StrEnum):
+    """Supported output formats."""
+
+    HUMAN = "human"
+    JSON = "json"
+    MARKDOWN = "markdown"
+    SARIF = "sarif"
+
+    @classmethod
+    def from_str(cls, value: str) -> Format:
+        """Return the :class:`Format` matching ``value``.
+
+        Parameters
+        ----------
+        value:
+            String representation of the desired format.
+
+        Raises
+        ------
+        ValueError
+            If ``value`` does not correspond to a known format.
+        """
+        try:
+            return cls(value)
+        except ValueError as e:  # pragma: no cover - defensive
+            msg = f"Unsupported format: {value!r}"
+            raise ValueError(msg) from e
+
+
+@dataclass(slots=True)
+class OutputMeta:
+    """Container for options shared by all formatters."""
+
+    context_lines: int
+    with_code: bool
+    coverage_xml: Path
+    color: bool
+
+
 class Formatter(Protocol):
-    def __call__(
-        self,
-        sections: list[UncoveredSection],
-        *,
-        context_lines: int,
-        with_code: bool,
-        coverage_xml: Path,
-        color: bool,
-    ) -> str: ...
+    def __call__(self, sections: list[UncoveredSection], meta: OutputMeta) -> str: ...
 
 
 def _colors(*, enabled: bool) -> dict[str, str]:
@@ -40,16 +73,9 @@ def _colors(*, enabled: bool) -> dict[str, str]:
     }
 
 
-def format_human(
-    sections: list[UncoveredSection],
-    *,
-    context_lines: int,
-    with_code: bool,  # noqa: ARG001 - kept for consistent signature
-    coverage_xml: Path,  # noqa: ARG001
-    color: bool,
-) -> str:
-    context_lines = max(0, context_lines)
-    colors = _colors(enabled=color)
+def format_human(sections: list[UncoveredSection], meta: OutputMeta) -> str:
+    context_lines = max(0, meta.context_lines)
+    colors = _colors(enabled=meta.color)
     if not sections:
         return f"{colors['GREEN']}{colors['BOLD']}No uncovered lines found!{colors['RESET']}"
 
@@ -94,28 +120,21 @@ def format_human(
     return "\n".join(parts).lstrip("\n")
 
 
-def format_json(
-    sections: list[UncoveredSection],
-    *,
-    context_lines: int,
-    with_code: bool,
-    coverage_xml: Path,
-    color: bool,  # noqa: ARG001
-) -> str:
-    context_lines = max(0, context_lines)
+def format_json(sections: list[UncoveredSection], meta: OutputMeta) -> str:
+    context_lines = max(0, meta.context_lines)
     root = Path.cwd().resolve()
     try:
-        xml_path = coverage_xml.resolve().relative_to(root)
+        xml_path = meta.coverage_xml.resolve().relative_to(root)
     except ValueError:
-        xml_path = coverage_xml.resolve()
+        xml_path = meta.coverage_xml.resolve()
     data: dict[str, object] = {
         "version": __version__,
         "environment": {
             "coverage_xml": xml_path.as_posix(),
             "context_lines": context_lines,
-            "with_code": with_code,
+            "with_code": meta.with_code,
         },
-        "files": [sec.to_dict(with_code=with_code, context_lines=context_lines) for sec in sections],
+        "files": [sec.to_dict(with_code=meta.with_code, context_lines=context_lines) for sec in sections],
     }
     validate(data, get_schema())
     return json.dumps(data, indent=2, sort_keys=True)
@@ -129,15 +148,8 @@ def parse_json_output(data: str) -> list[UncoveredSection]:
     return [UncoveredSection.from_dict(f) for f in files]
 
 
-def format_markdown(
-    sections: list[UncoveredSection],
-    *,
-    context_lines: int,
-    with_code: bool,  # noqa: ARG001 - kept for signature consistency
-    coverage_xml: Path,  # noqa: ARG001
-    color: bool,  # noqa: ARG001
-) -> str:
-    context_lines = max(0, context_lines)
+def format_markdown(sections: list[UncoveredSection], meta: OutputMeta) -> str:
+    context_lines = max(0, meta.context_lines)
     parts: list[str] = []
     root = Path.cwd().resolve()
     for section in sections:
@@ -166,14 +178,7 @@ def format_markdown(
     return "\n\n".join(parts)
 
 
-def format_sarif(
-    sections: list[UncoveredSection],
-    *,
-    context_lines: int,  # noqa: ARG001
-    with_code: bool,  # noqa: ARG001
-    coverage_xml: Path,  # noqa: ARG001
-    color: bool,  # noqa: ARG001
-) -> str:
+def format_sarif(sections: list[UncoveredSection], meta: OutputMeta) -> str:  # noqa: ARG001
     results: list[dict[str, object]] = []
     for section in sections:
         for start, end in section.ranges:
@@ -208,18 +213,18 @@ def format_sarif(
     return json.dumps(sarif, indent=2, sort_keys=True)
 
 
-FORMATTERS: dict[str, Formatter] = {
-    "human": format_human,
-    "json": format_json,
-    "markdown": format_markdown,
-    "sarif": format_sarif,
+FORMATTERS: dict[Format, Formatter] = {
+    Format.HUMAN: format_human,
+    Format.JSON: format_json,
+    Format.MARKDOWN: format_markdown,
+    Format.SARIF: format_sarif,
 }
 
 
-def get_formatter(format_name: str) -> Formatter:
-    """Return a formatter callable for the given format name."""
+def get_formatter(fmt: Format) -> Formatter:
+    """Return a formatter callable for the given :class:`Format`."""
     try:
-        return FORMATTERS[format_name]
-    except KeyError as e:
-        msg = f"Unsupported format: {format_name!r}"
+        return FORMATTERS[fmt]
+    except KeyError as e:  # pragma: no cover - defensive
+        msg = f"Unsupported format: {fmt!r}"
         raise ValueError(msg) from e
