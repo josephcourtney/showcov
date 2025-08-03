@@ -1,7 +1,7 @@
 import logging
 import sys
-import textwrap
 import types
+from collections.abc import Callable
 from configparser import ConfigParser
 from pathlib import Path
 
@@ -35,22 +35,18 @@ logging.basicConfig(level=logging.INFO)
 # --- Tests for `_get_xml_from_config` ---
 
 
-def test_get_xml_from_config_success(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("content", "expected"),
+    [
+        ("[section]\noption = value", "value"),
+        ("[other_section]\noption = value", None),
+        ("[section]\nother_option = value", None),
+    ],
+)
+def test_get_xml_from_config_cases(tmp_path: Path, content: str, expected: str | None) -> None:
     config_file = tmp_path / "config.ini"
-    config_file.write_text("[section]\noption = value")
-    assert _get_xml_from_config(config_file, "section", "option") == "value"
-
-
-def test_get_xml_from_config_no_section(tmp_path: Path) -> None:
-    config_file = tmp_path / "config.ini"
-    config_file.write_text("[other_section]\noption = value")
-    assert _get_xml_from_config(config_file, "section", "option") is None
-
-
-def test_get_xml_from_config_no_option(tmp_path: Path) -> None:
-    config_file = tmp_path / "config.ini"
-    config_file.write_text("[section]\nother_option = value")
-    assert _get_xml_from_config(config_file, "section", "option") is None
+    config_file.write_text(content)
+    assert _get_xml_from_config(config_file, "section", "option") == expected
 
 
 # --- Tests for `get_config_xml_file` ---
@@ -66,9 +62,10 @@ def test_get_config_xml_file_pyproject(monkeypatch: MonkeyPatch, tmp_path: Path)
 # --- Tests for `determine_xml_file` ---
 
 
-def test_determine_xml_file_argument(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
-    xml = tmp_path / "coverage.xml"
-    xml.write_text("<coverage/>")
+def test_determine_xml_file_argument(
+    monkeypatch: MonkeyPatch, coverage_xml_file: Callable[..., Path]
+) -> None:
+    xml = coverage_xml_file({})
     test_args = ["prog", str(xml)]
     monkeypatch.setattr(sys, "argv", test_args)
 
@@ -76,9 +73,10 @@ def test_determine_xml_file_argument(monkeypatch: MonkeyPatch, tmp_path: Path) -
     assert determine_xml_file(ns) == xml.resolve()
 
 
-def test_determine_xml_file_from_config(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
-    xml = tmp_path / "coverage.xml"
-    xml.write_text("<coverage/>")
+def test_determine_xml_file_from_config(
+    monkeypatch: MonkeyPatch, coverage_xml_file: Callable[..., Path]
+) -> None:
+    xml = coverage_xml_file({})
     test_args = ["prog"]
     monkeypatch.setattr(sys, "argv", test_args)
     monkeypatch.setattr("showcov.core.get_config_xml_file", lambda: str(xml))
@@ -96,7 +94,8 @@ def test_determine_xml_file_no_args(monkeypatch: MonkeyPatch) -> None:
 # --- Tests for `print_uncovered_sections` ---
 
 
-def test_format_human(tmp_path: Path) -> None:
+@pytest.mark.parametrize("color", [True, False])
+def test_format_human(tmp_path: Path, *, color: bool) -> None:
     source_file = tmp_path / "dummy.py"
     source_file.write_text("def foo():\n    pass\n\ndef bar():\n    return 42")
     sections = build_sections({source_file: [2, 4, 5]})
@@ -105,27 +104,14 @@ def test_format_human(tmp_path: Path) -> None:
         context_lines=0,
         with_code=False,
         coverage_xml=tmp_path / "cov.xml",
-        color=True,
+        color=color,
     )
     assert "Uncovered sections in" in out
     assert "Line" in out
     assert "2" in out
     assert "4" in out
     assert "5" in out
-
-
-def test_format_human_no_color(tmp_path: Path) -> None:
-    source_file = tmp_path / "dummy.py"
-    source_file.write_text("print('hi')\n")
-    sections = build_sections({source_file: [1]})
-    out = format_human(
-        sections,
-        context_lines=0,
-        with_code=False,
-        coverage_xml=tmp_path / "cov.xml",
-        color=False,
-    )
-    assert "\x1b" not in out
+    assert ("\x1b" in out) is color
 
 
 def test_format_human_sorted_files(tmp_path: Path) -> None:
@@ -149,23 +135,8 @@ def test_format_human_sorted_files(tmp_path: Path) -> None:
 # --- Tests for `gather_uncovered_lines` ---
 
 
-def test_gather_uncovered_lines_invalid_hits() -> None:
-    xml_content = textwrap.dedent("""
-    <coverage>
-      <packages>
-        <package>
-          <classes>
-            <class filename="dummy.py">
-              <lines>
-                <line number="1" hits="notanumber"/>
-                <line number="2" hits="0"/>
-              </lines>
-            </class>
-          </classes>
-        </package>
-      </packages>
-    </coverage>
-    """)
+def test_gather_uncovered_lines_invalid_hits(coverage_xml_content: Callable[..., str]) -> None:
+    xml_content = coverage_xml_content({"dummy.py": {1: "notanumber", 2: 0}})
     root = ElementTree.fromstring(xml_content)
     uncovered = gather_uncovered_lines(root)
     key = next(iter(uncovered))
@@ -176,25 +147,8 @@ def test_gather_uncovered_lines_invalid_hits() -> None:
 # --- Tests for `parse_large_xml` ---
 
 
-def test_parse_large_xml(tmp_path: Path) -> None:
-    xml_content = textwrap.dedent("""
-    <coverage>
-      <packages>
-        <package>
-          <classes>
-            <class filename="dummy.py">
-              <lines>
-                <line number="3" hits="0"/>
-                <line number="5" hits="0"/>
-              </lines>
-            </class>
-          </classes>
-        </package>
-      </packages>
-    </coverage>
-    """)
-    xml_file = tmp_path / "coverage.xml"
-    xml_file.write_text(xml_content)
+def test_parse_large_xml(coverage_xml_file: Callable[..., Path]) -> None:
+    xml_file = coverage_xml_file({"dummy.py": [3, 5]})
     root = parse_large_xml(xml_file)
     assert root is not None
     uncovered = gather_uncovered_lines(root)
@@ -203,29 +157,14 @@ def test_parse_large_xml(tmp_path: Path) -> None:
     assert uncovered[key] == [3, 5]
 
 
-def test_gather_uncovered_lines_resolves_paths(tmp_path: Path) -> None:
+def test_gather_uncovered_lines_resolves_paths(
+    tmp_path: Path, coverage_xml_content: Callable[..., str]
+) -> None:
     pkg = tmp_path / "pkg"
     pkg.mkdir()
     source_file = pkg / "dummy.py"
     source_file.write_text("print('hi')\n")
-    xml_content = f"""
-    <coverage>
-      <sources>
-        <source>{tmp_path}</source>
-      </sources>
-      <packages>
-        <package>
-          <classes>
-            <class filename="pkg/dummy.py">
-              <lines>
-                <line number="1" hits="0"/>
-              </lines>
-            </class>
-          </classes>
-        </package>
-      </packages>
-    </coverage>
-    """
+    xml_content = coverage_xml_content({"pkg/dummy.py": [1]}, sources=tmp_path)
     root = ElementTree.fromstring(xml_content)
     uncovered = gather_uncovered_lines(root)
     key = next(iter(uncovered))
@@ -233,26 +172,10 @@ def test_gather_uncovered_lines_resolves_paths(tmp_path: Path) -> None:
     assert key.as_posix().endswith("pkg/dummy.py")
 
 
-def test_gather_uncovered_lines_from_xml(tmp_path: Path) -> None:
+def test_gather_uncovered_lines_from_xml(tmp_path: Path, coverage_xml_file: Callable[..., Path]) -> None:
     src = tmp_path / "dummy.py"
     src.write_text("print('hi')\n")
-    xml_content = f"""
-    <coverage>
-      <packages>
-        <package>
-          <classes>
-            <class filename=\"{src}\">
-              <lines>
-                <line number=\"1\" hits=\"0\"/>
-              </lines>
-            </class>
-          </classes>
-        </package>
-      </packages>
-    </coverage>
-    """
-    xml_file = tmp_path / "coverage.xml"
-    xml_file.write_text(xml_content)
+    xml_file = coverage_xml_file({src: [1]})
     uncovered = gather_uncovered_lines_from_xml(xml_file)
     key = next(iter(uncovered))
     assert key == src.resolve()

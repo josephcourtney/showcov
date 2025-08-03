@@ -1,3 +1,10 @@
+## [0.0.11] - 2025-08-03
+
+### Changed
+- refactor tests with shared fixtures and parameterization
+
+---
+
 ## [0.0.10] - 2025-08-03
 
 ### Changed
