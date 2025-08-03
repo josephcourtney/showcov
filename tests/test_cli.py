@@ -46,3 +46,42 @@ def test_cli_filters_and_output(
     )
     assert result.exit_code == 0
     assert out_file.read_text(encoding="utf-8").strip().startswith("{")
+
+
+def test_cli_version_flag(cli_runner: CliRunner) -> None:
+    result = cli_runner.invoke(main, ["--version"])
+    assert result.exit_code == 0
+    assert "showcov, version" in result.output
+
+
+def test_cli_disables_color_flag(
+    cli_runner: CliRunner, coverage_xml_file: Callable[..., Path], tmp_path: Path
+) -> None:
+    src = tmp_path / "file.py"
+    src.write_text("print(1)\n")
+    xml = coverage_xml_file({src: [1]})
+
+    result = cli_runner.invoke(
+        main,
+        ["--xml-file", str(xml), str(src), "--no-color"],
+    )
+    assert result.exit_code == 0
+    assert "\x1b[" not in result.output  # ANSI escape sequences absent
+
+
+def test_cli_disables_color_when_not_tty(
+    cli_runner: CliRunner, coverage_xml_file: Callable[..., Path], tmp_path: Path
+) -> None:
+    src = tmp_path / "file.py"
+    src.write_text("print(1)\n")
+    xml = coverage_xml_file({src: [1]})
+
+    # Simulate piping by capturing output explicitly
+    result = cli_runner.invoke(
+        main,
+        ["--xml-file", str(xml), str(src)],
+        # colorama disables colors when isatty=False
+        # click.testing.CliRunner captures output, which behaves like non-TTY
+    )
+    assert result.exit_code == 0
+    assert "\x1b[" not in result.output
