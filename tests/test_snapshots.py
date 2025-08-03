@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 
 from showcov.core import build_sections
-from showcov.output import FORMATTERS
+from showcov.output import FORMATTERS, Format, OutputMeta
 
 
 def _build_sections() -> list:
@@ -12,13 +12,13 @@ def _build_sections() -> list:
 
 def test_json_output_snapshot() -> None:
     sections = _build_sections()
-    json_out = FORMATTERS["json"](
-        sections,
+    meta = OutputMeta(
         context_lines=1,
         with_code=True,
         coverage_xml=Path("coverage.xml"),
         color=False,
     )
+    json_out = FORMATTERS[Format.JSON](sections, meta)
     expected_text = Path("tests/snapshots/json_output.json").read_text(encoding="utf-8")
     actual = json.loads(json_out)
     expected = json.loads(expected_text)
@@ -31,13 +31,13 @@ def test_json_output_snapshot() -> None:
 
 def test_llm_prompt_snapshot() -> None:
     sections = _build_sections()
-    json_out = FORMATTERS["json"](
-        sections,
+    meta = OutputMeta(
         context_lines=1,
         with_code=True,
         coverage_xml=Path("coverage.xml"),
         color=False,
     )
+    json_out = FORMATTERS[Format.JSON](sections, meta)
     data = json.loads(json_out)
     data["version"] = "IGNORED"
     prompt = (
