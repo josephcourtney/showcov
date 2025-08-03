@@ -21,6 +21,30 @@ showcov is a command-line utility that prints uncovered lines of code—grouped 
 - Save results directly to a file with `--output FILE`  
 - Markdown format: emit collapsible code blocks for easy use in pull-request comments (`--format markdown`)  
 - SARIF format: emit machine-readable results for GitHub Advanced Security annotations (`--format sarif`)
+- Quiet and verbose modes:
+  - `--quiet` suppresses informational logs
+  - `--verbose` emits file and output diagnostics
+- Summary and statistics output:
+  - `--summary-only` prints only affected file paths
+  - `--stats` appends totals for uncovered files, regions, and lines
+- Auto-paging for long reports:
+  - Pipe `--format human` output through `$PAGER` when writing to TTY
+  - Configurable with `--pager` and `--no-pager`
+- Optional interactive mode:
+  - `--interactive` steps through uncovered files one at a time
+- Smarter error handling and logging:
+  - `--debug` enables full tracebacks
+  - Friendly error messages by default
+- Structured exit codes for CI:
+  - Use `sysexits.h`–style codes to indicate error cause
+- Format autodetection:
+  - `--format auto` selects `human` or `json` based on stdout target
+- Glob pattern support in CLI arguments:
+  - Accept glob patterns (e.g., `src/**/*.py`) as input paths
+- File-only listing mode:
+  - `--list-files` emits one uncovered file path per line
+- Output suggestions on flag errors:
+  - Suggest closest matching format name on typos
 
 ## Installation
 

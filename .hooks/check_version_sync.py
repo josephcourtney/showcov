@@ -1,9 +1,9 @@
 #!.venv/bin/python
 
 import re
-from pathlib import Path
 import sys
 import tomllib
+from pathlib import Path
 
 
 def get_pyproject_version(pyproject_path: Path) -> str:
@@ -16,7 +16,8 @@ def get_changelog_version(changelog_path: Path) -> str:
     text = changelog_path.read_text(encoding="utf-8")
     match = re.search(r"^## \[(\d+\.\d+\.\d+)\] - ", text, re.MULTILINE)
     if not match:
-        raise ValueError("No valid version heading found in CHANGELOG.md")
+        msg = "No valid version heading found in CHANGELOG.md"
+        raise ValueError(msg)
     return match.group(1)
 
 

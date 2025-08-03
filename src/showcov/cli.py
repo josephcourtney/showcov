@@ -22,6 +22,7 @@ from showcov.path_filter import PathFilter
 
 @click.command()
 @click.argument("paths", nargs=-1, type=click.Path(path_type=Path, exists=True))
+@click.version_option(package_name="showcov", prog_name="showcov")
 @click.option("--xml-file", type=click.Path(path_type=Path, exists=True), help="Path to coverage XML file")
 @click.option("--no-color", is_flag=True, help="Disable ANSI color codes in output")
 @click.option("--with-code", is_flag=True, help="Embed raw source lines for uncovered ranges in JSON output")
@@ -51,6 +52,10 @@ def main(
     """Show uncovered lines from a coverage XML report."""
     logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
     colorama_init(autoreset=True)
+
+    is_tty = sys.stdout.isatty()
+    use_color = is_tty and not no_color
+
     try:
         resolved_xml = determine_xml_file(str(xml_file) if xml_file else None)
         uncovered = gather_uncovered_lines_from_xml(resolved_xml)
@@ -66,10 +71,10 @@ def main(
         context_lines=context_lines,
         with_code=with_code,
         coverage_xml=resolved_xml,
-        color=not no_color,
+        color=use_color,
     )
     output_text = formatter(sections, meta)
-    if output:
+    if output and output != Path("-"):
         output.write_text(output_text, encoding="utf-8")
     else:
         click.echo(output_text)

@@ -1,51 +1,60 @@
-## Group A: schema packaging and config constants
-
-- [x] Embed schema.json via importlib.resources.files("showcov.data") at build time and list it under [tool.uv_build].resources to avoid runtime FileNotFoundError when installed as a wheel.
-- [x] Move `CONSECUTIVE_STEP` and other constants to `src/showcov/config.py`
-- [x] enumerate and eliminate module-level side effects
-
----
-
-## Group B: performance and stability enhancements
-
-- [x] Limit `_read_file_lines` cache size with `@lru_cache(maxsize=256)`
-  - Avoid unbounded memory use for large repositories
-
----
-
-## Group C: improved testing infrastructure
-
-- [x] Replace inline XML strings in tests with reusable fixture factories
-  - Move to `conftest.py` or shared `test_utils.py`
-- [x] Define a reusable test fixture for `CliRunner`
-- [x] Parameterize tests with `pytest.mark.parametrize` where appropriate
-- [x] Improve tests using parameterization, reusable mocks and fixtures, and make them more consistent with idiomatic pytest usage
-
----
-
-## Group D: hypothesis property-based testing
-
-- [ ] Add property-based tests with `hypothesis`
-
----
-
-## Group E: CLI and path-filtering improvements
-
-- [x] Create a `PathFilter` utility class for include/exclude logic
-  - Encapsulate `_expand_paths()` and `_filter_sections()` into a reusable and testable component
-- [x] Consolidate CLI error handling for `CoverageXMLNotFoundError`, `ElementTree.ParseError`, and `OSError`
-- [x] Validate CLI input types with Click `Path(..., exists=True)` and `IntRange(min=0)`
-- [x] Fail early on negative `context_lines` in non-CLI contexts
-  - Raise `ValueError` in `UncoveredSection.to_dict()` if violated
-
----
-
-## Group F: formatter API refactor and Enum cleanup
-
-- [x] Replace `--format` string flags with a `Format` Enum
-  - Define `Format(str, Enum)` in `output.py`
-  - Use Enum in `get_formatter()` and `click.Choice`
-- [x] Introduce `OutputMeta` dataclass to consolidate formatter options
-  - Replace `context_lines`, `with_code`, `coverage_xml`, and `color` params with a single object
-- [x] Replace format string literals in `FORMATTERS` with an Enum-based registry
-  - Add `.from_str()` helper if needed for CLI compatibility
+- [ ] Use built-in click functionality to implement the `man` page
+- [ ] Use built-in click functionality to implement the shell completion
+- [ ] Add `--quiet` (`-q`) flags: suppress INFO logs, emit only errors
+- [ ] Add `--verbose` (`-v`) flags: emit diagnostics such as:
+    - number of input files matched
+    - number of uncovered files/sections
+    - output format and destination path
+    - Wire into `logging.basicConfig(level=...)`
+- [ ] Add `--summary-only` flag
+  - Emit only file paths containing uncovered lines, one per line
+  - Suppress section details and formatting
+  - Support `--summary-only` in combination with format flags
+- [ ] Add `--stats` flag to emit coverage summary
+  - Show total uncovered files, sections, and line counts at the end
+  - Example output: `5 files with uncovered lines, 14 uncovered regions, 42 total lines`
+  - Ensure stats are deterministic and honor path filters
+- [ ] Add `--pager` and `--no-pager` flags
+  - Default behavior: if `stdout` is a TTY and format is `human`, pipe output through `$PAGER`
+  - `--no-pager` disables this
+  - `--pager` forces paging even if `stdout` is redirected
+  - Fallback to `less -R` if `$PAGER` not set
+- [ ] Improve error diagnostics and logging control
+  - Add `--debug` flag to show full tracebacks for errors
+  - Default behavior: truncate tracebacks, emit friendly error message
+  - Consistently emit parse/file errors with path and cause:
+    - e.g. `ERROR: failed to read coverage XML (invalid format): dummy.xml`
+- [ ] Refine exit codes using `sysexits.h` semantics
+  - Use standard codes:
+    - `66` (EXIT_NOINPUT): missing XML file
+    - `65` (EXIT_DATAERR): malformed XML
+    - `78` (EXIT_CONFIG): invalid config file
+    - `1`: generic fallback
+  - Update tests to assert on new codes
+- [ ] Add `--format auto` detection mode
+  - If `--format=auto` or unset:
+    - Use `human` when `stdout.isatty()`
+    - Use `json` when writing to pipe or file
+  - Preserve deterministic output regardless of terminal
+- [ ] Add support for `--list-files`
+  - Emit list of files with uncovered code, without line/section detail
+  - Contrast with `--summary-only` which may include stats
+  - Output one file per line in POSIX format
+  - Compatible with machine consumption and CI filters
+- [ ] Suggest closest match on invalid `--format` values
+  - On invalid value (e.g. `--format jsn`), emit:
+    - `Unsupported format: 'jsn'. Did you mean 'json'?`
+  - Use `difflib.get_close_matches()` with Format enum values
+  - Override `click.Choice` or handle via `Format.from_str()`
+- [ ] Improve fallback messages when no uncovered lines found
+  - If no uncovered sections match filters, emit:
+    - `No uncovered lines found (0 files matched input paths)`
+  - Include filter summary in verbose mode
+- [ ] Allow glob pattern arguments directly
+  - Interpret `paths` arguments as globs if they don’t resolve to existing paths
+  - Example: `showcov 'src/**/*.py'` should match recursively
+  - Preserve compatibility with Click’s `Path(exists=True)` validation
+- [ ] Emit optional summary footer for human output
+  - Controlled by `--stats` flag or `--format human` + TTY
+  - Append a footer with file/section/line counts
+  - Ensure this is suppressed in JSON/SARIF/Markdown formats
