@@ -1,5 +1,11 @@
 {
   "exclude_tree": [
+    ".hooks/",
+    ".grobl.config.json",
+    ".pre-commit-config.yaml",
+    "CHANGELOG.md",
+    "TODO.md",
+    "AGENTS.md",
     "__pycache__/",
     "*.egg-info",
     "*.ipynb",
