@@ -207,3 +207,14 @@ def show(
         aggregate_stats=opts.aggregate_stats,
     )
     write_output(output_text, opts)
+
+
+# --------------------------------------------------------------------------- #
+# Sub-command: mcp                                                            #
+# --------------------------------------------------------------------------- #
+@cli.command()
+def mcp() -> None:
+    """Start MCP server exposing showcov tools."""
+    from showcov.mcp.server import main as run_mcp  # noqa: PLC0415
+
+    run_mcp()

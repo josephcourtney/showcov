@@ -1,32 +1,32 @@
-### Goals
-- Serve coverage data via the Model Context Protocol
-- Ensure compatibility with LM Studio and other MCP clients
-- Expose schema-compliant `resources/list` and `resources/read` endpoints
-- Support deterministic LLM payload generation
-
-### Tasks
-
-- [ ] Add `mcp[cli]>=1.7.0` to project dependencies with justification in AGENTS.md
-- [ ] Create `src/showcov/mcp_server.py` as MCP server entrypoint module
-- [ ] Define `FastMCP` instance and lifecycle handler functions
-  - [ ] Implement `on_initialize()` to register tool metadata and capabilities
-  - [ ] Implement `on_shutdown()` to handle graceful termination
-- [ ] Register `resources/list` handler
-  - [ ] Return synthetic resource descriptor for coverage payload (e.g., `showcov:coverage.json`)
-  - [ ] Populate `name`, `description`, `mime`, and `read_only` fields
-  - [ ] Include source location metadata
-- [ ] Register `resources/read` handler
-  - [ ] Resolve coverage XML and uncovered sections (via `resolve_sections(...)`)
-  - [ ] Serialize using `generate_llm_payload(...)` with context and code flags
-  - [ ] Return JSON response conforming to `mcp_schema.json`
-  - [ ] Validate response using `jsonschema.validate(...)`
-- [ ] Add new CLI entry point:
-  - [ ] Expose `showcov-mcp = showcov.mcp_server:main` in `pyproject.toml`
-  - [ ] Support `--debug`, `--context`, `--with-code`, and `--cov` flags for local control
-  - [ ] Use `uvicorn` for debugging if desired (optional)
-- [ ] Add integration tests under `tests/test_mcp_server.py`
-  - [ ] Simulate `resources/list` and `resources/read` requests
-  - [ ] Validate returned structure matches expected `mcp_schema.json`
-  - [ ] Check for deterministic output
-- [ ] Add snapshot file for MCP JSON output to `tests/snapshots/`
-  - [ ] Ensure `context_lines=1` and `with_code=true` are covered
+- [ ] add HTML output format
+  - add `--format html` to produce static, readable reports.
+  - useful for sharing in CI artifacts, dashboards, or offline review.
+- [ ] add per-file coverage summary (informational, not enforcement)
+  - optionally show total uncovered lines per file and percent uncovered.
+  - e.g. `--file-summary` → `foo.py: 12 uncovered (30%)`.
+- [ ] add a `diff` subcommand for report comparison
+  - implement a `showcov diff a.xml b.xml` command.
+  - show new uncovered lines or resolved ones since a baseline.
+- [ ] improve the `human` format with `rich` terminal table format
+  - display uncovered sections in a compact table format (`rich.table`).
+  - columns: file | start line | end line | # lines
+- [ ] line-level tags / labels
+  - annotate output with reasons if known (e.g. `# pragma: no cover`, `@abstractmethod`) using heuristics.
+- [ ] reduce indirection in cli option parsing
+  - the `showcovoptions → parse_flags_to_opts → dataclasses.replace(...)` chain is needlessly complex.
+  - consider collapsing into a simpler dataclass or namespace with direct mutation.
+- [ ] simplify format resolution logic
+  - `format.from_str → determine_format → get_formatter` is too layered.
+  - can merge `from_str()` and `get_formatter()` logic into one resolver.
+- [ ] consolidate cli entry points
+  - `cli`, `__main__`, `entry.py`, `util.py` spread logic across multiple files.
+  - could unify command registration and dispatch into fewer modules.
+- [ ] avoid hardcoded format lists
+  - currently, `click.choice(["auto", "human", ...])` duplicates logic in `format`.
+  - dynamically generate from `format.__members__` to prevent drift.
+- [ ] avoid internal state in output
+  - currently includes `path.cwd()` resolution and relative paths in output.
+  - consider preserving original paths or normalizing consistently across formats.
+- [ ] unify file reading and path normalization logic
+   - code for resolving and reading files is duplicated across `core.py`, formatters, and `uncoveredsection`.
+   - centralize file access (existence, contents, relpath) in a single utility module.
