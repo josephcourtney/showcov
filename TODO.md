@@ -7,7 +7,7 @@
 - [x] add a `diff` subcommand for report comparison
   - implement a `showcov diff a.xml b.xml` command.
   - show new uncovered lines or resolved ones since a baseline.
-- [ ] improve the `human` format with `rich` terminal table format
+- [x] improve the `human` format with `rich` terminal table format
   - display uncovered sections in a compact table format (`rich.table`).
   - columns: file | start line | end line | # lines
 - [ ] line-level tags / labels
