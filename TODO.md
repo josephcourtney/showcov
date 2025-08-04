@@ -1,21 +1,32 @@
-* [x] refactor: move `render_output()` from `cli/util.py` to `output/`
-  * [x] Preserve existing call site in CLI
-  * [x] Ensure no CLI-specific logic remains in the moved function
+### Goals
+- Serve coverage data via the Model Context Protocol
+- Ensure compatibility with LM Studio and other MCP clients
+- Expose schema-compliant `resources/list` and `resources/read` endpoints
+- Support deterministic LLM payload generation
 
-* [x] feature: implement model context protocol interface
-  * [x] Add `mcp/` interface module under `src/showcov/mcp/`
-  * [x] Define public function `get_model_context(sections: list[UncoveredSection], meta: OutputMeta) -> dict`
-    * [x] Include version, environment metadata, uncovered sections (as JSON-compatible structures)
-    * [x] Strip non-relevant fields and internal-only attributes
+### Tasks
 
-* [x] feature: generate MCP JSON schema
-  * [x] Expose function `generate_llm_payload(...) -> str`
-  * [x] Ensure output adheres strictly to `mcp_schema.json`
-  * [x] Validate output format under test using `jsonschema`
-
-* [x] test: add snapshot tests for model protocol
-  * [x] Emit deterministic LLM payloads in `tests/snapshots/llm_interaction.json`
-  * [x] Validate round-trip structure using `UncoveredSection.from_dict`
-
-* [x] test: verify model output excludes global state
-  * [x] Ensure only minimal interface-relevant state is present
+- [ ] Add `mcp[cli]>=1.7.0` to project dependencies with justification in AGENTS.md
+- [ ] Create `src/showcov/mcp_server.py` as MCP server entrypoint module
+- [ ] Define `FastMCP` instance and lifecycle handler functions
+  - [ ] Implement `on_initialize()` to register tool metadata and capabilities
+  - [ ] Implement `on_shutdown()` to handle graceful termination
+- [ ] Register `resources/list` handler
+  - [ ] Return synthetic resource descriptor for coverage payload (e.g., `showcov:coverage.json`)
+  - [ ] Populate `name`, `description`, `mime`, and `read_only` fields
+  - [ ] Include source location metadata
+- [ ] Register `resources/read` handler
+  - [ ] Resolve coverage XML and uncovered sections (via `resolve_sections(...)`)
+  - [ ] Serialize using `generate_llm_payload(...)` with context and code flags
+  - [ ] Return JSON response conforming to `mcp_schema.json`
+  - [ ] Validate response using `jsonschema.validate(...)`
+- [ ] Add new CLI entry point:
+  - [ ] Expose `showcov-mcp = showcov.mcp_server:main` in `pyproject.toml`
+  - [ ] Support `--debug`, `--context`, `--with-code`, and `--cov` flags for local control
+  - [ ] Use `uvicorn` for debugging if desired (optional)
+- [ ] Add integration tests under `tests/test_mcp_server.py`
+  - [ ] Simulate `resources/list` and `resources/read` requests
+  - [ ] Validate returned structure matches expected `mcp_schema.json`
+  - [ ] Check for deterministic output
+- [ ] Add snapshot file for MCP JSON output to `tests/snapshots/`
+  - [ ] Ensure `context_lines=1` and `with_code=true` are covered
