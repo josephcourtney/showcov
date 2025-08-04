@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from showcov.output.base import Format, Formatter
+from showcov.output.html import format_html
 from showcov.output.human import format_human
 from showcov.output.json import format_json
 from showcov.output.markdown import format_markdown
@@ -10,6 +11,7 @@ from showcov.output.sarif import format_sarif
 
 FORMATTERS: dict[Format, Formatter] = {
     Format.HUMAN: format_human,
+    Format.HTML: format_html,
     Format.JSON: format_json,
     Format.MARKDOWN: format_markdown,
     Format.SARIF: format_sarif,

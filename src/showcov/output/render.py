@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
+from showcov.core.core import _read_file_lines
 from showcov.output import get_formatter
 from showcov.output.base import Format, OutputMeta
 
@@ -17,6 +19,7 @@ def render_output(
     meta: OutputMeta,
     *,
     aggregate_stats: bool = False,
+    file_stats: bool = False,
 ) -> str:
     """Render ``sections`` according to ``fmt`` and ``meta``.
 
@@ -31,12 +34,29 @@ def render_output(
     aggregate_stats:
         When ``True`` and ``fmt`` is :class:`~showcov.output.base.Format.HUMAN`,
         append a footer with aggregate statistics.
+    file_stats:
+        When ``True`` and ``fmt`` is :class:`~showcov.output.base.Format.HUMAN`,
+        append a per-file summary with uncovered counts and percentages.
     """
     if not sections:
         return "No uncovered lines found (0 files matched input patterns)"
 
     formatter = get_formatter(fmt)
     output = formatter(sections, meta)
+
+    if file_stats and fmt is Format.HUMAN:
+        root = Path.cwd().resolve()
+        summary_lines = []
+        for sec in sections:
+            uncovered = sum(end - start + 1 for start, end in sec.ranges)
+            total_lines = len(_read_file_lines(sec.file))
+            pct = (uncovered / total_lines * 100) if total_lines else 0
+            try:
+                rel = sec.file.resolve().relative_to(root)
+            except ValueError:
+                rel = sec.file.resolve()
+            summary_lines.append(f"{rel.as_posix()}: {uncovered} uncovered ({pct:.0f}%)")
+        output = f"{output}\n" + "\n".join(summary_lines)
 
     if aggregate_stats and fmt is Format.HUMAN:
         total_files = len(sections)
