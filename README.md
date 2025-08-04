@@ -16,8 +16,7 @@ showcov is a command-line utility that prints uncovered lines of code—grouped 
 - CLI flags: format selection, code embedding, context control, and disabling ANSI color.  
 - Graceful handling of common edge cases (missing source, invalid context, no uncovered lines).  
 - Programmatic API for consuming uncovered-section data in other tools or scripts.  
-- Flexible input filtering: specify files, directories, or glob patterns to include in the analysis  
-- Exclude specific files using `--exclude` with glob patterns  
+- Gitignore-style path filtering via `--include` and `--exclude` powered by `pathspec`
 - Save results directly to a file with `--output FILE`  
 - Markdown format: emit collapsible code blocks for easy use in pull-request comments (`--format markdown`)  
 - SARIF format: emit machine-readable results for GitHub Advanced Security annotations (`--format sarif`)

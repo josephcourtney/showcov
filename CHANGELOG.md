@@ -1,7 +1,9 @@
-## Unreleased - 2025-08-04
+## [0.0.17] - 2025-08-04
 
 ### Changed
-- remove `--no-pager`, make pager off the default
+- remove `--no-pager`; make pager off the default
+- replace custom path filtering with `pathspec` for include/exclude rules
+- use `more-itertools.consecutive_groups` to group uncovered line numbers
 
 ---
 

@@ -70,3 +70,12 @@
 - ran `.venv/bin/ruff check src/ tests/`
 - ran `.venv/bin/ty check src/ tests/`
 - ran `.venv/bin/pytest`
+
+## 2025-08-04T11:33Z
+- start implementing pathspec path filtering, consecutive grouping, and README feature update
+
+## 2025-08-04T11:35Z
+- ran `.venv/bin/ruff format src/ tests/`
+- ran `.venv/bin/ruff check src/ tests/`
+- ran `.venv/bin/ty check src/ tests/`
+- ran `.venv/bin/pytest`
