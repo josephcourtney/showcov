@@ -31,7 +31,7 @@ from showcov.core import (
     CoverageXMLNotFoundError,
 )
 from showcov.output import render_output
-from showcov.output.base import OutputMeta
+from showcov.output.base import Format, OutputMeta
 
 if TYPE_CHECKING:  # pragma: no cover
     from collections.abc import Sequence
@@ -121,7 +121,7 @@ def completion(shell: str) -> None:
     "format_",
     default="auto",
     show_default=True,
-    type=click.Choice(["auto", "human", "json", "markdown", "sarif"], case_sensitive=False),
+    type=click.Choice([fmt.value for fmt in Format], case_sensitive=False),
     help="Output format",
 )
 @click.option("--pager", is_flag=True, help="Force paging even if stdout is redirected")
@@ -205,6 +205,7 @@ def show(
         actual_format,
         meta,
         aggregate_stats=opts.aggregate_stats,
+        file_stats=opts.file_stats,
     )
     write_output(output_text, opts)
 

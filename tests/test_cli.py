@@ -130,6 +130,23 @@ def test_cli_format_auto_json(
     assert out.lstrip().startswith("{")
 
 
+def test_cli_format_html(
+    cli_runner: CliRunner,
+    coverage_xml_file: Callable[..., Path],
+    tmp_path: Path,
+) -> None:
+    src = tmp_path / "f.py"
+    src.write_text("a\n")
+    xml = coverage_xml_file({src: [1]})
+
+    code, out = _run(
+        cli_runner,
+        ["show", "--cov", str(xml), str(src), "--format", "html"],
+    )
+    assert code == 0
+    assert out.lstrip().startswith("<html>")
+
+
 def test_cli_invalid_format_suggestion(
     cli_runner: CliRunner,
     coverage_xml_file: Callable[..., Path],

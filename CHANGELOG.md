@@ -1,3 +1,12 @@
+## [0.0.19] - 2025-08-04
+
+### Added
+- add HTML output format for static reports
+- add optional per-file coverage summary with uncovered percentages
+- dynamically derive CLI format choices from available formats
+
+---
+
 ## [0.0.18] - 2025-08-04
 
 ### Added
