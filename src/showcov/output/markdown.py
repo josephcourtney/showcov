@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING
+
+from showcov.core.files import normalize_path, read_file_lines
 
 if TYPE_CHECKING:
     from showcov.core import UncoveredSection
@@ -13,18 +14,11 @@ if TYPE_CHECKING:
 def format_markdown(sections: list[UncoveredSection], meta: OutputMeta) -> str:
     context_lines = max(0, meta.context_lines)
     parts: list[str] = []
-    root = Path.cwd().resolve()
+    root = meta.coverage_xml.parent.resolve()
     for section in sections:
-        try:
-            rel = section.file.resolve().relative_to(root)
-        except ValueError:
-            rel = section.file.resolve()
+        rel = normalize_path(section.file, base=root)
         code_blocks: list[str] = []
-        try:
-            with section.file.open(encoding="utf-8") as f:
-                file_lines = [ln.rstrip("\n") for ln in f.readlines()]
-        except OSError:
-            file_lines = []
+        file_lines = read_file_lines(section.file)
         for start, end in section.ranges:
             start_idx = max(1, start - context_lines)
             end_idx = min(len(file_lines), end + context_lines)
