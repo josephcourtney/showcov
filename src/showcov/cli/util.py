@@ -23,12 +23,8 @@ from showcov.core import (
     determine_xml_file,
     gather_uncovered_lines_from_xml,
 )
-from showcov.output import (
-    get_formatter,
-)
 from showcov.output.base import (
     Format,
-    OutputMeta,
 )
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -171,38 +167,6 @@ def determine_format(opts: ShowcovOptions, output: Path | None, *, is_tty: bool)
         logger.info("destination: %s", output or "stdout")
 
     return fmt
-
-
-def render_output(
-    sections: list[UncoveredSection],
-    opts: ShowcovOptions,
-    fmt: Format,
-    xml_path: Path,
-) -> str:
-    if not sections:
-        return "No uncovered lines found (0 files matched input patterns)"
-
-    formatter = get_formatter(fmt)
-    meta = OutputMeta(
-        context_lines=max(opts.context_before, opts.context_after),
-        with_code=opts.show_code,
-        coverage_xml=xml_path,
-        color=opts.use_color,
-    )
-    output = formatter(sections, meta)
-
-    if opts.aggregate_stats and fmt is Format.HUMAN:
-        total_files = len(sections)
-        total_regions = sum(len(sec.ranges) for sec in sections)
-        total_lines = sum(end - start + 1 for sec in sections for start, end in sec.ranges)
-        footer = ", ".join([
-            f"{total_files} files with uncovered lines",
-            f"{total_regions} uncovered regions",
-            f"{total_lines} total lines",
-        ])
-        output = f"{output}\n{footer}"
-
-    return output
 
 
 def write_output(output_text: str, opts: ShowcovOptions) -> None:
