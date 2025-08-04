@@ -1,15 +1,5 @@
-- [x] add HTML output format
-  - add `--format html` to produce static, readable reports.
-  - useful for sharing in CI artifacts, dashboards, or offline review.
-- [x] add per-file coverage summary (informational, not enforcement)
-  - optionally show total uncovered lines per file and percent uncovered.
-  - implemented via `--file-stats` → `foo.py: 12 uncovered (30%)`.
-- [x] add a `diff` subcommand for report comparison
-  - implement a `showcov diff a.xml b.xml` command.
-  - show new uncovered lines or resolved ones since a baseline.
-- [x] improve the `human` format with `rich` terminal table format
-  - display uncovered sections in a compact table format (`rich.table`).
-  - columns: file | start line | end line | # lines
+- [ ] FIX: running just `showcov` produces an error.
+- [ ] FIX: the human format contains a table but no longer displays the code for  uncovered lines
 - [ ] line-level tags / labels
   - annotate output with reasons if known (e.g. `# pragma: no cover`, `@abstractmethod`) using heuristics.
 - [ ] reduce indirection in cli option parsing
@@ -21,9 +11,6 @@
 - [ ] consolidate cli entry points
   - `cli`, `__main__`, `entry.py`, `util.py` spread logic across multiple files.
   - could unify command registration and dispatch into fewer modules.
-- [x] avoid hardcoded format lists
-  - currently, `click.choice(["auto", "human", ...])` duplicates logic in `format`.
-  - dynamically generate from `format.__members__` to prevent drift.
 - [ ] avoid internal state in output
   - currently includes `path.cwd()` resolution and relative paths in output.
   - consider preserving original paths or normalizing consistently across formats.
