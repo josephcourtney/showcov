@@ -1,3 +1,10 @@
+## [0.0.20] - 2025-08-04
+
+### Added
+- add diff subcommand for comparing coverage reports
+
+---
+
 ## [0.0.19] - 2025-08-04
 
 ### Added
