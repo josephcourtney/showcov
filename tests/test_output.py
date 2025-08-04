@@ -1,22 +1,18 @@
 import json
 from pathlib import Path
 
-import pytest
-
 from showcov.core import build_sections
 from showcov.output import (
     FORMATTERS,
     format_html,
     format_human,
+    format_json,
     format_markdown,
     format_sarif,
-    get_formatter,
     render_output,
+    resolve_formatter,
 )
-from showcov.output.base import (
-    Format,
-    OutputMeta,
-)
+from showcov.output.base import Format, OutputMeta
 
 
 def test_format_human_respects_color(tmp_path: Path) -> None:
@@ -69,15 +65,10 @@ def test_format_registry() -> None:
     }
 
 
-def test_format_from_str() -> None:
-    assert Format.from_str("json") is Format.JSON
-    assert Format.from_str("html") is Format.HTML
-    with pytest.raises(ValueError, match="Unsupported format: 'bogus'"):
-        Format.from_str("bogus")
-
-
-def test_get_formatter_enum() -> None:
-    assert get_formatter(Format.HUMAN) is FORMATTERS[Format.HUMAN]
+def test_resolve_formatter() -> None:
+    fmt, formatter = resolve_formatter("json", is_tty=False)
+    assert fmt is Format.JSON
+    assert formatter is FORMATTERS[Format.JSON]
 
 
 def test_format_markdown(tmp_path: Path) -> None:
@@ -123,6 +114,7 @@ def test_file_stats_summary(tmp_path: Path) -> None:
     out = render_output(
         sections,
         Format.HUMAN,
+        FORMATTERS[Format.HUMAN],
         meta,
         file_stats=True,
     )
@@ -143,3 +135,18 @@ def test_format_sarif(tmp_path: Path) -> None:
     data = json.loads(out)
     assert data["version"] == "2.1.0"
     assert data["runs"][0]["results"][0]["locations"][0]["physicalLocation"]["region"]["startLine"] == 1
+
+
+def test_json_includes_tags(tmp_path: Path) -> None:
+    src = tmp_path / "f.py"
+    src.write_text("def g():\n    return 1  # pragma: no cover\n")
+    sections = build_sections({src: [2]})
+    meta = OutputMeta(
+        context_lines=0,
+        with_code=True,
+        coverage_xml=tmp_path / "cov.xml",
+        color=False,
+    )
+    out = format_json(sections, meta)
+    data = json.loads(out)
+    assert data["files"][0]["uncovered"][0]["source"][0]["tag"] == "no-cover"

@@ -14,8 +14,14 @@ def parse_json_output(data: str) -> list[UncoveredSection]:
     """Parse JSON coverage data into :class:`UncoveredSection` instances."""
     obj = json.loads(data)
     validate(obj, get_schema())
+    base = Path(obj["environment"]["coverage_xml"]).resolve().parent
     files = obj.get("files", [])
-    return [UncoveredSection.from_dict(f) for f in files]
+    sections = []
+    for entry in files:
+        item = dict(entry)
+        item["file"] = (base / item["file"]).as_posix()
+        sections.append(UncoveredSection.from_dict(item))
+    return sections
 
 
 def test_json_round_trip(tmp_path: Path) -> None:

@@ -1,3 +1,20 @@
+## [0.0.22] - 2025-08-04
+
+### Added
+- annotate uncovered lines with tags for `no-cover` and `abstractmethod`
+- centralize file reading and path normalization utilities
+
+### Changed
+- simplify CLI option parsing and consolidate entry points
+- simplify output format resolution
+- normalize paths without relying on the current working directory
+
+### Fixed
+- fix running `showcov` without arguments
+- restore code display in human output
+
+---
+
 ## [0.0.21] - 2025-08-04
 
 ### Changed
