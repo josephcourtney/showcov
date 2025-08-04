@@ -19,13 +19,13 @@
   dependencies = [
     "configparser>=7.1.0",
     "defusedxml>=0.7.1",
-    "jsonschema>=4.23.0", # Runtime JSON schema validation
-    "click>=8.1.7", # CLI framework
+    "jsonschema>=4.23.0",      # Runtime JSON schema validation
+    "click>=8.1.7",            # CLI framework
     "click-completion>=0.5.2",
     "rich>=14.1.0",
-    "pathspec>=0.12.1", # glob-style path filtering
-    "more-itertools>=10.3.0", # consecutive number grouping
-]
+    "pathspec>=0.12.1",        # glob-style path filtering
+    "more-itertools>=10.3.0",  # consecutive number grouping
+  ]
 
   [project.scripts]
     showcov = "showcov.cli:cli"
@@ -38,9 +38,7 @@
     "coverage>=7.7.0",
     "pytest-cov>=6.0.0",
     "pytest-randomly>=3.16.0",
-    "types-colorama>=0.4.15.20240311",
     "types-defusedxml>=0.7.0.20240218",
-    "types-toml>=0.10.8.20240310",
     "types-jsonschema>=4.23.0.20240712",
     "pre-commit>=4.2.0",
   ]
