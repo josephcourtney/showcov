@@ -1,7 +1,7 @@
 # =================================== project ====================================
 [project]
   name = "showcov"
-  version = "0.0.15"
+  version = "0.0.17"
   description = "Print out uncovered code."
   readme = "README.md"
   authors = [
@@ -23,6 +23,8 @@
     "click>=8.1.7", # CLI framework
     "click-completion>=0.5.2",
     "rich>=14.1.0",
+    "pathspec>=0.12.1", # glob-style path filtering
+    "more-itertools>=10.3.0", # consecutive number grouping
 ]
 
   [project.scripts]

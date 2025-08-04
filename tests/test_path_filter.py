@@ -25,3 +25,14 @@ def test_path_filter_include_exclude(tmp_path: Path) -> None:
     pf = PathFilter([tmp_path], ["*b.py"])
     out = pf.filter(sections)
     assert [s.file for s in out] == [file_a]
+
+
+def test_path_filter_resolves_paths(tmp_path: Path) -> None:
+    file_a = tmp_path / "a.py"
+    file_a.write_text("a\n")
+    sections = [UncoveredSection(file_a, [(1, 1)])]
+
+    rel = tmp_path / ".." / tmp_path.name / "a.py"
+    pf = PathFilter([str(rel)], [])
+    out = pf.filter(sections)
+    assert [s.file for s in out] == [file_a]
