@@ -4,7 +4,7 @@
 - [x] add per-file coverage summary (informational, not enforcement)
   - optionally show total uncovered lines per file and percent uncovered.
   - implemented via `--file-stats` → `foo.py: 12 uncovered (30%)`.
-- [ ] add a `diff` subcommand for report comparison
+- [x] add a `diff` subcommand for report comparison
   - implement a `showcov diff a.xml b.xml` command.
   - show new uncovered lines or resolved ones since a baseline.
 - [ ] improve the `human` format with `rich` terminal table format
