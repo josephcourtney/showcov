@@ -7,6 +7,7 @@ from showcov.output.human import format_human
 from showcov.output.json import format_json
 from showcov.output.markdown import format_markdown
 from showcov.output.registry import FORMATTERS, get_formatter
+from showcov.output.render import render_output
 from showcov.output.sarif import format_sarif
 
 __all__ = [
@@ -18,4 +19,5 @@ __all__ = [
     "format_markdown",
     "format_sarif",
     "get_formatter",
+    "render_output",
 ]

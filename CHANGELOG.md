@@ -1,3 +1,11 @@
+## [0.0.18] - 2025-08-04
+
+### Added
+- add model context protocol interface and LLM payload generator
+- move output rendering logic to output package
+
+---
+
 ## [0.0.17] - 2025-08-04
 
 ### Changed

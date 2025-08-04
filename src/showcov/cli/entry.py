@@ -24,13 +24,14 @@ from showcov.cli.util import (
     _emit_manpage,
     determine_format,
     parse_flags_to_opts,
-    render_output,
     resolve_sections,
     write_output,
 )
 from showcov.core import (
     CoverageXMLNotFoundError,
 )
+from showcov.output import render_output
+from showcov.output.base import OutputMeta
 
 if TYPE_CHECKING:  # pragma: no cover
     from collections.abc import Sequence
@@ -193,5 +194,16 @@ def show(
 
     is_tty = sys.stdout.isatty()
     actual_format = determine_format(opts, output, is_tty=is_tty)
-    output_text = render_output(sections, opts, actual_format, resolved_xml)
+    meta = OutputMeta(
+        context_lines=max(opts.context_before, opts.context_after),
+        with_code=opts.show_code,
+        coverage_xml=resolved_xml,
+        color=opts.use_color,
+    )
+    output_text = render_output(
+        sections,
+        actual_format,
+        meta,
+        aggregate_stats=opts.aggregate_stats,
+    )
     write_output(output_text, opts)
