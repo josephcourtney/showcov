@@ -313,6 +313,47 @@ def gather_uncovered_lines_from_xml(xml_file: Path) -> dict[Path, list[int]]:
         raise OSError(msg) from exc
 
 
+def diff_uncovered_lines(
+    baseline_xml: Path, current_xml: Path
+) -> tuple[list[UncoveredSection], list[UncoveredSection]]:
+    """Return new and resolved uncovered sections between two coverage reports.
+
+    Parameters
+    ----------
+    baseline_xml:
+        Path to the baseline coverage XML report.
+    current_xml:
+        Path to the current coverage XML report.
+
+    Returns
+    -------
+    tuple[list[UncoveredSection], list[UncoveredSection]]
+        Two lists of :class:`UncoveredSection` objects.  The first contains
+        sections that are newly uncovered in ``current_xml`` compared to the
+        baseline.  The second contains sections that were uncovered in the
+        baseline but have since been resolved.
+    """
+    baseline = gather_uncovered_lines_from_xml(baseline_xml)
+    current = gather_uncovered_lines_from_xml(current_xml)
+
+    new_uncovered: dict[Path, list[int]] = {}
+    resolved: dict[Path, list[int]] = {}
+
+    for file, lines in current.items():
+        prev = set(baseline.get(file, []))
+        added = sorted(set(lines) - prev)
+        if added:
+            new_uncovered[file] = added
+
+    for file, lines in baseline.items():
+        now = set(current.get(file, []))
+        removed = sorted(set(lines) - now)
+        if removed:
+            resolved[file] = removed
+
+    return build_sections(new_uncovered), build_sections(resolved)
+
+
 def parse_large_xml(file_path: Path) -> Element | None:
     """Efficiently parse large XML files with iterparse."""
     context = ElementTree.iterparse(file_path, events=("start", "end"))
