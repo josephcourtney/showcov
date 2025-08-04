@@ -22,6 +22,11 @@ def _run(runner: CliRunner, args: list[str]) -> tuple[int, str]:
 # --------------------------------------------------------------------------- #
 
 
+def test_cli_no_options(cli_runner: CliRunner) -> None:
+    code, _out = _run(cli_runner, [])
+    assert code == 0
+
+
 def test_cli_filters_and_output(
     tmp_path: Path,
     cli_runner: CliRunner,
