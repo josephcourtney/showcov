@@ -17,16 +17,16 @@
   ]
   requires-python = ">=3.13"
   dependencies = [
-    "colorama>=0.4.6",
     "configparser>=7.1.0",
     "defusedxml>=0.7.1",
-    "jsonschema>=4.23.0",      # Runtime JSON schema validation
-    "click>=8.1.7",            # CLI framework
+    "jsonschema>=4.23.0", # Runtime JSON schema validation
+    "click>=8.1.7", # CLI framework
     "click-completion>=0.5.2",
-  ]
+    "rich>=14.1.0",
+]
 
   [project.scripts]
-    showcov = "showcov.cli:main"
+    showcov = "showcov.cli:cli"
 
 [dependency-groups]
   dev = [

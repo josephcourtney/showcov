@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from showcov.core import UncoveredSection
-from showcov.path_filter import PathFilter
+from showcov.core import PathFilter, UncoveredSection
 
 if TYPE_CHECKING:
     from pathlib import Path

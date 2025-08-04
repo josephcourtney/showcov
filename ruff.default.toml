@@ -147,6 +147,7 @@ respect-gitignore = true
       "S603",    # `subprocess` call: check for execution of untrusted
       "SLF001",  # Private member accessed
       "PLC0415", # `import` should be at the top-level of a file
+      "INP001",  # File is part of an implicit namespace package. Add an `__init__.py`.
     ]
 
     # disable autofix when linting
