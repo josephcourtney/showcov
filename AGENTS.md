@@ -20,8 +20,6 @@ Your responsibilities include:
 
 ## Directory Constraints
 
-
-
 * Source code: `src/showcov/`
 * Tests: `tests/`
 * Do not write, or create files outside these directories unless explicitly instructed.
@@ -67,28 +65,10 @@ If any command fails due to missing executables or environment configuration, em
 * Omit ANSI styling in non-human formats (e.g., JSON)
 * No I/O outside `src/`, `tests/`, or `TODO.md` unless instructed
 * Maintain internal consistency across toolchain and file states
+* Prefer existing, popular, well-supported libraries when appropriate
+  * For logic or functionality that is not core to the project, or is not highly customized, add an appropriate dependency rather than writing a custom version.
 
 ## Logging and Progress Tracking
-
-### Live Log
-
-
-Maintain a `LIVELOG.md` file at the project root.
-Each entry must:
-
-* Be timestamped (`YYYY-MM-DDTHH:MMZ`) in ISO8601 format
-* Use readable Markdown headings and bullet points
-* Record major actions, decisions, errors, and state changes
-
-Example:
-
-```markdown
-## 2025-08-02T14:20Z
-
-- ran `.venv/bin/ruff check` with 0 errors
-- static typing failed: `ty` not found in `.venv/bin/`
-- emitted patch instead of direct code write
-````
 
 ### To-Do List Maintenance
 
@@ -96,7 +76,7 @@ Example:
 * Do not delete or rewrite historical entries
 * If `TODO.md` is missing, create a new file and notify the user in `LIVELOG.md`
 
-## Changelog Maintenance
+### Changelog Maintenance
 
 
 Follow [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format:
@@ -157,7 +137,6 @@ Before submitting a pull request:
 
 You must assume:
 
-* No access to long-term memory
 * Each task starts with only the current file state
 * You must re-read `LIVELOG.md`, `TODO.md`, and `CHANGELOG.md` before taking action on historical items
 

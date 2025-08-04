@@ -15,8 +15,7 @@ from configparser import Error as ConfigError
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
-from types import SimpleNamespace
-from typing import TYPE_CHECKING, Optional, cast
+from typing import TYPE_CHECKING, cast
 
 from defusedxml import ElementTree
 from more_itertools import consecutive_groups
@@ -24,6 +23,7 @@ from more_itertools import consecutive_groups
 from showcov import logger
 
 if TYPE_CHECKING:
+    from types import SimpleNamespace
     from xml.etree.ElementTree import Element  # noqa: S405
 
 
@@ -106,7 +106,7 @@ class UncoveredSection:
         return {"file": file_str, "uncovered": uncovered_entries}
 
     @classmethod
-    def from_dict(cls, data: dict[str, object]) -> "UncoveredSection":
+    def from_dict(cls, data: dict[str, object]) -> UncoveredSection:
         """Create an :class:`UncoveredSection` from a dictionary."""
         file = Path(str(data["file"]))
         items = cast("list[dict[str, object]]", data.get("uncovered", []))
@@ -178,7 +178,8 @@ def determine_xml_file(xml_file: SimpleNamespace | str | None = None) -> Path:
             raise CoverageXMLNotFoundError(msg)
         return path
 
-    from showcov.core import get_config_xml_file as _get_config_xml_file
+    # avoid circular import
+    from showcov.core import get_config_xml_file as _get_config_xml_file  # noqa: PLC0415
 
     config_xml = _get_config_xml_file()
     if config_xml:
@@ -218,7 +219,7 @@ def merge_blank_gap_groups(groups: list[list[int]], file_lines: list[str]) -> li
     return merged
 
 
-def gather_uncovered_lines(root: "Element") -> dict[Path, list[int]]:
+def gather_uncovered_lines(root: Element) -> dict[Path, list[int]]:
     """Gather uncovered lines per file from the parsed XML tree."""
     uncovered: dict[Path, list[int]] = {}
 
@@ -312,7 +313,7 @@ def gather_uncovered_lines_from_xml(xml_file: Path) -> dict[Path, list[int]]:
         raise OSError(msg) from exc
 
 
-def parse_large_xml(file_path: Path) -> Optional["Element"]:
+def parse_large_xml(file_path: Path) -> Element | None:
     """Efficiently parse large XML files with iterparse."""
     context = ElementTree.iterparse(file_path, events=("start", "end"))
     for event, elem in context:
