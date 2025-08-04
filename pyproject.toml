@@ -1,7 +1,7 @@
 # =================================== project ====================================
 [project]
   name = "showcov"
-version = "0.0.19"
+version = "0.0.18"
   description = "Print out uncovered code."
   readme = "README.md"
   authors = [
@@ -25,12 +25,10 @@ version = "0.0.19"
     "rich>=14.1.0",
     "pathspec>=0.12.1",        # glob-style path filtering
     "more-itertools>=10.3.0",  # consecutive number grouping
-    "mcp[cli]>=1.7.0",         # Model Context Protocol server
   ]
 
   [project.scripts]
     showcov = "showcov.cli:cli"
-    showcov-mcp = "showcov.mcp_server:main"
 
 [dependency-groups]
   dev = [

@@ -1,10 +1,3 @@
-## [0.0.19] - 2025-08-04
-
-### Added
-- add MCP server entry point and CLI for coverage resources
-
----
-
 ## [0.0.18] - 2025-08-04
 
 ### Added
