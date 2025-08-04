@@ -6,10 +6,12 @@ import pytest
 from showcov.core import build_sections
 from showcov.output import (
     FORMATTERS,
+    format_html,
     format_human,
     format_markdown,
     format_sarif,
     get_formatter,
+    render_output,
 )
 from showcov.output.base import (
     Format,
@@ -42,6 +44,7 @@ def test_format_human_respects_color(tmp_path: Path) -> None:
 def test_format_registry() -> None:
     assert set(FORMATTERS) == {
         Format.HUMAN,
+        Format.HTML,
         Format.JSON,
         Format.MARKDOWN,
         Format.SARIF,
@@ -50,6 +53,7 @@ def test_format_registry() -> None:
 
 def test_format_from_str() -> None:
     assert Format.from_str("json") is Format.JSON
+    assert Format.from_str("html") is Format.HTML
     with pytest.raises(ValueError, match="Unsupported format: 'bogus'"):
         Format.from_str("bogus")
 
@@ -71,6 +75,40 @@ def test_format_markdown(tmp_path: Path) -> None:
     out = format_markdown(sections, meta)
     assert "<details>" in out
     assert "```" in out
+
+
+def test_format_html(tmp_path: Path) -> None:
+    src = tmp_path / "x.py"
+    src.write_text("a\n")
+    sections = build_sections({src: [1]})
+    meta = OutputMeta(
+        context_lines=0,
+        with_code=False,
+        coverage_xml=tmp_path / "cov.xml",
+        color=False,
+    )
+    out = format_html(sections, meta)
+    assert "<html>" in out
+    assert "x.py" in out
+
+
+def test_file_stats_summary(tmp_path: Path) -> None:
+    src = tmp_path / "x.py"
+    src.write_text("a\n")
+    sections = build_sections({src: [1]})
+    meta = OutputMeta(
+        context_lines=0,
+        with_code=False,
+        coverage_xml=tmp_path / "cov.xml",
+        color=False,
+    )
+    out = render_output(
+        sections,
+        Format.HUMAN,
+        meta,
+        file_stats=True,
+    )
+    assert "x.py: 1 uncovered (100%)" in out
 
 
 def test_format_sarif(tmp_path: Path) -> None:

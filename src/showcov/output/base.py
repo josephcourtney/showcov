@@ -2,7 +2,7 @@
 
 Defines:
 
-- `Format`: Enum of supported output formats (human, json, markdown, sarif, auto).
+- `Format`: Enum of supported output formats (human, json, markdown, sarif, html, auto).
 - `OutputMeta`: Container for formatting options shared across all formatters.
 - `Formatter`: Protocol that all formatter functions must implement.
 
@@ -32,6 +32,7 @@ class Format(StrEnum):
     JSON = "json"
     MARKDOWN = "markdown"
     SARIF = "sarif"
+    HTML = "html"
     AUTO = "auto"
 
     @classmethod

@@ -1,9 +1,9 @@
-- [ ] add HTML output format
+- [x] add HTML output format
   - add `--format html` to produce static, readable reports.
   - useful for sharing in CI artifacts, dashboards, or offline review.
-- [ ] add per-file coverage summary (informational, not enforcement)
+- [x] add per-file coverage summary (informational, not enforcement)
   - optionally show total uncovered lines per file and percent uncovered.
-  - e.g. `--file-summary` → `foo.py: 12 uncovered (30%)`.
+  - implemented via `--file-stats` → `foo.py: 12 uncovered (30%)`.
 - [ ] add a `diff` subcommand for report comparison
   - implement a `showcov diff a.xml b.xml` command.
   - show new uncovered lines or resolved ones since a baseline.
@@ -21,7 +21,7 @@
 - [ ] consolidate cli entry points
   - `cli`, `__main__`, `entry.py`, `util.py` spread logic across multiple files.
   - could unify command registration and dispatch into fewer modules.
-- [ ] avoid hardcoded format lists
+- [x] avoid hardcoded format lists
   - currently, `click.choice(["auto", "human", ...])` duplicates logic in `format`.
   - dynamically generate from `format.__members__` to prevent drift.
 - [ ] avoid internal state in output

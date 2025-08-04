@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from contextlib import asynccontextmanager
 from functools import lru_cache
 from pathlib import Path
@@ -20,7 +21,7 @@ from showcov.core import (
 from showcov.output.base import OutputMeta
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import AsyncIterator, Iterable
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Pydantic primitives reused by many tools
@@ -106,7 +107,7 @@ def _sections_from_xml(xml_path: Path) -> list[UncoveredSection]:
     mtime = xml_path.stat().st_mtime
 
     @lru_cache(maxsize=8)
-    def _cached(path_str: str, mtime_val: float) -> list[UncoveredSection]:
+    def _cached(path_str: str, _mtime_val: float) -> list[UncoveredSection]:
         uncovered = gather_uncovered_lines_from_xml(Path(path_str))
         return build_sections(uncovered)
 
@@ -117,6 +118,7 @@ def _sections_and_meta(
     include: Iterable[str] | None,
     exclude: Iterable[str] | None,
     context_lines: int,
+    *,
     with_code: bool,
 ) -> tuple[list[UncoveredSection], OutputMeta]:
     """Resolve uncovered sections using CLI helpers so config-file logic stays central."""
@@ -186,7 +188,8 @@ def list_files(
     include: list[str] | None = None,
     exclude: list[str] | None = None,
 ) -> list[str]:
-    """
+    """Return paths of all source files with uncovered lines.
+
     Examples
     --------
     >>> client.call("coverage/list_files", {"include": ["src/**.py"]})
@@ -206,12 +209,14 @@ def list_files(
 def get_sections(
     include: list[str] | None = None,
     exclude: list[str] | None = None,
+    *,
     context_lines: int = 0,
     with_code: bool = True,
     page: int = 1,
     per_page: int = 100,  # number of files per page, not ranges
 ) -> CoverageReport:
-    """
+    """Return uncovered line ranges, optionally with source code.
+
     Examples
     --------
     Basic use
@@ -220,7 +225,7 @@ def get_sections(
     Fetch first 10 files only
     >>> client.call("coverage/get_sections", {"per_page": 10})
     """
-    sections, meta = _sections_and_meta(include, exclude, context_lines, with_code)
+    sections, meta = _sections_and_meta(include, exclude, context_lines, with_code=with_code)
     paged = _paginate(sections, max(1, page), max(1, per_page))
     return _make_report(paged, meta)
 
@@ -235,12 +240,13 @@ def stats(
     exclude: list[str] | None = None,
     threshold_lines: int | None = None,
 ) -> CoverageStats:
-    """
+    """Return counts of files, regions, and lines that remain uncovered.
+
     Examples
     --------
     >>> client.call("coverage/stats", {"threshold_lines": 50})
     """
-    sections, _meta = _sections_and_meta(include, exclude, 0, False)
+    sections, _meta = _sections_and_meta(include, exclude, 0, with_code=False)
     total_files = len(sections)
     total_regions = sum(len(s.ranges) for s in sections)
     total_lines = sum(end - start + 1 for s in sections for start, end in s.ranges)
@@ -257,12 +263,15 @@ def stats(
 # Entrypoint
 # ─────────────────────────────────────────────────────────────────────────────
 @asynccontextmanager
-async def lifespan(app):
-    # Startup: preload XML cache or log startup
+async def lifespan(_app: object) -> AsyncIterator[None]:
+    """Lifecycle hooks for FastMCP."""
     print("🚀 Starting Showcov MCP server...")
-    yield
-    # Shutdown: clean up resources
-    print("🛑 Shutting down Showcov MCP server...")
+    await asyncio.sleep(0)
+    try:
+        yield
+    finally:
+        await asyncio.sleep(0)
+        print("🛑 Shutting down Showcov MCP server...")
 
 
 def main() -> None:  # pragma: no cover
