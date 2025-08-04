@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/showcov.mcp.schema.json",
+  "title": "Showcov Model Context",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "environment": {
+      "type": "object",
+      "properties": {
+        "coverage_xml": {"type": "string"},
+        "context_lines": {"type": "integer", "minimum": 0},
+        "with_code": {"type": "boolean"}
+      },
+      "required": ["coverage_xml", "context_lines", "with_code"],
+      "additionalProperties": false
+    },
+    "sections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "file": {"type": "string"},
+          "uncovered": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "start": {"type": "integer", "minimum": 1},
+                "end": {"type": "integer", "minimum": 1},
+                "source": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "line": {"type": "integer", "minimum": 1},
+                      "code": {"type": "string"}
+                    },
+                    "required": ["line", "code"],
+                    "additionalProperties": false
+                  },
+                  "minItems": 1
+                }
+              },
+              "required": ["start", "end"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["file", "uncovered"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["version", "environment", "sections"],
+  "additionalProperties": false
+}
