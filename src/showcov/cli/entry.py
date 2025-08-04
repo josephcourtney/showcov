@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import dataclasses
+import json
 import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -29,6 +31,7 @@ from showcov.cli.util import (
 )
 from showcov.core import (
     CoverageXMLNotFoundError,
+    diff_uncovered_lines,
 )
 from showcov.output import render_output
 from showcov.output.base import Format, OutputMeta
@@ -208,6 +211,78 @@ def show(
         file_stats=opts.file_stats,
     )
     write_output(output_text, opts)
+
+
+# --------------------------------------------------------------------------- #
+# Sub-command: diff                                                           #
+# --------------------------------------------------------------------------- #
+@cli.command(name="diff")
+@click.argument("baseline", type=click.Path(path_type=Path, exists=True))
+@click.argument("current", type=click.Path(path_type=Path, exists=True))
+@click.option(
+    "--format",
+    "format_",
+    default="auto",
+    show_default=True,
+    type=click.Choice([fmt.value for fmt in Format], case_sensitive=False),
+    help="Output format",
+)
+@click.option("--output", type=click.Path(path_type=Path), help="Write output to FILE instead of stdout")
+@click.pass_obj
+def diff(
+    opts: ShowcovOptions,
+    *,
+    baseline: Path,
+    current: Path,
+    format_: str,
+    output: Path | None,
+) -> None:
+    """Compare coverage reports and show new or resolved uncovered lines."""
+    _configure_runtime(
+        quiet=opts.quiet,
+        verbose=opts.verbose,
+        debug=opts.debug,
+    )
+
+    try:
+        new_sections, resolved_sections = diff_uncovered_lines(baseline, current)
+    except ElementTree.ParseError:
+        click.echo("ERROR: failed to read coverage XML", err=True)
+        if opts.debug:
+            raise
+        sys.exit(EXIT_DATAERR)
+    except OSError as e:
+        click.echo(f"ERROR: failed to read coverage XML: {e}", err=True)
+        if opts.debug:
+            raise
+        sys.exit(EXIT_GENERIC)
+
+    fmt = Format.from_str(format_)
+    if fmt is Format.AUTO:
+        fmt = Format.HUMAN if sys.stdout.isatty() else Format.JSON
+
+    meta = OutputMeta(
+        context_lines=0,
+        with_code=False,
+        coverage_xml=current,
+        color=opts.use_color,
+    )
+
+    if fmt is Format.JSON:
+        data = {
+            "new": [sec.to_dict() for sec in new_sections],
+            "resolved": [sec.to_dict() for sec in resolved_sections],
+        }
+        output_text = json.dumps(data, indent=2, sort_keys=True)
+    else:
+        parts: list[str] = []
+        if new_sections:
+            parts.append("New uncovered lines:\n" + render_output(new_sections, fmt, meta))
+        if resolved_sections:
+            parts.append("Resolved uncovered lines:\n" + render_output(resolved_sections, fmt, meta))
+        output_text = "No changes in coverage" if not parts else "\n\n".join(parts)
+
+    write_output(output_text, dataclasses.replace(opts, output=output, output_format=fmt.value))
 
 
 # --------------------------------------------------------------------------- #
