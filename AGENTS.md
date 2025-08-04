@@ -28,7 +28,12 @@ Your responsibilities include:
 
 Before proposing code, validate all changes using the tools below.
 
-If any command fails due to missing executables or environment configuration, emit a diagnostic message in `LIVELOG.md` and request clarification from the user.
+If any command fails due to missing executables or environment configuration, emit a diagnostic message and request clarification from the user.
+
+### Package Management
+
+* Command: `uv`
+* Rules: use `uv` for all package management including adding and removing dependencies
 
 ### Linting
 
@@ -45,7 +50,7 @@ If any command fails due to missing executables or environment configuration, em
 * Syntax: Use Python 3.13–compatible type annotations
 * Constraints: Must follow `pyproject.toml` settings
 
-> If `ty` is not available in `.venv/bin/`, log a failure notice in `LIVELOG.md`, emit proposed code as a Markdown patch, and halt execution.
+> If `ty` is not available in `.venv/bin/`, log a failure notice, emit proposed code as a Markdown patch, and halt execution.
 
 ### Testing
 
@@ -74,7 +79,7 @@ If any command fails due to missing executables or environment configuration, em
 
 * As you complete items from `TODO.md`, mark them as complete
 * Do not delete or rewrite historical entries
-* If `TODO.md` is missing, create a new file and notify the user in `LIVELOG.md`
+* If `TODO.md` is missing, create a new file and notify the user
 
 ### Changelog Maintenance
 
@@ -93,7 +98,7 @@ Ensure:
 * Changelog matches the actual code changes
 * Version in `pyproject.toml` is updated
 * Historical entries are never modified
-* If `CHANGELOG.md` is missing, create a stub file and note this in `LIVELOG.md`
+* If `CHANGELOG.md` is missing, create a stub file and note this
 
 Example:
 
@@ -131,14 +136,14 @@ Before submitting a pull request:
 * Do not add new dependencies without an inline comment justifying the change
 * Do not reduce test coverage unless explicitly approved
 * Do not introduce non-determinism (e.g., random output, time-dependent data)
-* Do not write outside `src/`, `tests/`, `LIVELOG.md`, `CHANGELOG.md`, or `TODO.md` unless instructed
+* Do not write outside `src/`, `tests/`, `CHANGELOG.md`, or `TODO.md` unless instructed
 
 ## Assumptions and Capabilities
 
 You must assume:
 
 * Each task starts with only the current file state
-* You must re-read `LIVELOG.md`, `TODO.md`, and `CHANGELOG.md` before taking action on historical items
+* You must re-read `TODO.md`, and `CHANGELOG.md` before taking action on historical items
 
 If lacking access to shell or file I/O:
 
