@@ -133,6 +133,10 @@ Before submitting a pull request:
 * Do not introduce non-determinism (e.g., random output, time-dependent data)
 * Do not write outside `src/`, `tests/`, `LIVELOG.md`, `CHANGELOG.md`, or `TODO.md` unless instructed
 
+## Dependency Justifications
+
+- `mcp[cli]` is required to expose coverage data over the Model Context Protocol.
+
 ## Assumptions and Capabilities
 
 You must assume:
