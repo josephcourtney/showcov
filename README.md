@@ -4,21 +4,21 @@ showcov is a command-line utility that prints uncovered lines of code—grouped 
 
 ## Features
 
-- Human-readable report of uncovered lines with optional surrounding context.  
-- Structured JSON output conforming to a published schema.  
-- Option to include source code snippets around uncovered ranges.  
-- Deterministic ordering of files and ranges for reliable diffing and automation.  
-- Environment metadata embedded in JSON (coverage file, context settings, inclusion flags).  
-- Automatic resolution of the coverage XML file from argument or common config files.  
-- Snapshot-ready output for integration with LLMs or CI.  
-- Round-trip fidelity: JSON can be parsed back into the same coverage sections.  
-- Validation of JSON output against the schema to catch regressions.  
-- CLI flags: format selection, code embedding, context control, and disabling ANSI color.  
-- Graceful handling of common edge cases (missing source, invalid context, no uncovered lines).  
-- Programmatic API for consuming uncovered-section data in other tools or scripts.  
+- Human-readable report of uncovered lines with optional surrounding context.
+- Structured JSON output conforming to a published schema.
+- Option to include source code snippets around uncovered ranges.
+- Deterministic ordering of files and ranges for reliable diffing and automation.
+- Environment metadata embedded in JSON (coverage file, context settings, inclusion flags).
+- Automatic resolution of the coverage XML file from argument or common config files.
+- Snapshot-ready output for integration with LLMs or CI.
+- Round-trip fidelity: JSON can be parsed back into the same coverage sections.
+- Validation of JSON output against the schema to catch regressions.
+- CLI flags: format selection, code embedding, context control, and disabling ANSI color.
+- Graceful handling of common edge cases (missing source, invalid context, no uncovered lines).
+- Programmatic API for consuming uncovered-section data in other tools or scripts.
 - Gitignore-style path filtering via `--include` and `--exclude` powered by `pathspec`
-- Save results directly to a file with `--output FILE`  
-- Markdown format: emit collapsible code blocks for easy use in pull-request comments (`--format markdown`)  
+- Save results directly to a file with `--output FILE`
+- Markdown format: emit collapsible code blocks for easy use in pull-request comments (`--format markdown`)
 - SARIF format: emit machine-readable results for GitHub Advanced Security annotations (`--format sarif`)
 - Quiet and verbose modes:
   - `--quiet` suppresses informational logs
@@ -44,6 +44,15 @@ showcov is a command-line utility that prints uncovered lines of code—grouped 
   - `--list-files` emits one uncovered file path per line
 - Output suggestions on flag errors:
   - Suggest closest matching format name on typos
+- LLM protocol support:
+  - Generate structured model-context payloads for LLM consumption (`--format json`)
+  - Validate output against `mcp_schema.json`
+- Minimal interface exposure:
+  - Outputs exclude internal runtime state; suitable for CI or tooling
+- Deterministic LLM snapshots:
+  - Machine-readable JSON output reproducible for prompt engineering
+- Round-trip compatibility:
+  - Convert JSON output back into internal representation for automated review or test generation
 
 ## Installation
 
@@ -57,7 +66,7 @@ uv tool install clone https://github.com/josephcourtney/showcov.git
 showcov [COVERAGE_XML_FILE]
 ```
 
-- **COVERAGE_XML_FILE**: _(Optional)_ The path to your coverage XML report.  
+- **COVERAGE_XML_FILE**: _(Optional)_ The path to your coverage XML report.
   If omitted, showcov will search for a configuration file (such as `pyproject.toml`, `.coveragerc`, or `setup.cfg`) that specifies the XML report’s location.
 
 Result for showcov itself:
