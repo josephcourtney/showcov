@@ -107,7 +107,7 @@ def _resolve_context_option(value: str | None) -> tuple[int, int]:
     if len(parts) == 1:
         n = int(parts[0])
         return n, n
-    if len(parts) == 2:
+    if len(parts) == 2:  # noqa: PLR2004
         return int(parts[0]), int(parts[1])
     msg = "Expect 'N' or 'N,M' for --context"
     raise click.BadParameter(msg)
@@ -126,7 +126,7 @@ def parse_flags_to_opts(
     no_color: bool,
     line_numbers: bool,
     context_: str | None,
-    **kwargs,
+    **kwargs: object,
 ) -> ShowcovOptions:
     if force_color and no_color:
         msg = "--color/--no-color"
