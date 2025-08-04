@@ -7,7 +7,7 @@ information to generate accurate input/output schemas automatically.*
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field, PositiveInt, conint, validator
+from pydantic import BaseModel, Field, PositiveInt, model_validator
 
 # --------------------------------------------------------------------------- #
 # Primitives                                                                  #
@@ -25,12 +25,12 @@ class UncoveredRange(BaseModel):
     source: list[SourceLine] | None = None
 
     # Ensure callers pass sensible data when reconstructing from JSON
-    @validator("end")
-    def _end_not_before_start(cls, v: int, values):  # noqa: N805
-        if "start" in values and v < values["start"]:
+    @model_validator(mode="after")
+    def _end_not_before_start(self) -> UncoveredRange:
+        if self.end < self.start:
             msg = "end must be ≥ start"
             raise ValueError(msg)
-        return v
+        return self
 
 
 class CoverageFile(BaseModel):
@@ -45,7 +45,7 @@ class CoverageFile(BaseModel):
 
 class Environment(BaseModel):
     coverage_xml: str
-    context_lines: conint(ge=0, le=20)
+    context_lines: int = Field(ge=0, le=20)
     with_code: bool
 
 
