@@ -1,3 +1,10 @@
+## [0.0.21] - 2025-08-04
+
+### Changed
+- render uncovered lines in rich table for human format
+
+---
+
 ## [0.0.20] - 2025-08-04
 
 ### Added
