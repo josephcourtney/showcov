@@ -1,19 +1,19 @@
-- [ ] FIX: running just `showcov` produces an error.
-- [ ] FIX: the human format contains a table but no longer displays the code for  uncovered lines
-- [ ] line-level tags / labels
+- [x] FIX: running just `showcov` produces an error.
+- [x] FIX: the human format contains a table but no longer displays the code for  uncovered lines
+- [x] line-level tags / labels
   - annotate output with reasons if known (e.g. `# pragma: no cover`, `@abstractmethod`) using heuristics.
-- [ ] reduce indirection in cli option parsing
+- [x] reduce indirection in cli option parsing
   - the `showcovoptions → parse_flags_to_opts → dataclasses.replace(...)` chain is needlessly complex.
   - consider collapsing into a simpler dataclass or namespace with direct mutation.
-- [ ] simplify format resolution logic
+- [x] simplify format resolution logic
   - `format.from_str → determine_format → get_formatter` is too layered.
   - can merge `from_str()` and `get_formatter()` logic into one resolver.
-- [ ] consolidate cli entry points
+- [x] consolidate cli entry points
   - `cli`, `__main__`, `entry.py`, `util.py` spread logic across multiple files.
   - could unify command registration and dispatch into fewer modules.
-- [ ] avoid internal state in output
+- [x] avoid internal state in output
   - currently includes `path.cwd()` resolution and relative paths in output.
   - consider preserving original paths or normalizing consistently across formats.
-- [ ] unify file reading and path normalization logic
+- [x] unify file reading and path normalization logic
    - code for resolving and reading files is duplicated across `core.py`, formatters, and `uncoveredsection`.
    - centralize file access (existence, contents, relpath) in a single utility module.

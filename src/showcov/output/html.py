@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from html import escape
-from pathlib import Path
 from typing import TYPE_CHECKING
+
+from showcov.core.files import normalize_path, read_file_lines
 
 if TYPE_CHECKING:  # pragma: no cover
     from showcov.core import UncoveredSection
@@ -12,21 +13,12 @@ if TYPE_CHECKING:  # pragma: no cover
 def format_html(sections: list[UncoveredSection], meta: OutputMeta) -> str:
     """Return an HTML report for *sections*."""
     context_lines = max(0, meta.context_lines)
-    root = Path.cwd().resolve()
+    root = meta.coverage_xml.parent.resolve()
     parts: list[str] = ["<html>", "<body>"]
     for section in sections:
-        try:
-            rel = section.file.resolve().relative_to(root)
-        except ValueError:
-            rel = section.file.resolve()
+        rel = normalize_path(section.file, base=root)
         parts.append(f"<h2>{escape(rel.as_posix())}</h2>")
-        file_lines: list[str] = []
-        if meta.with_code:
-            try:
-                with section.file.open(encoding="utf-8") as f:
-                    file_lines = [ln.rstrip("\n") for ln in f.readlines()]
-            except OSError:
-                file_lines = []
+        file_lines: list[str] = read_file_lines(section.file) if meta.with_code else []
         for start, end in section.ranges:
             header = f"Lines {start}-{end}" if start != end else f"Line {start}"
             parts.append(f"<h3>{header}</h3>")

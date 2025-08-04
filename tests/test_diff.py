@@ -40,5 +40,5 @@ def test_cli_diff_json(cli_runner: CliRunner, coverage_xml_file: Callable[..., P
     result = cli_runner.invoke(cli, ["diff", str(baseline), str(current), "--format", "json"])
     assert result.exit_code == 0
     data = json.loads(result.output)
-    assert data["new"] == [{"file": a.resolve().as_posix(), "uncovered": [{"start": 2, "end": 2}]}]
-    assert data["resolved"] == [{"file": b.resolve().as_posix(), "uncovered": [{"start": 1, "end": 1}]}]
+    assert data["new"] == [{"file": a.name, "uncovered": [{"start": 2, "end": 2}]}]
+    assert data["resolved"] == [{"file": b.name, "uncovered": [{"start": 1, "end": 1}]}]

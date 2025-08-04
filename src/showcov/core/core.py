@@ -13,7 +13,6 @@ import xml.etree.ElementTree as ET  # noqa: S405
 from configparser import ConfigParser
 from configparser import Error as ConfigError
 from dataclasses import dataclass
-from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
@@ -21,6 +20,7 @@ from defusedxml import ElementTree
 from more_itertools import consecutive_groups
 
 from showcov import logger
+from showcov.core.files import detect_line_tag, normalize_path, read_file_lines
 
 if TYPE_CHECKING:
     from types import SimpleNamespace
@@ -29,20 +29,6 @@ if TYPE_CHECKING:
 
 class CoverageXMLNotFoundError(Exception):
     """Coverage XML file not found."""
-
-
-@lru_cache(maxsize=256)
-def _read_file_lines(path: Path) -> list[str]:
-    """Read a file and cache its lines.
-
-    Returns an empty list if the file cannot be read or contains invalid
-    UTF-8 sequences.
-    """
-    try:
-        with path.open(encoding="utf-8") as f:
-            return [ln.rstrip("\n") for ln in f.readlines()]
-    except (OSError, UnicodeDecodeError):
-        return []
 
 
 @dataclass(slots=True)
@@ -60,7 +46,13 @@ class UncoveredSection:
     file: Path
     ranges: list[tuple[int, int]]
 
-    def to_dict(self, *, with_code: bool = False, context_lines: int = 0) -> dict[str, object]:
+    def to_dict(
+        self,
+        *,
+        with_code: bool = False,
+        context_lines: int = 0,
+        base: Path | None = None,
+    ) -> dict[str, object]:
         """Convert the section into a JSON-serialisable dictionary.
 
         Parameters
@@ -77,29 +69,25 @@ class UncoveredSection:
             msg = "context_lines must be non-negative"
             raise ValueError(msg)
 
-        root = Path.cwd().resolve()
-        try:
-            path = self.file.resolve().relative_to(root)
-        except ValueError:
-            path = self.file.resolve()
-        file_str = path.as_posix()
+        file_str = normalize_path(self.file, base=base).as_posix()
 
         uncovered_entries: list[dict[str, object]] = []
 
-        file_lines: list[str] = _read_file_lines(self.file) if with_code else []
+        file_lines: list[str] = read_file_lines(self.file) if with_code else []
 
         for start, end in self.ranges:
             entry: dict[str, object] = {"start": start, "end": end}
             if with_code and file_lines:
                 start_idx = max(1, start - context_lines)
                 end_idx = min(len(file_lines), end + context_lines)
-                source = [
-                    {
-                        "line": i,
-                        "code": file_lines[i - 1] if 1 <= i <= len(file_lines) else "<line not found>",
-                    }
-                    for i in range(start_idx, end_idx + 1)
-                ]
+                source = []
+                for i in range(start_idx, end_idx + 1):
+                    code = file_lines[i - 1] if 1 <= i <= len(file_lines) else "<line not found>"
+                    tag = detect_line_tag(file_lines, i - 1) if 1 <= i <= len(file_lines) else None
+                    line_entry: dict[str, object] = {"line": i, "code": code}
+                    if tag:
+                        line_entry["tag"] = tag
+                    source.append(line_entry)
                 entry["source"] = source
             uncovered_entries.append(entry)
 
@@ -260,7 +248,7 @@ def build_sections(uncovered: dict[Path, list[int]]) -> list[UncoveredSection]:
     for filename in sorted(uncovered.keys(), key=lambda p: p.as_posix()):
         lines_sorted = sorted(uncovered[filename])
         groups = group_consecutive_numbers(lines_sorted)
-        file_lines = _read_file_lines(filename)
+        file_lines = read_file_lines(filename)
         if file_lines:
             groups = merge_blank_gap_groups(groups, file_lines)
         ranges = [(grp[0], grp[-1]) for grp in sorted(groups, key=operator.itemgetter(0))]

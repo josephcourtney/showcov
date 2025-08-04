@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import json
 from importlib import resources
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from jsonschema import validate
 
 from showcov import __version__
+from showcov.core.files import normalize_path
 
 if TYPE_CHECKING:  # pragma: no cover
     from showcov.core import UncoveredSection
@@ -25,11 +25,8 @@ def _get_schema() -> dict[str, object]:
 def get_model_context(sections: list[UncoveredSection], meta: OutputMeta) -> dict:
     """Return a dictionary describing *sections* for LLM consumption."""
     context_lines = max(0, meta.context_lines)
-    root = Path.cwd().resolve()
-    try:
-        xml_path = meta.coverage_xml.resolve().relative_to(root)
-    except ValueError:
-        xml_path = meta.coverage_xml.resolve()
+    root = meta.coverage_xml.parent.resolve()
+    xml_path = normalize_path(meta.coverage_xml, base=root)
     data: dict[str, object] = {
         "version": __version__,
         "environment": {
@@ -37,7 +34,9 @@ def get_model_context(sections: list[UncoveredSection], meta: OutputMeta) -> dic
             "context_lines": context_lines,
             "with_code": meta.with_code,
         },
-        "sections": [sec.to_dict(with_code=meta.with_code, context_lines=context_lines) for sec in sections],
+        "sections": [
+            sec.to_dict(with_code=meta.with_code, context_lines=context_lines, base=root) for sec in sections
+        ],
     }
     return data
 

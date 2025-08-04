@@ -15,7 +15,6 @@ from showcov.core import (
     CoverageXMLNotFoundError,
     _get_xml_from_config,
     _get_xml_from_pyproject,
-    _read_file_lines,
     build_sections,
     determine_xml_file,
     gather_uncovered_lines,
@@ -24,6 +23,7 @@ from showcov.core import (
     group_consecutive_numbers,
     merge_blank_gap_groups,
     parse_large_xml,
+    read_file_lines,
 )
 from showcov.output import format_human
 from showcov.output.base import (
@@ -142,7 +142,7 @@ def test_format_human_sorted_files(tmp_path: Path) -> None:
     files_shown = [
         ln.replace("│", " ").replace("┃", " ").split()[0] for ln in out.splitlines() if ".py" in ln
     ]
-    assert files_shown == [file_a.as_posix(), file_b.as_posix()]
+    assert files_shown == [file_a.name, file_b.name]
 
 
 # --- Tests for `gather_uncovered_lines` ---
@@ -198,29 +198,29 @@ def test_gather_uncovered_lines_from_xml(tmp_path: Path, coverage_xml_file: Call
 def test_read_file_lines_handles_unicode_error(tmp_path: Path) -> None:
     bad = tmp_path / "bad.py"
     bad.write_bytes(b"\xff\xfe")
-    _read_file_lines.cache_clear()
-    assert _read_file_lines(bad) == []
+    read_file_lines.cache_clear()
+    assert read_file_lines(bad) == []
 
 
 def test_read_file_lines_caches(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
     file = tmp_path / "a.py"
     file.write_text("print(1)\n")
-    _read_file_lines.cache_clear()
-    assert _read_file_lines(file) == ["print(1)"]
+    read_file_lines.cache_clear()
+    assert read_file_lines(file) == ["print(1)"]
 
     def fail(*args, **kwargs):
         msg = "should not open file again"
         raise AssertionError(msg)
 
     monkeypatch.setattr(Path, "open", fail)
-    assert _read_file_lines(file) == ["print(1)"]
+    assert read_file_lines(file) == ["print(1)"]
 
 
 def test_read_file_lines_cache_evicted(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
     files = [tmp_path / f"{i}.py" for i in range(260)]
     for f in files:
         f.write_text("print(1)\n")
-    _read_file_lines.cache_clear()
+    read_file_lines.cache_clear()
     first = files[0]
 
     open_count = 0
@@ -233,16 +233,16 @@ def test_read_file_lines_cache_evicted(monkeypatch: MonkeyPatch, tmp_path: Path)
         return orig_open(self, *args, **kwargs)
 
     monkeypatch.setattr(Path, "open", wrapper)
-    assert _read_file_lines.cache_info().maxsize == 256
-    assert _read_file_lines(first) == ["print(1)"]
+    assert read_file_lines.cache_info().maxsize == 256
+    assert read_file_lines(first) == ["print(1)"]
     assert open_count == 1
 
     for f in files[1:]:
-        _read_file_lines(f)
+        read_file_lines(f)
 
-    assert _read_file_lines(first) == ["print(1)"]
+    assert read_file_lines(first) == ["print(1)"]
     assert open_count == 2
-    _read_file_lines.cache_clear()
+    read_file_lines.cache_clear()
 
 
 # --- Tests for `cli()` ---
@@ -360,7 +360,7 @@ def test_cli_coverage_xml_not_found(cli_runner: CliRunner, monkeypatch: MonkeyPa
         msg = "boom"
         raise CoverageXMLNotFoundError(msg)
 
-    monkeypatch.setattr("showcov.cli.util.determine_xml_file", fail)
+    monkeypatch.setattr("showcov.cli.determine_xml_file", fail)
     code, _ = _invoke(cli_runner, ["show"])
     assert code == 66
 
@@ -369,13 +369,13 @@ def test_cli_parse_error(cli_runner: CliRunner, monkeypatch: MonkeyPatch, tmp_pa
     fake_xml = tmp_path / "cov.xml"
     fake_xml.write_text("<coverage>", encoding="utf-8")
 
-    monkeypatch.setattr("showcov.cli.util.determine_xml_file", lambda *_: fake_xml)
+    monkeypatch.setattr("showcov.cli.determine_xml_file", lambda *_: fake_xml)
 
     def explode(_):
         msg = "broken"
         raise ElementTree.ParseError(msg)
 
-    monkeypatch.setattr("showcov.cli.util.gather_uncovered_lines_from_xml", explode)
+    monkeypatch.setattr("showcov.cli.gather_uncovered_lines_from_xml", explode)
 
     code, _ = _invoke(cli_runner, ["show", "--cov", str(fake_xml)])
     assert code == 65
@@ -385,13 +385,13 @@ def test_cli_os_error(cli_runner: CliRunner, monkeypatch: MonkeyPatch, tmp_path:
     fake_xml = tmp_path / "cov.xml"
     fake_xml.write_text("<coverage></coverage>", encoding="utf-8")
 
-    monkeypatch.setattr("showcov.cli.util.determine_xml_file", lambda *_: fake_xml)
+    monkeypatch.setattr("showcov.cli.determine_xml_file", lambda *_: fake_xml)
 
     def explode(_):
         msg = "disk failure"
         raise OSError(msg)
 
-    monkeypatch.setattr("showcov.cli.util.gather_uncovered_lines_from_xml", explode)
+    monkeypatch.setattr("showcov.cli.gather_uncovered_lines_from_xml", explode)
 
     code, _ = _invoke(cli_runner, ["show", "--cov", str(fake_xml)])
     assert code == 1
