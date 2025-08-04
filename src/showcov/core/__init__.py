@@ -4,7 +4,6 @@ from showcov.core.core import (
     UncoveredSection,
     _get_xml_from_config,
     _get_xml_from_pyproject,
-    _read_file_lines,
     build_sections,
     determine_xml_file,
     diff_uncovered_lines,
@@ -15,6 +14,7 @@ from showcov.core.core import (
     merge_blank_gap_groups,
     parse_large_xml,
 )
+from showcov.core.files import detect_line_tag, normalize_path, read_file_lines
 from showcov.core.path_filter import PathFilter
 
 __all__ = [
@@ -24,8 +24,8 @@ __all__ = [
     "UncoveredSection",
     "_get_xml_from_config",
     "_get_xml_from_pyproject",
-    "_read_file_lines",
     "build_sections",
+    "detect_line_tag",
     "determine_xml_file",
     "diff_uncovered_lines",
     "gather_uncovered_lines",
@@ -34,5 +34,7 @@ __all__ = [
     "get_schema",
     "group_consecutive_numbers",
     "merge_blank_gap_groups",
+    "normalize_path",
     "parse_large_xml",
+    "read_file_lines",
 ]

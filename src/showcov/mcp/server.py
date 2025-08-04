@@ -12,7 +12,7 @@ from mcp.server.fastmcp import FastMCP
 from pydantic import BaseModel, Field, PositiveInt
 
 from showcov import __version__
-from showcov.cli.util import ShowcovOptions, resolve_sections
+from showcov.cli import ShowcovOptions, resolve_sections
 from showcov.core import (
     UncoveredSection,
     build_sections,
@@ -141,7 +141,12 @@ def _sections_and_meta(
 
 def _make_report(sections: list[UncoveredSection], meta: OutputMeta) -> CoverageReport:
     files = [
-        section.to_dict(with_code=meta.with_code, context_lines=meta.context_lines) for section in sections
+        section.to_dict(
+            with_code=meta.with_code,
+            context_lines=meta.context_lines,
+            base=meta.coverage_xml.parent,
+        )
+        for section in sections
     ]
     env = Environment(
         coverage_xml=str(meta.coverage_xml),

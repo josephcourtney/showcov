@@ -1,11 +1,14 @@
-"""Definition of the command line interface."""
+"""Command line interface for ``showcov``."""
 
 from __future__ import annotations
 
 import dataclasses
+import datetime
 import json
+import logging
 import sys
 from pathlib import Path
+from textwrap import dedent
 from typing import TYPE_CHECKING
 
 import click
@@ -13,36 +16,133 @@ import click_completion
 import click_completion.core
 from defusedxml import ElementTree
 
-from showcov import __version__
-from showcov.cli.errors import (
-    EXIT_DATAERR,
-    EXIT_GENERIC,
-    EXIT_NOINPUT,
-    EXIT_OK,
-)
-from showcov.cli.util import (
-    ShowcovOptions,
-    _configure_runtime,
-    _emit_manpage,
-    determine_format,
-    parse_flags_to_opts,
-    resolve_sections,
-    write_output,
-)
+from showcov import __version__, logger
 from showcov.core import (
+    LOG_FORMAT,
     CoverageXMLNotFoundError,
+    PathFilter,
+    UncoveredSection,
+    build_sections,
+    determine_xml_file,
     diff_uncovered_lines,
+    gather_uncovered_lines_from_xml,
 )
 from showcov.output import render_output
 from showcov.output.base import Format, OutputMeta
+from showcov.output.registry import resolve_formatter
 
 if TYPE_CHECKING:  # pragma: no cover
     from collections.abc import Sequence
 
+# ---------------------------------------------------------------------------
+# Exit codes
+# ---------------------------------------------------------------------------
+EXIT_OK = 0
+EXIT_GENERIC = 1
+EXIT_DATAERR = 65
+EXIT_NOINPUT = 66
+EXIT_CONFIG = 78
 
-# --------------------------------------------------------------------------- #
-# CLI - root command group                                                    #
-# --------------------------------------------------------------------------- #
+
+# ---------------------------------------------------------------------------
+# Dataclass to hold options
+# ---------------------------------------------------------------------------
+@dataclasses.dataclass(slots=True)
+class ShowcovOptions:
+    debug: bool = False
+    quiet: bool = False
+    verbose: bool = False
+    use_color: bool = True
+
+    xml_file: Path | None = None
+    include: list[str] = dataclasses.field(default_factory=list)
+    exclude: list[str] = dataclasses.field(default_factory=list)
+
+    output_format: str = "auto"
+    pager: bool | None = None
+    output: Path | None = None
+
+    show_paths: bool = True
+    file_stats: bool = False
+    aggregate_stats: bool = False
+    show_code: bool = False
+    show_line_numbers: bool = False
+    context_before: int = 0
+    context_after: int = 0
+
+
+# ---------------------------------------------------------------------------
+# Helper functions
+# ---------------------------------------------------------------------------
+
+
+def _emit_manpage(prog: str, cmd: click.Command) -> str:
+    """Return roff-formatted man page for *cmd*."""
+    help_text = cmd.get_help(click.Context(cmd))
+    today = datetime.datetime.now(datetime.UTC).date().strftime("%Y-%m-%d")
+    return dedent(
+        rf"""
+        .TH {prog.upper()} 1 "{today}" "{prog} {__version__}" "User Commands"
+        .SH NAME
+        {prog} \- show uncovered lines from a coverage XML report
+        .SH SYNOPSIS
+        {prog} [OPTIONS] [PATHS]...
+        .SH DESCRIPTION
+        {help_text}
+        """
+    ).strip()
+
+
+def _configure_runtime(*, quiet: bool, verbose: bool, debug: bool) -> None:
+    """Configure logging based on *quiet*/*verbose*."""
+    level = logging.ERROR if quiet else (logging.DEBUG if verbose else logging.INFO)
+    logging.basicConfig(level=level, format=LOG_FORMAT)
+
+    click_completion.init()
+
+    if debug:
+        logger.debug("debug mode active")
+
+
+def _resolve_context_option(value: str | None) -> tuple[int, int]:
+    """Translate ``--context`` value into before/after counts."""
+    if not value:
+        return 0, 0
+    parts = [p.strip() for p in value.replace(",", " ").split()]
+    if len(parts) == 1:
+        n = int(parts[0])
+        return n, n
+    if len(parts) == 2:  # noqa: PLR2004
+        return int(parts[0]), int(parts[1])
+    msg = "Expect 'N' or 'N,M' for --context"
+    raise click.BadParameter(msg)
+
+
+def resolve_sections(opts: ShowcovOptions) -> tuple[list[UncoveredSection], Path]:
+    xml_path = determine_xml_file(str(opts.xml_file) if opts.xml_file else None)
+    uncovered = gather_uncovered_lines_from_xml(xml_path)
+    sections_all = build_sections(uncovered)
+    filtered = PathFilter(opts.include, opts.exclude).filter(sections_all)
+    return filtered, xml_path
+
+
+def write_output(output_text: str, opts: ShowcovOptions) -> None:
+    if opts.output and opts.output != Path("-"):
+        opts.output.write_text(output_text, encoding="utf-8")
+        return
+
+    use_pager = opts.pager if opts.pager is not None else (sys.stdout.isatty() and not opts.quiet)
+    if use_pager:
+        click.echo_via_pager(output_text)
+    else:
+        click.echo(output_text)
+
+
+# ---------------------------------------------------------------------------
+# CLI group and commands
+# ---------------------------------------------------------------------------
+
+
 @click.group(
     context_settings={
         "help_option_names": ["-h", "--help"],
@@ -51,43 +151,30 @@ if TYPE_CHECKING:  # pragma: no cover
     },
     invoke_without_command=True,
 )
-@click.option(
-    "--version",
-    is_flag=True,
-    is_eager=True,
-    help="Show the version and exit",
-)
+@click.option("--version", is_flag=True, is_eager=True, help="Show the version and exit")
 @click.option("--debug", is_flag=True, help="Show full tracebacks for errors")
 @click.option("-q", "--quiet", is_flag=True, help="Suppress INFO logs, emit only errors")
 @click.option("-v", "--verbose", is_flag=True, help="Emit diagnostic logging")
 @click.pass_context
 def cli(ctx: click.Context, *, version: bool, debug: bool, quiet: bool, verbose: bool) -> None:
     """Showcov - show uncovered lines from a coverage XML report."""
-    # initialise context storage
     ctx.obj = ShowcovOptions(debug=debug, quiet=quiet, verbose=verbose)
 
-    # eager --version flag
     if version and ctx.invoked_subcommand is None:
         click.echo(__version__)
         ctx.exit(EXIT_OK)
 
     if ctx.invoked_subcommand is None:
-        # no sub-command given → behave as if `show`
-        ctx.forward(show)
+        show_ctx = show.make_context("show", ctx.args, parent=ctx)
+        ctx.invoke(show, **show_ctx.params)
 
 
-# --------------------------------------------------------------------------- #
-# Sub-command: version                                                        #
-# --------------------------------------------------------------------------- #
 @cli.command()
 def version() -> None:
     """Print the version and exit."""
     click.echo(__version__)
 
 
-# --------------------------------------------------------------------------- #
-# Sub-command: man                                                            #
-# --------------------------------------------------------------------------- #
 @cli.command()
 @click.pass_context
 def man(ctx: click.Context) -> None:
@@ -96,9 +183,6 @@ def man(ctx: click.Context) -> None:
     ctx.exit(EXIT_OK)
 
 
-# --------------------------------------------------------------------------- #
-# Sub-command: completion                                                     #
-# --------------------------------------------------------------------------- #
 @cli.command()
 @click.argument("shell", type=click.Choice(["bash", "zsh", "fish"], case_sensitive=False))
 def completion(shell: str) -> None:
@@ -107,18 +191,13 @@ def completion(shell: str) -> None:
     click.echo(script)
 
 
-# --------------------------------------------------------------------------- #
-# Sub-command: show (default)                                                 #
-# --------------------------------------------------------------------------- #
 @cli.command(name="show")
 @click.argument("paths", nargs=-1, type=click.Path())
-# input
 @click.option(
     "--cov", "xml_file", type=click.Path(path_type=Path, exists=True), help="Path to coverage XML file"
 )
 @click.option("--exclude", multiple=True, help="Glob pattern to exclude (can be repeated)")
 @click.option("--include", "include_", multiple=True, help="Glob pattern to include (can be repeated)")
-# output routing / styling
 @click.option(
     "--format",
     "format_",
@@ -132,12 +211,10 @@ def completion(shell: str) -> None:
 @click.option("--color", "force_color", is_flag=True, help="Force ANSI color codes in output")
 @click.option("--no-color", is_flag=True, help="Disable ANSI color codes in output")
 @click.option("--output", type=click.Path(path_type=Path), help="Write output to FILE instead of stdout")
-# output content flags
 @click.option("--paths/--no-paths", "show_paths", default=True, help="Include file paths in output")
 @click.option("--file-stats/--no-file-stats", default=False, help="Include per-file statistics")
 @click.option("--stats/--no-stats", "aggregate_stats", default=False, help="Include aggregate statistics")
 @click.option("--code/--no-code", "show_code", default=False, help="Include the uncovered source code lines")
-# code-specific
 @click.option("--line-numbers", is_flag=True, help="Show line numbers alongside code")
 @click.option(
     "--context",
@@ -168,14 +245,30 @@ def show(
     context_: str | None,
 ) -> None:
     """Show uncovered lines (default command)."""
-    kwargs = locals()  # magic way to capture all kwargs at once
-    opts = parse_flags_to_opts(**kwargs)  # type: ignore[missing-argument]
+    if force_color and no_color:
+        msg = "--color/--no-color"
+        raise click.BadOptionUsage(msg, "Cannot combine --color and --no-color")
 
-    _configure_runtime(
-        quiet=opts.quiet,
-        verbose=opts.verbose,
-        debug=opts.debug,
-    )
+    before, after = _resolve_context_option(context_)
+    is_tty = sys.stdout.isatty()
+
+    opts.include.extend(paths)
+    opts.include.extend(include_)
+    opts.exclude.extend(exclude)
+    opts.output_format = format_
+    opts.pager = True if pager else False if no_pager else None
+    opts.use_color = force_color or (is_tty and not no_color)
+    opts.show_line_numbers = line_numbers
+    opts.context_before = before
+    opts.context_after = after
+    opts.xml_file = xml_file
+    opts.output = output
+    opts.show_code = show_code
+    opts.file_stats = file_stats
+    opts.aggregate_stats = aggregate_stats
+    opts.show_paths = show_paths
+
+    _configure_runtime(quiet=opts.quiet, verbose=opts.verbose, debug=opts.debug)
 
     try:
         sections, resolved_xml = resolve_sections(opts)
@@ -195,8 +288,7 @@ def show(
             raise
         sys.exit(EXIT_GENERIC)
 
-    is_tty = sys.stdout.isatty()
-    actual_format = determine_format(opts, output, is_tty=is_tty)
+    fmt, formatter = resolve_formatter(opts.output_format, is_tty=is_tty)
     meta = OutputMeta(
         context_lines=max(opts.context_before, opts.context_after),
         with_code=opts.show_code,
@@ -205,17 +297,16 @@ def show(
     )
     output_text = render_output(
         sections,
-        actual_format,
+        fmt,
+        formatter,
         meta,
         aggregate_stats=opts.aggregate_stats,
         file_stats=opts.file_stats,
     )
+
     write_output(output_text, opts)
 
 
-# --------------------------------------------------------------------------- #
-# Sub-command: diff                                                           #
-# --------------------------------------------------------------------------- #
 @cli.command(name="diff")
 @click.argument("baseline", type=click.Path(path_type=Path, exists=True))
 @click.argument("current", type=click.Path(path_type=Path, exists=True))
@@ -237,12 +328,8 @@ def diff(
     format_: str,
     output: Path | None,
 ) -> None:
-    """Compare coverage reports and show new or resolved uncovered lines."""
-    _configure_runtime(
-        quiet=opts.quiet,
-        verbose=opts.verbose,
-        debug=opts.debug,
-    )
+    """Compare two coverage reports."""
+    _configure_runtime(quiet=opts.quiet, verbose=opts.verbose, debug=opts.debug)
 
     try:
         new_sections, resolved_sections = diff_uncovered_lines(baseline, current)
@@ -257,37 +344,29 @@ def diff(
             raise
         sys.exit(EXIT_GENERIC)
 
-    fmt = Format.from_str(format_)
-    if fmt is Format.AUTO:
-        fmt = Format.HUMAN if sys.stdout.isatty() else Format.JSON
-
-    meta = OutputMeta(
-        context_lines=0,
-        with_code=False,
-        coverage_xml=current,
-        color=opts.use_color,
-    )
-
+    fmt, formatter = resolve_formatter(format_, is_tty=sys.stdout.isatty())
+    meta = OutputMeta(context_lines=0, with_code=False, coverage_xml=current, color=opts.use_color)
     if fmt is Format.JSON:
+        base = current.parent
         data = {
-            "new": [sec.to_dict() for sec in new_sections],
-            "resolved": [sec.to_dict() for sec in resolved_sections],
+            "new": [sec.to_dict(base=base) for sec in new_sections],
+            "resolved": [sec.to_dict(base=base) for sec in resolved_sections],
         }
         output_text = json.dumps(data, indent=2, sort_keys=True)
     else:
         parts: list[str] = []
         if new_sections:
-            parts.append("New uncovered lines:\n" + render_output(new_sections, fmt, meta))
+            parts.append("New uncovered lines:\n" + render_output(new_sections, fmt, formatter, meta))
         if resolved_sections:
-            parts.append("Resolved uncovered lines:\n" + render_output(resolved_sections, fmt, meta))
+            parts.append(
+                "Resolved uncovered lines:\n" + render_output(resolved_sections, fmt, formatter, meta)
+            )
         output_text = "No changes in coverage" if not parts else "\n\n".join(parts)
 
-    write_output(output_text, dataclasses.replace(opts, output=output, output_format=fmt.value))
+    tmp = dataclasses.replace(opts, output=output, output_format=fmt.value, pager=False)
+    write_output(output_text, tmp)
 
 
-# --------------------------------------------------------------------------- #
-# Sub-command: mcp                                                            #
-# --------------------------------------------------------------------------- #
 @cli.command()
 def mcp() -> None:
     """Start MCP server exposing showcov tools."""

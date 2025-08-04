@@ -18,10 +18,22 @@ FORMATTERS: dict[Format, Formatter] = {
 }
 
 
-def get_formatter(fmt: Format) -> Formatter:
-    """Return the formatter callable registered for the given format."""
+def resolve_formatter(format_str: str, *, is_tty: bool) -> tuple[Format, Formatter]:
+    """Resolve *format_str* to a :class:`Format` and its formatter."""
     try:
-        return FORMATTERS[fmt]
-    except KeyError as e:  # defensive fallback
+        fmt = Format(format_str.lower())
+    except ValueError as err:
+        choices = ", ".join(f.value for f in Format)
+        msg = f"{format_str!r} is not one of {choices}"
+        raise ValueError(msg) from err
+
+    if fmt is Format.AUTO:
+        fmt = Format.HUMAN if is_tty else Format.JSON
+
+    try:
+        formatter = FORMATTERS[fmt]
+    except KeyError as err:  # pragma: no cover - defensive
         msg = f"Unsupported format: {fmt!r}"
-        raise ValueError(msg) from e
+        raise ValueError(msg) from err
+
+    return fmt, formatter

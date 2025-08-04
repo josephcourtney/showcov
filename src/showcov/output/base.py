@@ -15,7 +15,6 @@ Formatters are registered in `registry.py` and selected dynamically at runtime.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from difflib import get_close_matches
 from enum import StrEnum
 from typing import TYPE_CHECKING, Protocol
 
@@ -34,31 +33,6 @@ class Format(StrEnum):
     SARIF = "sarif"
     HTML = "html"
     AUTO = "auto"
-
-    @classmethod
-    def from_str(cls, value: str) -> Format:
-        """Return the :class:`Format` matching ``value``.
-
-        Parameters
-        ----------
-        value:
-            String representation of the desired format.
-
-        Raises
-        ------
-        ValueError
-            If ``value`` does not correspond to a known format.
-        """
-        try:
-            return cls(value.lower())
-        except ValueError as e:  # pragma: no cover - defensive
-            choices = [fmt.value for fmt in cls]
-            suggestion = get_close_matches(value, choices, n=1)
-            if suggestion:
-                msg = f"Unsupported format: {value!r}. Did you mean {suggestion[0]!r}?"
-            else:
-                msg = f"Unsupported format: {value!r}"
-            raise ValueError(msg) from e
 
 
 @dataclass(slots=True)

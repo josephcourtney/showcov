@@ -24,7 +24,7 @@ def _run(runner: CliRunner, args: list[str]) -> tuple[int, str]:
 
 def test_cli_no_options(cli_runner: CliRunner) -> None:
     code, _out = _run(cli_runner, [])
-    assert code == 0
+    assert code == 66
 
 
 def test_cli_filters_and_output(
@@ -44,8 +44,8 @@ def test_cli_filters_and_output(
         ["show", "--cov", str(xml_file), str(file_a), "--format", "human"],
     )
     assert code == 0
-    assert file_a.as_posix() in out
-    assert file_b.as_posix() not in out
+    assert file_a.name in out
+    assert file_b.name not in out
 
     # include directory but exclude file_b
     code, out = _run(
@@ -62,8 +62,8 @@ def test_cli_filters_and_output(
         ],
     )
     assert code == 0
-    assert str(file_a) in out
-    assert str(file_b) not in out
+    assert file_a.name in out
+    assert file_b.name not in out
 
     # write json output to file
     out_file = tmp_path / "out.json"
@@ -119,6 +119,43 @@ def test_cli_disables_color_when_not_tty(
     code, out = _run(cli_runner, ["show", "--cov", str(xml), str(src), "--format", "human"])
     assert code == 0
     assert "\x1b[" not in out  # colorama disables colours when output captured
+
+
+def test_cli_human_shows_code(
+    cli_runner: CliRunner, coverage_xml_file: Callable[..., Path], tmp_path: Path
+) -> None:
+    src = tmp_path / "f.py"
+    src.write_text("a = 1\nb = 2\n")
+    xml = coverage_xml_file({src: [2]})
+    code, out = _run(cli_runner, ["show", "--cov", str(xml), str(src), "--code", "--format", "human"])
+    assert code == 0
+    assert "b = 2" in out
+
+
+def test_cli_line_tags(cli_runner: CliRunner, coverage_xml_file: Callable[..., Path], tmp_path: Path) -> None:
+    src = tmp_path / "f.py"
+    src.write_text("def g():\n    return 1  # pragma: no cover\n")
+    xml = coverage_xml_file({src: [2]})
+    code, out = _run(cli_runner, ["show", "--cov", str(xml), str(src), "--code", "--format", "human"])
+    assert code == 0
+    assert "[no-cover]" in out
+
+
+def test_cli_line_tag_abstractmethod(
+    cli_runner: CliRunner, coverage_xml_file: Callable[..., Path], tmp_path: Path
+) -> None:
+    src = tmp_path / "f.py"
+    src.write_text(
+        "from abc import ABC, abstractmethod\n"
+        "class A(ABC):\n"
+        "    @abstractmethod\n"
+        "    def f(self):\n"
+        "        pass\n"
+    )
+    xml = coverage_xml_file({src: [4, 5]})
+    code, out = _run(cli_runner, ["show", "--cov", str(xml), str(src), "--code", "--format", "human"])
+    assert code == 0
+    assert "[abstractmethod]" in out
 
 
 def test_cli_format_auto_json(
@@ -193,7 +230,7 @@ def test_cli_glob_patterns(
 
     code, out = _run(cli_runner, ["show", "--cov", str(xml), pattern, "--format", "human"])
     assert code == 0
-    assert src.as_posix() in out
+    assert src.name in out
 
 
 def test_cli_exit_codes(cli_runner: CliRunner, tmp_path: Path) -> None:
