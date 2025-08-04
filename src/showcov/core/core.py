@@ -5,6 +5,8 @@ If no XML filename is given as a command-line argument, the script will try to r
 a configuration file (pyproject.toml, .coveragerc, or setup.cfg).
 """
 
+from __future__ import annotations
+
 import operator
 import tomllib
 import xml.etree.ElementTree as ET  # noqa: S405
@@ -17,9 +19,9 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING, Optional, cast
 
 from defusedxml import ElementTree
+from more_itertools import consecutive_groups
 
 from showcov import logger
-from showcov.core.config import CONSECUTIVE_STEP
 
 if TYPE_CHECKING:
     from xml.etree.ElementTree import Element  # noqa: S405
@@ -176,7 +178,9 @@ def determine_xml_file(xml_file: SimpleNamespace | str | None = None) -> Path:
             raise CoverageXMLNotFoundError(msg)
         return path
 
-    config_xml = get_config_xml_file()
+    from showcov.core import get_config_xml_file as _get_config_xml_file
+
+    config_xml = _get_config_xml_file()
     if config_xml:
         path = Path(config_xml).resolve()
         if not path.is_file():
@@ -190,18 +194,7 @@ def determine_xml_file(xml_file: SimpleNamespace | str | None = None) -> Path:
 
 def group_consecutive_numbers(numbers: list[int]) -> list[list[int]]:
     """Group consecutive numbers into sublists."""
-    groups: list[list[int]] = []
-    group: list[int] = []
-
-    for num in numbers:
-        if group and num != group[-1] + CONSECUTIVE_STEP:
-            groups.append(group)
-            group = []
-        group.append(num)
-
-    if group:
-        groups.append(group)
-    return groups
+    return [list(grp) for grp in consecutive_groups(numbers)]
 
 
 def merge_blank_gap_groups(groups: list[list[int]], file_lines: list[str]) -> list[list[int]]:
@@ -274,14 +267,14 @@ def build_sections(uncovered: dict[Path, list[int]]) -> list[UncoveredSection]:
     return sections
 
 
-def _parse_coverage_xml(xml_file: Path) -> ET.ElementTree:
+def _parse_coverage_xml(xml_file: Path) -> ET.ElementTree[ET.Element]:
     return ET.parse(xml_file)  # noqa: S314
 
 
-def _get_coverage_root(tree: ET.ElementTree) -> ET.Element:
+def _get_coverage_root(tree: ET.ElementTree[ET.Element]) -> ET.Element:
     root = tree.getroot()
-    if root.tag != "coverage":
-        msg = f"Invalid root element: expected <coverage>, got <{root.tag}>"
+    if root is None or root.tag != "coverage":
+        msg = f"Invalid root element: expected <coverage>, got <{getattr(root, 'tag', None)}>"
         raise ValueError(msg)
     return root
 

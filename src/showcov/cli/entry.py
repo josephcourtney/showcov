@@ -165,7 +165,7 @@ def show(
 ) -> None:
     """Show uncovered lines (default command)."""
     kwargs = locals()  # magic way to capture all kwargs at once
-    opts = parse_flags_to_opts(**kwargs)
+    opts = parse_flags_to_opts(**kwargs)  # type: ignore[missing-argument]
 
     _configure_runtime(
         quiet=opts.quiet,
