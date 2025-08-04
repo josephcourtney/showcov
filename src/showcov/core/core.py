@@ -7,6 +7,7 @@ a configuration file (pyproject.toml, .coveragerc, or setup.cfg).
 
 import operator
 import tomllib
+import xml.etree.ElementTree as ET  # noqa: S405
 from configparser import ConfigParser
 from configparser import Error as ConfigError
 from dataclasses import dataclass
@@ -18,7 +19,7 @@ from typing import TYPE_CHECKING, Optional, cast
 from defusedxml import ElementTree
 
 from showcov import logger
-from showcov.config import CONSECUTIVE_STEP
+from showcov.core.config import CONSECUTIVE_STEP
 
 if TYPE_CHECKING:
     from xml.etree.ElementTree import Element  # noqa: S405
@@ -273,38 +274,49 @@ def build_sections(uncovered: dict[Path, list[int]]) -> list[UncoveredSection]:
     return sections
 
 
-def gather_uncovered_lines_from_xml(file_path: Path) -> dict[Path, list[int]]:
-    """Gather uncovered lines per file by streaming the XML file."""
-    uncovered: dict[Path, list[int]] = {}
-    source_roots: list[Path] = []
+def _parse_coverage_xml(xml_file: Path) -> ET.ElementTree:
+    return ET.parse(xml_file)  # noqa: S314
 
-    context = ElementTree.iterparse(file_path, events=("start", "end"))
-    for event, elem in context:
-        if event != "end":
+
+def _get_coverage_root(tree: ET.ElementTree) -> ET.Element:
+    root = tree.getroot()
+    if root.tag != "coverage":
+        msg = f"Invalid root element: expected <coverage>, got <{root.tag}>"
+        raise ValueError(msg)
+    return root
+
+
+def _extract_uncovered_by_file(root: ET.Element) -> dict[Path, list[int]]:
+    uncovered: dict[Path, list[int]] = {}
+
+    for class_elt in root.findall(".//class"):
+        filename = class_elt.get("filename")
+        if not filename:
             continue
-        if elem.tag == "source" and elem.text:
-            source_roots.append(Path(elem.text).resolve())
-            elem.clear()
-        elif elem.tag == "class":
-            filename_str = elem.get("filename")
-            if filename_str:
-                filename = Path(filename_str)
-                resolved_path = next(
-                    (src / filename for src in source_roots if (src / filename).exists()),
-                    filename,
-                ).resolve()
-                for line in elem.findall("lines/line"):
-                    try:
-                        hits = int(line.get("hits", "0"))
-                        line_no = int(line.get("number", "0"))
-                    except (TypeError, ValueError):
-                        continue
-                    if hits == 0:
-                        lines = uncovered.setdefault(resolved_path, [])
-                        if line_no not in lines:
-                            lines.append(line_no)
-            elem.clear()
+
+        path = Path(filename)
+        lines = [
+            int(line.get("number")) for line in class_elt.findall("lines/line") if line.get("hits") == "0"
+        ]
+
+        if lines:
+            uncovered.setdefault(path, []).extend(lines)
+
     return uncovered
+
+
+def gather_uncovered_lines_from_xml(xml_file: Path) -> dict[Path, list[int]]:
+    """Extract uncovered line numbers for each source file from coverage XML."""
+    try:
+        tree = _parse_coverage_xml(xml_file)
+        root = _get_coverage_root(tree)
+        return _extract_uncovered_by_file(root)
+    except ET.ParseError as exc:
+        msg = f"{xml_file}: failed to parse coverage XML: {exc}"
+        raise ET.ParseError(msg) from exc
+    except OSError as exc:
+        msg = f"{xml_file}: could not read file: {exc}"
+        raise OSError(msg) from exc
 
 
 def parse_large_xml(file_path: Path) -> Optional["Element"]:

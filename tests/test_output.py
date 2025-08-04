@@ -6,12 +6,14 @@ import pytest
 from showcov.core import build_sections
 from showcov.output import (
     FORMATTERS,
-    Format,
-    OutputMeta,
     format_human,
     format_markdown,
     format_sarif,
     get_formatter,
+)
+from showcov.output.base import (
+    Format,
+    OutputMeta,
 )
 
 

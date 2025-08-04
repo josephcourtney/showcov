@@ -1,10 +1,21 @@
+import json
 from pathlib import Path
 from typing import cast
 
 import pytest
+from jsonschema import validate
 
-from showcov.core import UncoveredSection, build_sections
-from showcov.output import FORMATTERS, Format, OutputMeta, parse_json_output
+from showcov.core import UncoveredSection, build_sections, get_schema
+from showcov.output import FORMATTERS
+from showcov.output.base import Format, OutputMeta
+
+
+def parse_json_output(data: str) -> list[UncoveredSection]:
+    """Parse JSON coverage data into :class:`UncoveredSection` instances."""
+    obj = json.loads(data)
+    validate(obj, get_schema())
+    files = obj.get("files", [])
+    return [UncoveredSection.from_dict(f) for f in files]
 
 
 def test_json_round_trip(tmp_path: Path) -> None:

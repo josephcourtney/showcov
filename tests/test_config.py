@@ -6,12 +6,10 @@ import importlib
 import logging
 import sys
 
-import colorama
-
 
 def test_get_schema_cached(monkeypatch):
     """``get_schema`` should load the schema once and cache the result."""
-    from showcov import config
+    from showcov.core import config
 
     config.get_schema.cache_clear()
     calls = 0
@@ -45,7 +43,6 @@ def test_import_has_no_side_effects(monkeypatch):
         init_called = True
 
     monkeypatch.setattr(logging, "basicConfig", fake_basic)
-    monkeypatch.setattr(colorama, "init", fake_init)
 
     sys.modules.pop("showcov", None)
     sys.modules.pop("showcov.output", None)

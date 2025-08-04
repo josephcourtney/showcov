@@ -4,14 +4,14 @@ import types
 from collections.abc import Callable
 from configparser import ConfigParser
 from pathlib import Path
+from re import findall
 
 import pytest
 from _pytest.monkeypatch import MonkeyPatch
+from click.testing import CliRunner
 from defusedxml import ElementTree
 
-from showcov.cli import main
-
-# Import functions and exceptions from your module.
+from showcov.cli import cli
 from showcov.core import (
     CoverageXMLNotFoundError,
     _get_xml_from_config,
@@ -26,13 +26,23 @@ from showcov.core import (
     merge_blank_gap_groups,
     parse_large_xml,
 )
-from showcov.output import OutputMeta, format_human
+from showcov.output import format_human
+from showcov.output.base import (
+    OutputMeta,
+)
 
-# Set logging level to capture output for tests
+# Capture logs during tests
 logging.basicConfig(level=logging.INFO)
 
 
-# --- Tests for `_get_xml_from_config` ---
+# --------------------------------------------------------------------------- #
+# helper                                                                      #
+# --------------------------------------------------------------------------- #
+
+
+def _invoke(runner: CliRunner, args: list[str]) -> tuple[int, str]:
+    res = runner.invoke(cli, args)
+    return res.exit_code, res.output
 
 
 @pytest.mark.parametrize(
@@ -127,9 +137,9 @@ def test_format_human_sorted_files(tmp_path: Path) -> None:
         color=True,
     )
     out = format_human(sections, meta)
-    first = out.find(file_a.as_posix())
-    second = out.find(file_b.as_posix())
-    assert first < second
+
+    files_shown = findall(r"Uncovered sections in (.+\.py):", out)
+    assert files_shown == sorted([file_a.as_posix(), file_b.as_posix()])
 
 
 # --- Tests for `gather_uncovered_lines` ---
@@ -232,7 +242,7 @@ def test_read_file_lines_cache_evicted(monkeypatch: MonkeyPatch, tmp_path: Path)
     _read_file_lines.cache_clear()
 
 
-# --- Tests for `main()` ---
+# --- Tests for `cli()` ---
 # --- Tests for _get_xml_from_config exception branch (lines 53-55) ---
 
 
@@ -262,7 +272,7 @@ def test_get_xml_from_pyproject_exception(monkeypatch, tmp_path):
         msg = "simulated error"
         raise OSError(msg)
 
-    monkeypatch.setattr("showcov.core.tomllib.load", fake_tomllib_load)
+    monkeypatch.setattr("showcov.core.core.tomllib.load", fake_tomllib_load)
     result = _get_xml_from_pyproject(pyproject)
     assert result is None
 
@@ -336,56 +346,48 @@ def test_parse_large_xml_no_coverage(tmp_path):
     assert result is None
 
 
-# --- Tests for main() error-handling branches ---
+# --- Tests for cli() error-handling branches ---
 
 
-def test_main_coverage_xml_not_found(monkeypatch):
-    # Force determine_xml_file to throw CoverageXMLNotFoundError and verify that main() calls sys.exit(1).
-    monkeypatch.setattr(sys, "argv", ["prog"])
+def test_cli_coverage_xml_not_found(cli_runner: CliRunner, monkeypatch: MonkeyPatch) -> None:
+    """determine_xml_file raises → CLI exits 66."""
 
     def fail(*_):
-        msg = "No coverage XML file specified"
+        msg = "boom"
         raise CoverageXMLNotFoundError(msg)
 
-    monkeypatch.setattr("showcov.core.determine_xml_file", fail)
-
-    with pytest.raises(SystemExit) as exc_info:
-        main()
-    assert isinstance(exc_info.value, SystemExit)
-    assert exc_info.value.code == 66
+    monkeypatch.setattr("showcov.cli.util.determine_xml_file", fail)
+    code, _ = _invoke(cli_runner, ["show"])
+    assert code == 66
 
 
-def test_main_parse_error(monkeypatch, tmp_path):
-    # Force gather_uncovered_lines_from_xml to raise an ElementTree.ParseError and verify exit code 65.
-    fake_path = tmp_path / "dummy.xml"
-    fake_path.write_text("<coverage>", encoding="utf-8")
-    monkeypatch.setattr(sys, "argv", ["prog"])
-    monkeypatch.setattr("showcov.cli.determine_xml_file", lambda _args: fake_path)
+def test_cli_parse_error(cli_runner: CliRunner, monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
+    fake_xml = tmp_path / "cov.xml"
+    fake_xml.write_text("<coverage>", encoding="utf-8")
 
-    def fake_gather(_):
-        msg = "simulated parse error"
+    monkeypatch.setattr("showcov.cli.util.determine_xml_file", lambda *_: fake_xml)
+
+    def explode(_):
+        msg = "broken"
         raise ElementTree.ParseError(msg)
 
-    monkeypatch.setattr("showcov.cli.gather_uncovered_lines_from_xml", fake_gather)
-    with pytest.raises(SystemExit) as exc_info:
-        main()
-    assert isinstance(exc_info.value, SystemExit)
-    assert exc_info.value.code == 65
+    monkeypatch.setattr("showcov.cli.util.gather_uncovered_lines_from_xml", explode)
+
+    code, _ = _invoke(cli_runner, ["show", "--cov", str(fake_xml)])
+    assert code == 65
 
 
-def test_main_os_error(monkeypatch, tmp_path):
-    # Force gather_uncovered_lines_from_xml to raise an OSError and verify exit code 1.
-    fake_path = tmp_path / "dummy.xml"
-    fake_path.write_text("<coverage></coverage>", encoding="utf-8")
-    monkeypatch.setattr(sys, "argv", ["prog"])
-    monkeypatch.setattr("showcov.cli.determine_xml_file", lambda _args: fake_path)
+def test_cli_os_error(cli_runner: CliRunner, monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
+    fake_xml = tmp_path / "cov.xml"
+    fake_xml.write_text("<coverage></coverage>", encoding="utf-8")
 
-    def fake_gather(_):
-        msg = "simulated OS error"
+    monkeypatch.setattr("showcov.cli.util.determine_xml_file", lambda *_: fake_xml)
+
+    def explode(_):
+        msg = "disk failure"
         raise OSError(msg)
 
-    monkeypatch.setattr("showcov.cli.gather_uncovered_lines_from_xml", fake_gather)
-    with pytest.raises(SystemExit) as exc_info:
-        main()
-    assert isinstance(exc_info.value, SystemExit)
-    assert exc_info.value.code == 1
+    monkeypatch.setattr("showcov.cli.util.gather_uncovered_lines_from_xml", explode)
+
+    code, _ = _invoke(cli_runner, ["show", "--cov", str(fake_xml)])
+    assert code == 1

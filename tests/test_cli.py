@@ -3,11 +3,29 @@ from pathlib import Path
 
 from click.testing import CliRunner
 
-from showcov.cli import main
+from showcov import __version__
+from showcov.cli import cli
+
+# --------------------------------------------------------------------------- #
+# helpers                                                                     #
+# --------------------------------------------------------------------------- #
+
+
+def _run(runner: CliRunner, args: list[str]) -> tuple[int, str]:
+    """Invoke the CLI and return *(exit_code, output)* for convenience."""
+    result = runner.invoke(cli, args)
+    return result.exit_code, result.output
+
+
+# --------------------------------------------------------------------------- #
+# tests                                                                       #
+# --------------------------------------------------------------------------- #
 
 
 def test_cli_filters_and_output(
-    tmp_path: Path, cli_runner: CliRunner, coverage_xml_file: Callable[..., Path]
+    tmp_path: Path,
+    cli_runner: CliRunner,
+    coverage_xml_file: Callable[..., Path],
 ) -> None:
     file_a = tmp_path / "a.py"
     file_a.write_text("a\n")
@@ -16,26 +34,39 @@ def test_cli_filters_and_output(
     xml_file = coverage_xml_file({file_a: [1], file_b: [1]})
 
     # include only file_a
-    result = cli_runner.invoke(main, ["--xml-file", str(xml_file), str(file_a), "--format", "human"])
-    assert result.exit_code == 0
-    assert str(file_a) in result.output
-    assert str(file_b) not in result.output
+    code, out = _run(
+        cli_runner,
+        ["show", "--cov", str(xml_file), str(file_a), "--format", "human"],
+    )
+    assert code == 0
+    assert file_a.as_posix() in out
+    assert file_b.as_posix() not in out
 
     # include directory but exclude file_b
-    result = cli_runner.invoke(
-        main,
-        ["--xml-file", str(xml_file), str(tmp_path), "--exclude", "*b.py", "--format", "human"],
+    code, out = _run(
+        cli_runner,
+        [
+            "show",
+            "--cov",
+            str(xml_file),
+            str(tmp_path),
+            "--exclude",
+            "*b.py",
+            "--format",
+            "human",
+        ],
     )
-    assert result.exit_code == 0
-    assert str(file_a) in result.output
-    assert str(file_b) not in result.output
+    assert code == 0
+    assert str(file_a) in out
+    assert str(file_b) not in out
 
     # write json output to file
     out_file = tmp_path / "out.json"
-    result = cli_runner.invoke(
-        main,
+    code, _ = _run(
+        cli_runner,
         [
-            "--xml-file",
+            "show",
+            "--cov",
             str(xml_file),
             str(tmp_path),
             "--format",
@@ -44,122 +75,108 @@ def test_cli_filters_and_output(
             str(out_file),
         ],
     )
-    assert result.exit_code == 0
-    assert out_file.read_text(encoding="utf-8").strip().startswith("{")
+    assert code == 0
+    assert out_file.read_text(encoding="utf-8").lstrip().startswith("{")
 
 
 def test_cli_version_flag(cli_runner: CliRunner) -> None:
-    result = cli_runner.invoke(main, ["--version"])
-    assert result.exit_code == 0
-    assert "showcov, version" in result.output
+    code, out = _run(cli_runner, ["--version"])
+    assert code == 0
+    assert out.strip() == __version__
 
 
 def test_cli_disables_color_flag(
-    cli_runner: CliRunner, coverage_xml_file: Callable[..., Path], tmp_path: Path
+    cli_runner: CliRunner,
+    coverage_xml_file: Callable[..., Path],
+    tmp_path: Path,
 ) -> None:
     src = tmp_path / "file.py"
     src.write_text("print(1)\n")
     xml = coverage_xml_file({src: [1]})
 
-    result = cli_runner.invoke(
-        main,
-        ["--xml-file", str(xml), str(src), "--no-color", "--format", "human"],
+    code, out = _run(
+        cli_runner,
+        ["show", "--cov", str(xml), str(src), "--no-color", "--format", "human"],
     )
-    assert result.exit_code == 0
-    assert "\x1b[" not in result.output  # ANSI escape sequences absent
+    assert code == 0
+    assert "\x1b[" not in out  # ANSI sequences absent
 
 
 def test_cli_disables_color_when_not_tty(
-    cli_runner: CliRunner, coverage_xml_file: Callable[..., Path], tmp_path: Path
+    cli_runner: CliRunner,
+    coverage_xml_file: Callable[..., Path],
+    tmp_path: Path,
 ) -> None:
     src = tmp_path / "file.py"
     src.write_text("print(1)\n")
     xml = coverage_xml_file({src: [1]})
 
-    # Simulate piping by capturing output explicitly
-    result = cli_runner.invoke(
-        main,
-        ["--xml-file", str(xml), str(src), "--format", "human"],
-        # colorama disables colors when isatty=False
-        # click.testing.CliRunner captures output, which behaves like non-TTY
-    )
-    assert result.exit_code == 0
-    assert "\x1b[" not in result.output
-
-
-def test_cli_summary_only_and_stats(
-    cli_runner: CliRunner, coverage_xml_file: Callable[..., Path], tmp_path: Path
-) -> None:
-    file_a = tmp_path / "a.py"
-    file_a.write_text("a\n")
-    xml = coverage_xml_file({file_a: [1]})
-    result = cli_runner.invoke(
-        main,
-        ["--xml-file", str(xml), str(tmp_path), "--summary-only", "--stats", "--format", "human"],
-    )
-    assert result.exit_code == 0
-    assert result.output.splitlines()[0] == file_a.as_posix()
-    assert "files with uncovered lines" in result.output
+    code, out = _run(cli_runner, ["show", "--cov", str(xml), str(src), "--format", "human"])
+    assert code == 0
+    assert "\x1b[" not in out  # colorama disables colours when output captured
 
 
 def test_cli_format_auto_json(
-    cli_runner: CliRunner, coverage_xml_file: Callable[..., Path], tmp_path: Path
+    cli_runner: CliRunner,
+    coverage_xml_file: Callable[..., Path],
+    tmp_path: Path,
 ) -> None:
     src = tmp_path / "f.py"
     src.write_text("a\n")
     xml = coverage_xml_file({src: [1]})
-    result = cli_runner.invoke(main, ["--xml-file", str(xml), str(src)])
-    assert result.exit_code == 0
-    assert result.output.strip().startswith("{")
+
+    code, out = _run(cli_runner, ["show", "--cov", str(xml), str(src)])
+    assert code == 0
+    assert out.lstrip().startswith("{")
 
 
 def test_cli_invalid_format_suggestion(
-    cli_runner: CliRunner, coverage_xml_file: Callable[..., Path], tmp_path: Path
+    cli_runner: CliRunner,
+    coverage_xml_file: Callable[..., Path],
+    tmp_path: Path,
 ) -> None:
     src = tmp_path / "f.py"
     src.write_text("a\n")
     xml = coverage_xml_file({src: [1]})
-    result = cli_runner.invoke(main, ["--xml-file", str(xml), str(src), "--format", "jsn"])
-    assert result.exit_code != 0
-    assert "Unsupported format: 'jsn'. Did you mean 'json'?" in result.output
 
-
-def test_cli_list_files(
-    cli_runner: CliRunner, coverage_xml_file: Callable[..., Path], tmp_path: Path
-) -> None:
-    src = tmp_path / "f.py"
-    src.write_text("a\n")
-    xml = coverage_xml_file({src: [1]})
-    result = cli_runner.invoke(main, ["--xml-file", str(xml), str(tmp_path), "--list-files"])
-    assert result.exit_code == 0
-    assert result.output.strip() == src.as_posix()
+    code, out = _run(cli_runner, ["show", "--cov", str(xml), str(src), "--format", "jsn"])
+    assert code != 0
+    assert "'jsn' is not one of" in out
 
 
 def test_cli_no_uncovered_message(
-    cli_runner: CliRunner, coverage_xml_file: Callable[..., Path], tmp_path: Path
+    cli_runner: CliRunner,
+    coverage_xml_file: Callable[..., Path],
+    tmp_path: Path,
 ) -> None:
     src = tmp_path / "f.py"
     src.write_text("a\n")
     xml = coverage_xml_file({src: [1]})
+
     # Pass non-matching path
-    result = cli_runner.invoke(main, ["--xml-file", str(xml), "nonexistent", "--format", "human"])
-    assert result.exit_code == 0
-    assert "No uncovered lines found" in result.output
+    code, out = _run(cli_runner, ["show", "--cov", str(xml), "nonexistent", "--format", "human"])
+    assert code == 0
+    assert "No uncovered lines found" in out
 
 
 def test_cli_glob_patterns(
-    cli_runner: CliRunner, coverage_xml_file: Callable[..., Path], tmp_path: Path
+    cli_runner: CliRunner,
+    coverage_xml_file: Callable[..., Path],
+    tmp_path: Path,
 ) -> None:
     src = tmp_path / "f.py"
     src.write_text("a\n")
     xml = coverage_xml_file({src: [1]})
-    result = cli_runner.invoke(main, ["--xml-file", str(xml), str(tmp_path / "*.py"), "--format", "human"])
-    assert result.exit_code == 0
-    assert src.as_posix() in result.output
+    pattern = str(tmp_path / "*.py")
+
+    code, out = _run(cli_runner, ["show", "--cov", str(xml), pattern, "--format", "human"])
+    assert code == 0
+    assert src.as_posix() in out
 
 
 def test_cli_exit_codes(cli_runner: CliRunner, tmp_path: Path) -> None:
     bad_xml = tmp_path / "bad.xml"
     bad_xml.write_text("<coverage>", encoding="utf-8")  # malformed
-    result = cli_runner.invoke(main, ["--xml-file", str(bad_xml), "--format", "human"])
-    assert result.exit_code == 65
+
+    code, _ = _run(cli_runner, ["show", "--cov", str(bad_xml), "--format", "human"])
+    assert code == 65

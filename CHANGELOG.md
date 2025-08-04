@@ -1,3 +1,10 @@
+## Unreleased - 2025-08-04
+
+### Changed
+- remove `--no-pager`, make pager off the default
+
+---
+
 ## [0.0.16] - 2025-08-03
 
 ### Fixed
