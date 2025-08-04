@@ -41,6 +41,24 @@ def test_format_human_respects_color(tmp_path: Path) -> None:
     assert "\x1b" not in plain
 
 
+def test_format_human_outputs_table(tmp_path: Path) -> None:
+    src = tmp_path / "x.py"
+    src.write_text("a\n" * 3)
+    sections = build_sections({src: [2, 3]})
+    meta = OutputMeta(
+        context_lines=0,
+        with_code=False,
+        coverage_xml=tmp_path / "cov.xml",
+        color=False,
+    )
+    out = format_human(sections, meta)
+    assert "File" in out
+    assert "Start" in out
+    assert "End" in out
+    assert "# Lines" in out
+    assert "x.py" in out
+
+
 def test_format_registry() -> None:
     assert set(FORMATTERS) == {
         Format.HUMAN,

@@ -4,7 +4,6 @@ import types
 from collections.abc import Callable
 from configparser import ConfigParser
 from pathlib import Path
-from re import findall
 
 import pytest
 from _pytest.monkeypatch import MonkeyPatch
@@ -116,8 +115,10 @@ def test_format_human(tmp_path: Path, *, color: bool) -> None:
         color=color,
     )
     out = format_human(sections, meta)
-    assert "Uncovered sections in" in out
-    assert "Line" in out
+    assert "File" in out
+    assert "Start" in out
+    assert "End" in out
+    assert "# Lines" in out
     assert "2" in out
     assert "4" in out
     assert "5" in out
@@ -134,12 +135,14 @@ def test_format_human_sorted_files(tmp_path: Path) -> None:
         context_lines=0,
         with_code=False,
         coverage_xml=tmp_path / "cov.xml",
-        color=True,
+        color=False,
     )
     out = format_human(sections, meta)
 
-    files_shown = findall(r"Uncovered sections in (.+\.py):", out)
-    assert files_shown == sorted([file_a.as_posix(), file_b.as_posix()])
+    files_shown = [
+        ln.replace("│", " ").replace("┃", " ").split()[0] for ln in out.splitlines() if ".py" in ln
+    ]
+    assert files_shown == [file_a.as_posix(), file_b.as_posix()]
 
 
 # --- Tests for `gather_uncovered_lines` ---
@@ -331,8 +334,9 @@ def test_format_human_file_open_error(tmp_path: Path) -> None:
         color=True,
     )
     out = format_human(sections, meta)
-    assert "Uncovered sections in" in out
-    assert "Line" in out
+    assert "nonexistent.py" in out
+    assert "1" in out
+    assert "2" in out
 
 
 # --- Test for parse_large_xml fallback (line 218) ---
