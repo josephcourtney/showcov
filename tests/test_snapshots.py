@@ -18,6 +18,8 @@ def test_json_output_snapshot() -> None:
         with_code=True,
         coverage_xml=Path("coverage.xml"),
         color=False,
+        show_paths=True,
+        show_line_numbers=True,
     )
     json_out = FORMATTERS[Format.JSON](sections, meta)
     expected_text = Path("tests/snapshots/json_output.json").read_text(encoding="utf-8")
@@ -39,6 +41,8 @@ def test_llm_prompt_snapshot() -> None:
         with_code=True,
         coverage_xml=Path("coverage.xml"),
         color=False,
+        show_paths=True,
+        show_line_numbers=True,
     )
     json_out = FORMATTERS[Format.JSON](sections, meta)
     data = json.loads(json_out)

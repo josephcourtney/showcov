@@ -17,18 +17,23 @@ def format_html(sections: list[UncoveredSection], meta: OutputMeta) -> str:
     parts: list[str] = ["<html>", "<body>"]
     for section in sections:
         rel = normalize_path(section.file, base=root)
-        parts.append(f"<h2>{escape(rel.as_posix())}</h2>")
+        if meta.show_paths:
+            parts.append(f"<h2>{escape(rel.as_posix())}</h2>")
         file_lines: list[str] = read_file_lines(section.file) if meta.with_code else []
         for start, end in section.ranges:
             header = f"Lines {start}-{end}" if start != end else f"Line {start}"
-            parts.append(f"<h3>{header}</h3>")
+            if meta.show_paths:
+                parts.append(f"<h3>{header}</h3>")
+            else:
+                parts.append(f"<p>{header}</p>")
             if meta.with_code and file_lines:
                 start_idx = max(1, start - context_lines)
                 end_idx = min(len(file_lines), end + context_lines)
                 snippet = []
                 for ln in range(start_idx, end_idx + 1):
                     code = file_lines[ln - 1] if 1 <= ln <= len(file_lines) else "<line not found>"
-                    snippet.append(f"{ln}: {code}")
+                    prefix = f"{ln}: " if meta.show_line_numbers else ""
+                    snippet.append(f"{prefix}{code}")
                 code_html = "<br/>".join(escape(line) for line in snippet)
                 parts.append(f"<pre>{code_html}</pre>")
     parts.extend(("</body>", "</html>"))

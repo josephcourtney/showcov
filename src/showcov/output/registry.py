@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import difflib
+
+from showcov import logger
 from showcov.output.base import Format, Formatter
 from showcov.output.html import format_html
 from showcov.output.human import format_human
@@ -23,8 +26,10 @@ def resolve_formatter(format_str: str, *, is_tty: bool) -> tuple[Format, Formatt
     try:
         fmt = Format(format_str.lower())
     except ValueError as err:
-        choices = ", ".join(f.value for f in Format)
-        msg = f"{format_str!r} is not one of {choices}"
+        choices = [f.value for f in Format]
+        suggestion = difflib.get_close_matches(format_str, choices, n=1)
+        hint = f". Did you mean {suggestion[0]!r}?" if suggestion else ""
+        msg = f"{format_str!r} is not one of {', '.join(choices)}{hint}"
         raise ValueError(msg) from err
 
     if fmt is Format.AUTO:
@@ -36,4 +41,5 @@ def resolve_formatter(format_str: str, *, is_tty: bool) -> tuple[Format, Formatt
         msg = f"Unsupported format: {fmt!r}"
         raise ValueError(msg) from err
 
+    logger.debug("selected formatter %s", fmt.value)
     return fmt, formatter
