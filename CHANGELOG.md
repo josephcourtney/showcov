@@ -1,3 +1,21 @@
+## [0.0.23] - 2025-08-04
+
+### Added
+- add `show_paths` and `show_line_numbers` controls for all formatters
+- emit summary and per-file counts in JSON output
+
+### Changed
+- normalize include and exclude path handling
+- document and extend pager controls across commands
+- suggest close matches for invalid `--format`
+
+### Fixed
+- guard against invalid `--context` values
+- validate output paths before writing
+- disallow `--format=auto` with `--output`
+
+---
+
 ## [0.0.22] - 2025-08-04
 
 ### Added

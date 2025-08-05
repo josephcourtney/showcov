@@ -113,6 +113,8 @@ def test_format_human(tmp_path: Path, *, color: bool) -> None:
         with_code=False,
         coverage_xml=tmp_path / "cov.xml",
         color=color,
+        show_paths=True,
+        show_line_numbers=False,
     )
     out = format_human(sections, meta)
     assert "File" in out
@@ -136,6 +138,8 @@ def test_format_human_sorted_files(tmp_path: Path) -> None:
         with_code=False,
         coverage_xml=tmp_path / "cov.xml",
         color=False,
+        show_paths=True,
+        show_line_numbers=False,
     )
     out = format_human(sections, meta)
 
@@ -332,6 +336,8 @@ def test_format_human_file_open_error(tmp_path: Path) -> None:
         with_code=False,
         coverage_xml=tmp_path / "cov.xml",
         color=True,
+        show_paths=True,
+        show_line_numbers=False,
     )
     out = format_human(sections, meta)
     assert "nonexistent.py" in out

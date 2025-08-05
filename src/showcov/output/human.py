@@ -21,7 +21,8 @@ def format_human(sections: list[UncoveredSection], meta: OutputMeta) -> str:
     console = Console(force_terminal=meta.color, width=sys.maxsize)
 
     table = Table(show_header=True, header_style="bold")
-    table.add_column("File", style="yellow")
+    if meta.show_paths:
+        table.add_column("File", style="yellow")
     table.add_column("Start", justify="right", style="cyan")
     table.add_column("End", justify="right", style="cyan")
     table.add_column("# Lines", justify="right", style="magenta")
@@ -29,12 +30,11 @@ def format_human(sections: list[UncoveredSection], meta: OutputMeta) -> str:
     for section in sections:
         rel = normalize_path(section.file, base=root)
         for start, end in section.ranges:
-            table.add_row(
-                rel.as_posix(),
-                str(start),
-                str(end),
-                str(end - start + 1),
-            )
+            row = []
+            if meta.show_paths:
+                row.append(rel.as_posix())
+            row.extend([str(start), str(end), str(end - start + 1)])
+            table.add_row(*row)
 
     parts: list[str] = []
     with console.capture() as capture:
@@ -46,13 +46,14 @@ def format_human(sections: list[UncoveredSection], meta: OutputMeta) -> str:
             rel = normalize_path(section.file, base=root)
             lines = read_file_lines(section.file)
             for start, end in section.ranges:
-                parts.append(f"{rel.as_posix()}:{start}-{end}")
+                heading = f"{rel.as_posix()}:{start}-{end}" if meta.show_paths else f"{start}-{end}"
+                parts.append(heading)
                 start_idx = max(1, start - meta.context_lines)
                 end_idx = min(len(lines), end + meta.context_lines)
                 for i in range(start_idx, end_idx + 1):
                     code = lines[i - 1] if 1 <= i <= len(lines) else "<line not found>"
                     tag = detect_line_tag(lines, i - 1) if 1 <= i <= len(lines) else None
-                    line = f"{i:>4}: {code}"
+                    line = f"{i:>4}: {code}" if meta.show_line_numbers else code
                     if tag:
                         line += f"  [{tag}]"
                     parts.append(line)

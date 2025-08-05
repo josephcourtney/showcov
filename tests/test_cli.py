@@ -1,10 +1,12 @@
 from collections.abc import Callable
 from pathlib import Path
 
+import click
+import pytest
 from click.testing import CliRunner
 
 from showcov import __version__
-from showcov.cli import cli
+from showcov.cli import _resolve_context_option, cli
 
 # --------------------------------------------------------------------------- #
 # helpers                                                                     #
@@ -156,6 +158,48 @@ def test_cli_line_tag_abstractmethod(
     code, out = _run(cli_runner, ["show", "--cov", str(xml), str(src), "--code", "--format", "human"])
     assert code == 0
     assert "[abstractmethod]" in out
+
+
+def test_context_option_error() -> None:
+    with pytest.raises(click.BadParameter):
+        _resolve_context_option("bad,value")
+
+
+def test_output_path_error(
+    tmp_path: Path, cli_runner: CliRunner, coverage_xml_file: Callable[..., Path]
+) -> None:
+    src = tmp_path / "f.py"
+    src.write_text("a\n")
+    xml = coverage_xml_file({src: [1]})
+    bad = tmp_path / "missing" / "out.txt"
+    code, out = _run(
+        cli_runner,
+        ["show", "--cov", str(xml), str(src), "--format", "human", "--output", str(bad)],
+    )
+    assert code != 0
+    assert "directory does not exist" in out
+
+
+def test_auto_format_with_output(
+    tmp_path: Path, cli_runner: CliRunner, coverage_xml_file: Callable[..., Path]
+) -> None:
+    src = tmp_path / "f.py"
+    src.write_text("a\n")
+    xml = coverage_xml_file({src: [1]})
+    out_file = tmp_path / "out.txt"
+    code, out = _run(
+        cli_runner,
+        [
+            "show",
+            "--cov",
+            str(xml),
+            str(src),
+            "--output",
+            str(out_file),
+        ],
+    )
+    assert code != 0
+    assert "Cannot use --format=auto" in out
 
 
 def test_cli_format_auto_json(

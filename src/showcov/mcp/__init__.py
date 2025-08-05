@@ -35,7 +35,13 @@ def get_model_context(sections: list[UncoveredSection], meta: OutputMeta) -> dic
             "with_code": meta.with_code,
         },
         "sections": [
-            sec.to_dict(with_code=meta.with_code, context_lines=context_lines, base=root) for sec in sections
+            sec.to_dict(
+                with_code=meta.with_code,
+                context_lines=context_lines,
+                base=root,
+                show_line_numbers=meta.show_line_numbers,
+            )
+            for sec in sections
         ],
     }
     return data

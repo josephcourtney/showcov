@@ -1,6 +1,8 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from showcov.core import build_sections
 from showcov.output import (
     FORMATTERS,
@@ -24,12 +26,16 @@ def test_format_human_respects_color(tmp_path: Path) -> None:
         with_code=False,
         coverage_xml=tmp_path / "cov.xml",
         color=True,
+        show_paths=True,
+        show_line_numbers=False,
     )
     plain_meta = OutputMeta(
         context_lines=0,
         with_code=False,
         coverage_xml=tmp_path / "cov.xml",
         color=False,
+        show_paths=True,
+        show_line_numbers=False,
     )
     colored = format_human(sections, colored_meta)
     plain = format_human(sections, plain_meta)
@@ -46,6 +52,8 @@ def test_format_human_outputs_table(tmp_path: Path) -> None:
         with_code=False,
         coverage_xml=tmp_path / "cov.xml",
         color=False,
+        show_paths=True,
+        show_line_numbers=False,
     )
     out = format_human(sections, meta)
     assert "File" in out
@@ -53,6 +61,39 @@ def test_format_human_outputs_table(tmp_path: Path) -> None:
     assert "End" in out
     assert "# Lines" in out
     assert "x.py" in out
+
+
+def test_format_human_no_paths(tmp_path: Path) -> None:
+    src = tmp_path / "x.py"
+    src.write_text("a\n")
+    sections = build_sections({src: [1]})
+    meta = OutputMeta(
+        context_lines=0,
+        with_code=False,
+        coverage_xml=tmp_path / "cov.xml",
+        color=False,
+        show_paths=False,
+        show_line_numbers=False,
+    )
+    out = format_human(sections, meta)
+    assert "File" not in out
+    assert "x.py" not in out
+
+
+def test_format_human_no_line_numbers(tmp_path: Path) -> None:
+    src = tmp_path / "x.py"
+    src.write_text("a\n")
+    sections = build_sections({src: [1]})
+    meta = OutputMeta(
+        context_lines=0,
+        with_code=True,
+        coverage_xml=tmp_path / "cov.xml",
+        color=False,
+        show_paths=True,
+        show_line_numbers=False,
+    )
+    out = format_human(sections, meta)
+    assert "1:" not in out
 
 
 def test_format_registry() -> None:
@@ -71,15 +112,22 @@ def test_resolve_formatter() -> None:
     assert formatter is FORMATTERS[Format.JSON]
 
 
+def test_format_suggestion() -> None:
+    with pytest.raises(ValueError, match="Did you mean 'json'"):
+        resolve_formatter("jsn", is_tty=False)
+
+
 def test_format_markdown(tmp_path: Path) -> None:
     src = tmp_path / "x.py"
     src.write_text("a\n")
     sections = build_sections({src: [1]})
     meta = OutputMeta(
         context_lines=0,
-        with_code=False,
+        with_code=True,
         coverage_xml=tmp_path / "cov.xml",
         color=False,
+        show_paths=True,
+        show_line_numbers=True,
     )
     out = format_markdown(sections, meta)
     assert "<details>" in out
@@ -95,10 +143,28 @@ def test_format_html(tmp_path: Path) -> None:
         with_code=False,
         coverage_xml=tmp_path / "cov.xml",
         color=False,
+        show_paths=True,
+        show_line_numbers=False,
     )
     out = format_html(sections, meta)
     assert "<html>" in out
     assert "x.py" in out
+
+
+def test_markdown_no_code(tmp_path: Path) -> None:
+    src = tmp_path / "x.py"
+    src.write_text("a\n")
+    sections = build_sections({src: [1]})
+    meta = OutputMeta(
+        context_lines=0,
+        with_code=False,
+        coverage_xml=tmp_path / "cov.xml",
+        color=False,
+        show_paths=True,
+        show_line_numbers=True,
+    )
+    out = format_markdown(sections, meta)
+    assert "```" not in out
 
 
 def test_file_stats_summary(tmp_path: Path) -> None:
@@ -110,6 +176,8 @@ def test_file_stats_summary(tmp_path: Path) -> None:
         with_code=False,
         coverage_xml=tmp_path / "cov.xml",
         color=False,
+        show_paths=True,
+        show_line_numbers=False,
     )
     out = render_output(
         sections,
@@ -121,6 +189,48 @@ def test_file_stats_summary(tmp_path: Path) -> None:
     assert "x.py: 1 uncovered (100%)" in out
 
 
+def test_json_stats(tmp_path: Path) -> None:
+    src = tmp_path / "x.py"
+    src.write_text("a\n")
+    sections = build_sections({src: [1]})
+    meta = OutputMeta(
+        context_lines=0,
+        with_code=False,
+        coverage_xml=tmp_path / "cov.xml",
+        color=False,
+        show_paths=True,
+        show_line_numbers=True,
+    )
+    out = render_output(
+        sections,
+        Format.JSON,
+        FORMATTERS[Format.JSON],
+        meta,
+        aggregate_stats=True,
+        file_stats=True,
+    )
+    data = json.loads(out)
+    assert data["summary"]["uncovered"] == 1
+    assert data["files"][0]["counts"]["uncovered"] == 1
+
+
+def test_json_no_paths(tmp_path: Path) -> None:
+    src = tmp_path / "x.py"
+    src.write_text("a\n")
+    sections = build_sections({src: [1]})
+    meta = OutputMeta(
+        context_lines=0,
+        with_code=False,
+        coverage_xml=tmp_path / "cov.xml",
+        color=False,
+        show_paths=False,
+        show_line_numbers=True,
+    )
+    out = format_json(sections, meta)
+    data = json.loads(out)
+    assert "file" not in data["files"][0]
+
+
 def test_format_sarif(tmp_path: Path) -> None:
     src = tmp_path / "x.py"
     src.write_text("a\n")
@@ -130,6 +240,8 @@ def test_format_sarif(tmp_path: Path) -> None:
         with_code=False,
         coverage_xml=tmp_path / "cov.xml",
         color=False,
+        show_paths=True,
+        show_line_numbers=False,
     )
     out = format_sarif(sections, meta)
     data = json.loads(out)
@@ -146,6 +258,8 @@ def test_json_includes_tags(tmp_path: Path) -> None:
         with_code=True,
         coverage_xml=tmp_path / "cov.xml",
         color=False,
+        show_paths=True,
+        show_line_numbers=True,
     )
     out = format_json(sections, meta)
     data = json.loads(out)
