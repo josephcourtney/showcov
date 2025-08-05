@@ -31,6 +31,18 @@
       ],
       "additionalProperties": false
     },
+    "summary": {
+      "description": "Aggregate statistics for uncovered code.",
+      "type": "object",
+      "properties": {
+        "uncovered": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": ["uncovered"],
+      "additionalProperties": false
+    },
     "files": {
       "description": "List of source files with uncovered code sections.",
       "type": "array",
@@ -55,31 +67,30 @@
                   "type": "integer",
                   "minimum": 1
                 },
-                "source": {
-                  "description": "Optional source code lines in this range.",
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "line": {
-                        "type": "integer",
-                        "minimum": 1
-                      },
-                      "code": {
-                        "type": "string"
-                      },
-                      "tag": {
-                        "type": "string"
-                      }
-                    },
-                    "required": [
-                      "line",
-                      "code"
-                    ],
-                    "additionalProperties": false
+            "source": {
+              "description": "Optional source code lines in this range.",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "line": {
+                    "type": "integer",
+                    "minimum": 1
                   },
-                  "minItems": 1
-                }
+                  "code": {
+                    "type": "string"
+                  },
+                  "tag": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "code"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 1
+            }
               },
               "required": [
                 "start",
@@ -87,10 +98,19 @@
               ],
               "additionalProperties": false
             }
+          },
+          "counts": {
+            "description": "Statistics for the file.",
+            "type": "object",
+            "properties": {
+              "uncovered": {"type": "integer", "minimum": 0},
+              "total": {"type": "integer", "minimum": 0}
+            },
+            "required": ["uncovered", "total"],
+            "additionalProperties": false
           }
         },
         "required": [
-          "file",
           "uncovered"
         ],
         "additionalProperties": false

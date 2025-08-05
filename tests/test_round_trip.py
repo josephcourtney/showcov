@@ -33,6 +33,8 @@ def test_json_round_trip(tmp_path: Path) -> None:
         with_code=True,
         coverage_xml=tmp_path / "cov.xml",
         color=False,
+        show_paths=True,
+        show_line_numbers=True,
     )
     json_out = FORMATTERS[Format.JSON](sections, meta)
     parsed = parse_json_output(json_out)

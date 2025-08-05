@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from showcov import logger
 from showcov.core.files import normalize_path, read_file_lines
 from showcov.output.base import Format, Formatter, OutputMeta
 
@@ -40,9 +41,20 @@ def render_output(
     if not sections:
         return "No uncovered lines found (0 files matched input patterns)"
 
-    output = formatter(sections, meta)
+    if fmt is Format.JSON:
+        from showcov.output.json import format_json  # noqa: PLC0415
+
+        output = format_json(
+            sections,
+            meta,
+            aggregate_stats=aggregate_stats,
+            file_stats=file_stats,
+        )
+    else:
+        output = formatter(sections, meta)
 
     if file_stats and fmt is Format.HUMAN:
+        logger.debug("computing per-file statistics")
         base = meta.coverage_xml.parent.resolve()
         summary_lines = []
         for sec in sections:
@@ -54,6 +66,7 @@ def render_output(
         output = f"{output}\n" + "\n".join(summary_lines)
 
     if aggregate_stats and fmt is Format.HUMAN:
+        logger.debug("computing aggregate statistics")
         total_files = len(sections)
         total_regions = sum(len(sec.ranges) for sec in sections)
         total_lines = sum(end - start + 1 for sec in sections for start, end in sec.ranges)
