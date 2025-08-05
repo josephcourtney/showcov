@@ -135,6 +135,8 @@ def _sections_and_meta(
         with_code=with_code,
         coverage_xml=xml_path,
         color=False,
+        show_paths=True,
+        show_line_numbers=False,
     )
     return sections, meta
 
@@ -145,6 +147,8 @@ def _make_report(sections: list[UncoveredSection], meta: OutputMeta) -> Coverage
             with_code=meta.with_code,
             context_lines=meta.context_lines,
             base=meta.coverage_xml.parent,
+            show_file=meta.show_paths,
+            show_line_numbers=meta.show_line_numbers,
         )
         for section in sections
     ]

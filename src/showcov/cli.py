@@ -6,6 +6,7 @@ import dataclasses
 import datetime
 import json
 import logging
+import os
 import sys
 from pathlib import Path
 from textwrap import dedent
@@ -109,11 +110,15 @@ def _resolve_context_option(value: str | None) -> tuple[int, int]:
     if not value:
         return 0, 0
     parts = [p.strip() for p in value.replace(",", " ").split()]
-    if len(parts) == 1:
-        n = int(parts[0])
-        return n, n
-    if len(parts) == 2:  # noqa: PLR2004
-        return int(parts[0]), int(parts[1])
+    try:
+        if len(parts) == 1:
+            n = int(parts[0])
+            return n, n
+        if len(parts) == 2:  # noqa: PLR2004
+            return int(parts[0]), int(parts[1])
+    except ValueError as err:
+        msg = "context must be integers"
+        raise click.BadParameter(msg) from err
     msg = "Expect 'N' or 'N,M' for --context"
     raise click.BadParameter(msg)
 
@@ -122,16 +127,27 @@ def resolve_sections(opts: ShowcovOptions) -> tuple[list[UncoveredSection], Path
     xml_path = determine_xml_file(str(opts.xml_file) if opts.xml_file else None)
     uncovered = gather_uncovered_lines_from_xml(xml_path)
     sections_all = build_sections(uncovered)
-    filtered = PathFilter(opts.include, opts.exclude).filter(sections_all)
+    logger.debug("coverage xml resolved to %s", xml_path)
+    logger.debug("include patterns: %s", opts.include)
+    logger.debug("exclude patterns: %s", opts.exclude)
+    filtered = PathFilter(opts.include, opts.exclude, base=xml_path.parent).filter(sections_all)
+    logger.debug("filtered %d of %d sections", len(filtered), len(sections_all))
     return filtered, xml_path
 
 
 def write_output(output_text: str, opts: ShowcovOptions) -> None:
     if opts.output and opts.output != Path("-"):
-        opts.output.write_text(output_text, encoding="utf-8")
+        try:
+            if not opts.output.parent.exists():
+                raise click.FileError(str(opts.output), hint="directory does not exist")
+            opts.output.write_text(output_text, encoding="utf-8")
+        except OSError as err:
+            raise click.FileError(str(opts.output), hint=str(err)) from err
         return
 
-    use_pager = opts.pager if opts.pager is not None else (sys.stdout.isatty() and not opts.quiet)
+    env_pager = os.getenv("SHOWCOV_PAGER", "").lower()
+    default = False if env_pager == "off" else (sys.stdout.isatty() and not opts.quiet)
+    use_pager = opts.pager if opts.pager is not None else default
     if use_pager:
         click.echo_via_pager(output_text)
     else:
@@ -268,6 +284,9 @@ def show(
     opts.aggregate_stats = aggregate_stats
     opts.show_paths = show_paths
 
+    if opts.output_format == "auto" and opts.output and opts.output != Path("-"):
+        raise click.BadOptionUsage("--format", "Cannot use --format=auto with --output")  # noqa: EM101
+
     _configure_runtime(quiet=opts.quiet, verbose=opts.verbose, debug=opts.debug)
 
     try:
@@ -294,6 +313,8 @@ def show(
         with_code=opts.show_code,
         coverage_xml=resolved_xml,
         color=opts.use_color,
+        show_paths=opts.show_paths,
+        show_line_numbers=opts.show_line_numbers,
     )
     output_text = render_output(
         sections,
@@ -319,6 +340,8 @@ def show(
     help="Output format",
 )
 @click.option("--output", type=click.Path(path_type=Path), help="Write output to FILE instead of stdout")
+@click.option("--pager", is_flag=True, help="Force paging even if stdout is redirected")
+@click.option("--no-pager", is_flag=True, help="Disable paging even if stdout is a TTY")
 @click.pass_obj
 def diff(
     opts: ShowcovOptions,
@@ -327,8 +350,13 @@ def diff(
     current: Path,
     format_: str,
     output: Path | None,
+    pager: bool,
+    no_pager: bool,
 ) -> None:
     """Compare two coverage reports."""
+    if format_ == "auto" and output and output != Path("-"):
+        raise click.BadOptionUsage("--format", "Cannot use --format=auto with --output")  # noqa: EM101
+
     _configure_runtime(quiet=opts.quiet, verbose=opts.verbose, debug=opts.debug)
 
     try:
@@ -344,8 +372,19 @@ def diff(
             raise
         sys.exit(EXIT_GENERIC)
 
+    opts.output_format = format_
+    opts.output = output
+    opts.pager = True if pager else False if no_pager else None
+
     fmt, formatter = resolve_formatter(format_, is_tty=sys.stdout.isatty())
-    meta = OutputMeta(context_lines=0, with_code=False, coverage_xml=current, color=opts.use_color)
+    meta = OutputMeta(
+        context_lines=0,
+        with_code=False,
+        coverage_xml=current,
+        color=opts.use_color,
+        show_paths=True,
+        show_line_numbers=False,
+    )
     if fmt is Format.JSON:
         base = current.parent
         data = {
@@ -363,7 +402,7 @@ def diff(
             )
         output_text = "No changes in coverage" if not parts else "\n\n".join(parts)
 
-    tmp = dataclasses.replace(opts, output=output, output_format=fmt.value, pager=False)
+    tmp = dataclasses.replace(opts, output_format=fmt.value)
     write_output(output_text, tmp)
 
 

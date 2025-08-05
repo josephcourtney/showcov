@@ -19,6 +19,8 @@ def _meta() -> OutputMeta:
         with_code=True,
         coverage_xml=Path("coverage.xml"),
         color=False,
+        show_paths=True,
+        show_line_numbers=True,
     )
 
 

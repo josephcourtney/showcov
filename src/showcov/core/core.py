@@ -52,6 +52,8 @@ class UncoveredSection:
         with_code: bool = False,
         context_lines: int = 0,
         base: Path | None = None,
+        show_file: bool = True,
+        show_line_numbers: bool = True,
     ) -> dict[str, object]:
         """Convert the section into a JSON-serialisable dictionary.
 
@@ -84,14 +86,18 @@ class UncoveredSection:
                 for i in range(start_idx, end_idx + 1):
                     code = file_lines[i - 1] if 1 <= i <= len(file_lines) else "<line not found>"
                     tag = detect_line_tag(file_lines, i - 1) if 1 <= i <= len(file_lines) else None
-                    line_entry: dict[str, object] = {"line": i, "code": code}
+                    line_entry: dict[str, object] = {"code": code}
+                    if show_line_numbers:
+                        line_entry["line"] = i
                     if tag:
                         line_entry["tag"] = tag
                     source.append(line_entry)
                 entry["source"] = source
             uncovered_entries.append(entry)
-
-        return {"file": file_str, "uncovered": uncovered_entries}
+        out: dict[str, object] = {"uncovered": uncovered_entries}
+        if show_file:
+            out["file"] = file_str
+        return out
 
     @classmethod
     def from_dict(cls, data: dict[str, object]) -> UncoveredSection:

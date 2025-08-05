@@ -36,3 +36,15 @@ def test_path_filter_resolves_paths(tmp_path: Path) -> None:
     pf = PathFilter([str(rel)], [])
     out = pf.filter(sections)
     assert [s.file for s in out] == [file_a]
+
+
+def test_path_filter_normalizes_and_expands(tmp_path: Path) -> None:
+    sub = tmp_path / "pkg"
+    sub.mkdir()
+    file_a = sub / "a.py"
+    file_a.write_text("a\n")
+    sections = [UncoveredSection(file_a, [(1, 1)])]
+
+    pf = PathFilter([sub], [], base=tmp_path)
+    out = pf.filter(sections)
+    assert out == sections

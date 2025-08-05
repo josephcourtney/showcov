@@ -43,6 +43,8 @@ class OutputMeta:
     with_code: bool
     coverage_xml: Path
     color: bool
+    show_paths: bool
+    show_line_numbers: bool
 
 
 class Formatter(Protocol):
