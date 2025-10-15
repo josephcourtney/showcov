@@ -5,6 +5,13 @@ from __future__ import annotations
 import importlib
 import logging
 import sys
+import textwrap
+from typing import TYPE_CHECKING
+
+from showcov.core.core import _get_xml_from_pyproject, get_config_xml_file
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def test_get_schema_cached(monkeypatch):
@@ -51,3 +58,50 @@ def test_import_has_no_side_effects(monkeypatch):
 
     assert not basic_called
     assert not init_called
+
+
+def test_get_xml_from_pyproject_valid(tmp_path: Path) -> None:
+    py = tmp_path / "pyproject.toml"
+    py.write_text(
+        textwrap.dedent(
+            """
+            [tool.coverage.xml]
+            output = ".coverage.xml"
+            """
+        ),
+        encoding="utf-8",
+    )
+    assert _get_xml_from_pyproject(py) == ".coverage.xml"
+
+
+def test_get_config_xml_file_uses_pyproject(tmp_path: Path, monkeypatch) -> None:
+    # create a project with a pyproject specifying coverage xml
+    py = tmp_path / "pyproject.toml"
+    (tmp_path / ".coverage.xml").write_text("<coverage/>", encoding="utf-8")
+    py.write_text(
+        textwrap.dedent(
+            """
+            [tool.coverage.xml]
+            output = ".coverage.xml"
+            """
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+    assert get_config_xml_file() == ".coverage.xml"
+
+
+def test_get_xml_from_pyproject_does_not_return_addopts_like_values(tmp_path: Path) -> None:
+    py = tmp_path / "pyproject.toml"
+    py.write_text(
+        textwrap.dedent(
+            """
+            [tool.coverage]
+            # no xml defined here; ensure function does not fall back to unrelated lists
+            [tool.pytest.ini_options]
+            addopts = ["-q"]
+            """
+        ),
+        encoding="utf-8",
+    )
+    assert _get_xml_from_pyproject(py) is None

@@ -6,21 +6,18 @@ import dataclasses
 import datetime
 import json
 import logging
-import os
 import sys
+import xml.etree.ElementTree as ET  # noqa: S405
 from pathlib import Path
 from textwrap import dedent
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Final
 
 import click
-import click_completion
-import click_completion.core
 from defusedxml import ElementTree
 
 from showcov import __version__, logger
 from showcov.core import (
     LOG_FORMAT,
-    CoverageXMLNotFoundError,
     PathFilter,
     UncoveredSection,
     build_sections,
@@ -97,8 +94,6 @@ def _configure_runtime(*, quiet: bool, verbose: bool, debug: bool) -> None:
     """Configure logging based on *quiet*/*verbose*."""
     level = logging.ERROR if quiet else (logging.DEBUG if verbose else logging.INFO)
     logging.basicConfig(level=level, format=LOG_FORMAT)
-
-    click_completion.init()
 
     if debug:
         logger.debug("debug mode active")
@@ -192,12 +187,33 @@ def man(ctx: click.Context) -> None:
     ctx.exit(EXIT_OK)
 
 
-@cli.command()
-@click.argument("shell", type=click.Choice(["bash", "zsh", "fish"], case_sensitive=False))
-def completion(shell: str) -> None:
-    """Print shell-completion script and exit."""
-    script = click_completion.core.get_code(shell=shell, prog_name="showcov")
-    click.echo(script)
+COMPLETION_TEMPLATES: Final[dict[str, str]] = {
+    "bash": (
+        '_grobl_completion() {{ eval "$(env {var}=bash_source {prog} "$@")"; }}\n'
+        "complete -F _grobl_completion {prog}"
+    ),
+    "zsh": 'autoload -U compinit; compinit\neval "$(env {var}=zsh_source {prog})"',
+    "fish": "eval (env {var}=fish_source {prog})",
+}
+
+
+@click.command()
+@click.option(
+    "--shell",
+    type=click.Choice(["bash", "zsh", "fish"], case_sensitive=False),
+    required=True,
+    help="Target shell to generate completion script for",
+)
+def completions(shell: str) -> None:
+    """Print shell completion script for the given shell."""
+    prog = "grobl"
+    var = "_GROBL_COMPLETE"
+    try:
+        template = COMPLETION_TEMPLATES[shell]
+    except KeyError as err:  # pragma: no cover - defensive
+        print(f"Unsupported shell: {shell}", file=sys.stderr)
+        raise SystemExit(1) from err
+    print(template.format(var=var, prog=prog))
 
 
 @cli.command(name="show")
@@ -279,12 +295,11 @@ def show(
 
     try:
         sections, resolved_xml = resolve_sections(opts)
-    except CoverageXMLNotFoundError as e:
-        click.echo(f"ERROR: {e}", err=True)
-        if opts.debug:
-            raise
-        sys.exit(EXIT_NOINPUT)
-    except ElementTree.ParseError:
+    except (  # handle both stdlib and defusedxml parse errors + bad root
+        ElementTree.ParseError,
+        ET.ParseError,
+        ValueError,
+    ):
         click.echo(f"ERROR: failed to read coverage XML (invalid format): {xml_file or '<auto>'}", err=True)
         if opts.debug:
             raise
@@ -345,7 +360,11 @@ def diff(
 
     try:
         new_sections, resolved_sections = diff_uncovered_lines(baseline, current)
-    except ElementTree.ParseError:
+    except (  # handle both stdlib and defusedxml parse errors + bad root
+        ElementTree.ParseError,
+        ET.ParseError,
+        ValueError,
+    ):
         click.echo("ERROR: failed to read coverage XML", err=True)
         if opts.debug:
             raise
