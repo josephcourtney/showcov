@@ -1,7 +1,7 @@
 # =================================== project ====================================
 [project]
   name = "showcov"
-version = "0.0.23"
+  version = "0.0.23"
   description = "Print out uncovered code."
   readme = "README.md"
   authors = [
@@ -15,18 +15,17 @@ version = "0.0.23"
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
   ]
-  requires-python = ">=3.13"
+  requires-python = ">=3.13,<3.14"
   dependencies = [
     "configparser>=7.1.0",
     "defusedxml>=0.7.1",
-    "jsonschema>=4.23.0", # Runtime JSON schema validation
-    "click>=8.1.7", # CLI framework
+    "jsonschema>=4.23.0",      # Runtime JSON schema validation
+    "click>=8.1.7",            # CLI framework
     "click-completion>=0.5.2",
     "rich>=14.1.0",
-    "pathspec>=0.12.1", # glob-style path filtering
-    "more-itertools>=10.3.0", # consecutive number grouping
-    "mcp>=1.12.3",
-]
+    "pathspec>=0.12.1",        # glob-style path filtering
+    "more-itertools>=10.3.0",
+  ]
 
   [project.scripts]
     showcov = "showcov.cli:cli"
@@ -41,16 +40,14 @@ version = "0.0.23"
     "pytest-randomly>=3.16.0",
     "types-defusedxml>=0.7.0.20240218",
     "types-jsonschema>=4.23.0.20240712",
-    "pre-commit>=4.2.0",
+    "mutmut>=3.3.1",
+    "hypothesis>=6.138.7",
   ]
 
 # =================================== build ====================================
 [build-system]
   requires      = ["uv_build>=0.6,<0.7"]
   build-backend = "uv_build"
-
-[tool.uv_build]
-  resources = ["showcov/data/schema.json"]
 
 
 # ==================================== lint ====================================
@@ -64,26 +61,12 @@ version = "0.0.23"
       # "FIX002", # Line contains TODO, consider resolving the issue
     ]
 
-# =================================== typecheck ===================================
-[tool.basedpyright]
-  typeCheckingMode = "recommended"
-  pythonVersion = "3.13"
-  pythonPlatform = "Darwin"
-  reportImplicitOverride = false
-  reportMissingTypeStubs = false
-  reportMissingImports = false
-  reportUnusedParameter = false
-  executionEnvironments = [
-    { root = "tests", reportPrivateUsage = false, reportUnusedCallResult = false, extraPaths = [] },
-  ]
-
-
 # =================================== test ===================================
 [tool.pytest.ini_options]
   addopts = [
+    "--cov-branch",
     "--cov=showcov",
     "--cov-report=xml",
-    "--cov-report=term-missing",
   ]
   testpaths = ["tests"]
 
@@ -94,7 +77,7 @@ version = "0.0.23"
   parallel = true
 
 [tool.coverage.report]
-  show_missing = true
+  show_missing = false
   skip_covered = true
   # Regexes for lines to exclude from consideration
   exclude_also = [

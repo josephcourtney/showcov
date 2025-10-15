@@ -4,23 +4,18 @@
 
 This file defines how You, an AI coding agent (LLMs, autonomous dev tools, etc.), must operate when contributing to this project.
 
-## Project Context
-
-You are contributing to `showcov`, a CLI tool that identifies uncovered lines in Python source files from a coverage XML report.
-
 ## Role
-
 
 Your responsibilities include:
 
-* Editing Python source files under `src/showcov/`
+* Editing Python source files under `src/`
 * Creating or editing test files under `tests/`
 * Preserving output determinism, testability, and extensibility
 * Respecting existing CLI conventions and internal architecture
 
 ## Directory Constraints
 
-* Source code: `src/showcov/`
+* Source code: `src/`
 * Tests: `tests/`
 * Do not write, or create files outside these directories unless explicitly instructed.
 
@@ -82,7 +77,6 @@ If any command fails due to missing executables or environment configuration, em
 * If `TODO.md` is missing, create a new file and notify the user
 
 ### Changelog Maintenance
-
 
 Follow [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format:
 
@@ -160,4 +154,3 @@ All actions must follow this protocol unless:
 
 ```
 ```
-
