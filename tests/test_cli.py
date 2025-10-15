@@ -6,7 +6,7 @@ import pytest
 from click.testing import CliRunner
 
 from showcov import __version__
-from showcov.cli import _resolve_context_option, cli
+from showcov.cli import EXIT_DATAERR, EXIT_GENERIC, _resolve_context_option, cli
 
 # --------------------------------------------------------------------------- #
 # helpers                                                                     #
@@ -283,3 +283,24 @@ def test_cli_exit_codes(cli_runner: CliRunner, tmp_path: Path) -> None:
 
     code, _ = _run(cli_runner, ["show", "--cov", str(bad_xml), "--format", "human"])
     assert code == 65
+
+
+def test_show_with_malformed_xml_reports_data_error(tmp_path: Path) -> None:
+    bad = tmp_path / "bad.xml"
+    bad.write_text("<not-coverage></not-coverage>", encoding="utf-8")
+    runner = CliRunner()
+    result = runner.invoke(cli, ["show", "--cov", str(bad)])
+    assert result.exit_code == EXIT_DATAERR
+    assert "ERROR: failed to read coverage XML" in result.output
+
+
+def test_diff_with_malformed_xml_reports_data_error(tmp_path: Path) -> None:
+    base = tmp_path / "base.xml"
+    cur = tmp_path / "cur.xml"
+    base.write_text("<coverage></coverage>", encoding="utf-8")
+    cur.write_text("<not-coverage/>", encoding="utf-8")
+    runner = CliRunner()
+    result = runner.invoke(cli, ["diff", str(base), str(cur)])
+    # defused or stdlib parse error or invalid root -> DATAERR
+    assert result.exit_code in {EXIT_DATAERR, EXIT_GENERIC}
+    assert "ERROR: failed to read coverage XML" in result.output
