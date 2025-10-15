@@ -135,7 +135,11 @@ def _get_xml_from_pyproject(pyproject: Path) -> str | None:
 
     tool = data.get("tool", {})
     coverage_cfg = tool.get("coverage", {})
-    return coverage_cfg.get("xml_report") or coverage_cfg.get("xml", {}).get("output")
+    return (
+        coverage_cfg.get("xml_report")
+        or coverage_cfg.get("xml", {}).get("output")
+        or tool.get("pytest.ini_options.addopts", [])
+    )
 
 
 def get_config_xml_file() -> str | None:

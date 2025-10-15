@@ -1,8 +1,0 @@
-repos:
-  - repo: local
-    hooks:
-      - id: check-version-sync
-        name: check version sync between pyproject.toml and CHANGELOG.md
-        entry: .hooks/check_version_sync.py
-        language: python
-        types: [toml, markdown]

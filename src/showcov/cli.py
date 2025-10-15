@@ -60,7 +60,6 @@ class ShowcovOptions:
     exclude: list[str] = dataclasses.field(default_factory=list)
 
     output_format: str = "auto"
-    pager: bool | None = None
     output: Path | None = None
 
     show_paths: bool = True
@@ -145,13 +144,7 @@ def write_output(output_text: str, opts: ShowcovOptions) -> None:
             raise click.FileError(str(opts.output), hint=str(err)) from err
         return
 
-    env_pager = os.getenv("SHOWCOV_PAGER", "").lower()
-    default = False if env_pager == "off" else (sys.stdout.isatty() and not opts.quiet)
-    use_pager = opts.pager if opts.pager is not None else default
-    if use_pager:
-        click.echo_via_pager(output_text)
-    else:
-        click.echo(output_text)
+    click.echo(output_text)
 
 
 # ---------------------------------------------------------------------------
@@ -222,8 +215,6 @@ def completion(shell: str) -> None:
     type=click.Choice([fmt.value for fmt in Format], case_sensitive=False),
     help="Output format",
 )
-@click.option("--pager", is_flag=True, help="Force paging even if stdout is redirected")
-@click.option("--no-pager", is_flag=True, help="Disable paging even if stdout is a TTY")
 @click.option("--color", "force_color", is_flag=True, help="Force ANSI color codes in output")
 @click.option("--no-color", is_flag=True, help="Disable ANSI color codes in output")
 @click.option("--output", type=click.Path(path_type=Path), help="Write output to FILE instead of stdout")
@@ -248,8 +239,6 @@ def show(
     include_: Sequence[str],
     exclude: Sequence[str],
     format_: str,
-    pager: bool,
-    no_pager: bool,
     force_color: bool,
     no_color: bool,
     output: Path | None,
@@ -272,7 +261,6 @@ def show(
     opts.include.extend(include_)
     opts.exclude.extend(exclude)
     opts.output_format = format_
-    opts.pager = True if pager else False if no_pager else None
     opts.use_color = force_color or (is_tty and not no_color)
     opts.show_line_numbers = line_numbers
     opts.context_before = before
@@ -340,8 +328,6 @@ def show(
     help="Output format",
 )
 @click.option("--output", type=click.Path(path_type=Path), help="Write output to FILE instead of stdout")
-@click.option("--pager", is_flag=True, help="Force paging even if stdout is redirected")
-@click.option("--no-pager", is_flag=True, help="Disable paging even if stdout is a TTY")
 @click.pass_obj
 def diff(
     opts: ShowcovOptions,
@@ -350,8 +336,6 @@ def diff(
     current: Path,
     format_: str,
     output: Path | None,
-    pager: bool,
-    no_pager: bool,
 ) -> None:
     """Compare two coverage reports."""
     if format_ == "auto" and output and output != Path("-"):
@@ -374,7 +358,6 @@ def diff(
 
     opts.output_format = format_
     opts.output = output
-    opts.pager = True if pager else False if no_pager else None
 
     fmt, formatter = resolve_formatter(format_, is_tty=sys.stdout.isatty())
     meta = OutputMeta(
@@ -404,11 +387,3 @@ def diff(
 
     tmp = dataclasses.replace(opts, output_format=fmt.value)
     write_output(output_text, tmp)
-
-
-@cli.command()
-def mcp() -> None:
-    """Start MCP server exposing showcov tools."""
-    from showcov.mcp.server import main as run_mcp  # noqa: PLC0415
-
-    run_mcp()
