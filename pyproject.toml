@@ -1,7 +1,7 @@
 # =================================== project ====================================
 [project]
   name = "showcov"
-  version = "0.0.23"
+  version = "0.0.24"
   description = "Print out uncovered code."
   readme = "README.md"
   authors = [
@@ -19,12 +19,12 @@
   dependencies = [
     "configparser>=7.1.0",
     "defusedxml>=0.7.1",
-    "jsonschema>=4.23.0", # Runtime JSON schema validation
+    "jsonschema>=4.23.0",     # Runtime JSON schema validation
     "click>=8.1.7",
     "rich>=14.1.0",
-    "pathspec>=0.12.1", # glob-style path filtering
+    "pathspec>=0.12.1",       # glob-style path filtering
     "more-itertools>=10.3.0",
-]
+  ]
 
   [project.scripts]
     showcov = "showcov.cli:cli"
