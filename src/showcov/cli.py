@@ -18,6 +18,7 @@ from defusedxml import ElementTree
 from showcov import __version__, logger
 from showcov.core import (
     LOG_FORMAT,
+    CoverageXMLNotFoundError,
     PathFilter,
     UncoveredSection,
     build_sections,
@@ -304,11 +305,13 @@ def show(
         if opts.debug:
             raise
         sys.exit(EXIT_DATAERR)
-    except OSError as e:
-        click.echo(f"ERROR: failed to read coverage XML: {e}", err=True)
+    except CoverageXMLNotFoundError as e:
+        # No coverage XML specified or found in configuration (or path not found):
+        # align with CLI contract/tests to exit with EX_NOINPUT (66).
+        click.echo(f"ERROR: {e}", err=True)
         if opts.debug:
             raise
-        sys.exit(EXIT_GENERIC)
+        sys.exit(EXIT_NOINPUT)
 
     fmt, formatter = resolve_formatter(opts.output_format, is_tty=is_tty)
     meta = OutputMeta(

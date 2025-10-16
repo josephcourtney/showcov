@@ -13,8 +13,10 @@ from showcov.core.core import _get_xml_from_pyproject, get_config_xml_file
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from _pytest.monkeypatch import MonkeyPatch
 
-def test_get_schema_cached(monkeypatch):
+
+def test_get_schema_cached(monkeypatch: MonkeyPatch) -> None:
     """``get_schema`` should load the schema once and cache the result."""
     from showcov.core import config
 
@@ -74,7 +76,7 @@ def test_get_xml_from_pyproject_valid(tmp_path: Path) -> None:
     assert _get_xml_from_pyproject(py) == ".coverage.xml"
 
 
-def test_get_config_xml_file_uses_pyproject(tmp_path: Path, monkeypatch) -> None:
+def test_get_config_xml_file_uses_pyproject(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
     # create a project with a pyproject specifying coverage xml
     py = tmp_path / "pyproject.toml"
     (tmp_path / ".coverage.xml").write_text("<coverage/>", encoding="utf-8")
