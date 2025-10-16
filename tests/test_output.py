@@ -10,7 +10,6 @@ from showcov.output import (
     format_human,
     format_json,
     format_markdown,
-    format_sarif,
     render_output,
     resolve_formatter,
 )
@@ -102,7 +101,6 @@ def test_format_registry() -> None:
         Format.HTML,
         Format.JSON,
         Format.MARKDOWN,
-        Format.SARIF,
     }
 
 
@@ -229,24 +227,6 @@ def test_json_no_paths(tmp_path: Path) -> None:
     out = format_json(sections, meta)
     data = json.loads(out)
     assert "file" not in data["files"][0]
-
-
-def test_format_sarif(tmp_path: Path) -> None:
-    src = tmp_path / "x.py"
-    src.write_text("a\n")
-    sections = build_sections({src: [1]})
-    meta = OutputMeta(
-        context_lines=0,
-        with_code=False,
-        coverage_xml=tmp_path / "cov.xml",
-        color=False,
-        show_paths=True,
-        show_line_numbers=False,
-    )
-    out = format_sarif(sections, meta)
-    data = json.loads(out)
-    assert data["version"] == "2.1.0"
-    assert data["runs"][0]["results"][0]["locations"][0]["physicalLocation"]["region"]["startLine"] == 1
 
 
 def test_json_includes_tags(tmp_path: Path) -> None:
