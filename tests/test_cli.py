@@ -304,3 +304,50 @@ def test_diff_with_malformed_xml_reports_data_error(tmp_path: Path) -> None:
     # defused or stdlib parse error or invalid root -> DATAERR
     assert result.exit_code in {EXIT_DATAERR, EXIT_GENERIC}
     assert "ERROR: failed to read coverage XML" in result.output
+
+
+def test_cli_branches_human(cli_runner: CliRunner, tmp_path: Path) -> None:
+    src = tmp_path / "b.py"
+    src.write_text("if x:\n    pass\n")
+    xml = tmp_path / "cov.xml"
+    xml.write_text(
+        (
+            "<coverage>"
+            "<packages><package><classes>"
+            f'<class filename="{src}"><lines>'
+            '<line number="1" hits="1" branch="true" condition-coverage="50% (1/2)">'
+            '<conditions><condition number="0" type="jump" coverage="0%"/></conditions>'
+            "</line>"
+            "</lines></class>"
+            "</classes></package></packages>"
+            "</coverage>"
+        ),
+        encoding="utf-8",
+    )
+    result = cli_runner.invoke(cli, ["branches", "--cov", str(xml), "--format", "human"])
+    assert result.exit_code == 0
+    assert "Uncovered Conditions" in result.output
+    assert "1" in result.output
+
+
+def test_cli_branches_json(cli_runner: CliRunner, tmp_path: Path) -> None:
+    src = tmp_path / "b.py"
+    src.write_text("if x:\n    pass\n")
+    xml = tmp_path / "cov.xml"
+    xml.write_text(
+        (
+            "<coverage>"
+            "<packages><package><classes>"
+            f'<class filename="{src}"><lines>'
+            '<line number="1" hits="1" branch="true" condition-coverage="50% (1/2)">'
+            '<conditions><condition number="0" type="jump" coverage="0%"/></conditions>'
+            "</line>"
+            "</lines></class>"
+            "</classes></package></packages>"
+            "</coverage>"
+        ),
+        encoding="utf-8",
+    )
+    result = cli_runner.invoke(cli, ["branches", "--cov", str(xml), "--format", "json"])
+    assert result.exit_code == 0
+    assert result.output.lstrip().startswith("[")

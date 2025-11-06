@@ -55,6 +55,10 @@ class PathFilter:
         rel = normalize_path(path, base=self._base).as_posix()
         return self._exclude_spec.match_file(rel)
 
+    def allow(self, path: Path) -> bool:
+        """Return True iff *path* is included and not excluded."""
+        return self._match_includes(path) and not self._match_excludes(path)
+
     def filter(self, sections: Iterable[UncoveredSection]) -> list[UncoveredSection]:
         """Return sections that satisfy include/exclude rules."""
         result: list[UncoveredSection] = []

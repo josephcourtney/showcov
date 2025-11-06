@@ -37,6 +37,21 @@ class FileAgg:
     lines: dict[int, LineAgg]  # lineno -> agg
 
 
+# --------------------------- Branch gap models -------------------------------
+@dataclass(frozen=True)
+class BranchCondition:
+    number: int
+    type: str | None
+    coverage: int  # percentage, 0..100
+
+
+@dataclass(frozen=True)
+class BranchGap:
+    file: Path
+    line: int
+    conditions: list[BranchCondition]  # only uncovered (coverage == 0)
+
+
 # --------------------------- Discovery/Parsing -------------------------------
 def find_coverage_xml_paths(root: Path, patterns: Sequence[str]) -> list[Path]:
     """Return a de-duplicated list of coverage XML files under *root*."""
@@ -100,6 +115,65 @@ def iter_lines(root: ET.Element) -> Iterable[tuple[str, int, int, int, int]]:
                 if parsed is not None:
                     br_cov, br_tot = parsed
             yield fname, lineno, hits, br_cov, br_tot
+
+
+def _parse_uncovered_conditions(line_elem: ET.Element) -> list[BranchCondition]:
+    """Return branch conditions on this line that have 0% coverage."""
+    out: list[BranchCondition] = []
+    conds = line_elem.find("conditions")
+    if conds is None:
+        return out
+    for c in conds.findall("condition"):
+        # Coverage attribute is typically like "0%" or "100%"
+        cov_text = (c.get("coverage") or "").strip().rstrip("%")
+        try:
+            pct = int(cov_text)
+        except ValueError:
+            continue
+        if pct != 0:
+            continue
+        num = c.get("number")
+        typ = c.get("type")
+        try:
+            idx = int(num) if num is not None else -1
+        except ValueError:
+            idx = -1
+        out.append(BranchCondition(number=idx, type=typ, coverage=pct))
+    return out
+
+
+def gather_uncovered_branches_from_xml(xml_file: Path) -> list[BranchGap]:
+    """Extract lines and specific branch conditions that are uncovered (0%)."""
+    try:
+        tree = ET.parse(xml_file)  # noqa: S314
+    except ET.ParseError as exc:
+        msg = f"{xml_file}: failed to parse coverage XML: {exc}"
+        raise ET.ParseError(msg) from exc
+    root = tree.getroot()
+    if root is None or root.tag != "coverage":
+        msg = f"Invalid root element: expected <coverage>, got <{getattr(root, 'tag', None)}>"
+        raise ValueError(msg)
+
+    gaps: list[BranchGap] = []
+    for cls in root.findall(".//class"):
+        fname = cls.get("filename") or ""
+        fpath = Path(fname).resolve()
+        lines_node = cls.find("lines")
+        if lines_node is None:
+            continue
+        for ln in lines_node.findall("line"):
+            if ln.get("branch") != "true":
+                continue
+            # Only care about branch lines with not-fully-covered conditions
+            conds = _parse_uncovered_conditions(ln)
+            if not conds:
+                continue
+            try:
+                lineno = int(ln.get("number", "0"))
+            except ValueError:
+                continue
+            gaps.append(BranchGap(file=fpath, line=lineno, conditions=conds))
+    return gaps
 
 
 # --------------------------- Aggregation -------------------------------------
@@ -199,11 +273,14 @@ def relativize(path_str: str, *, rel_to: Path | None) -> str:
 
 
 __all__ = [
+    "BranchCondition",
+    "BranchGap",
     "FileAgg",
     "LineAgg",
     "aggregate",
     "compute_file_rows",
     "find_coverage_xml_paths",
+    "gather_uncovered_branches_from_xml",
     "iter_lines",
     "parse_condition_coverage",
     "read_all_coverage_roots",

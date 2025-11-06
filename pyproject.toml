@@ -1,7 +1,7 @@
 # =================================== project ====================================
 [project]
   name = "showcov"
-  version = "0.0.24"
+  version = "0.0.26"
   description = "Print out uncovered code."
   readme = "README.md"
   authors = [
@@ -15,7 +15,7 @@
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
   ]
-  requires-python = ">=3.10,<3.14"
+  requires-python = ">=3.11,<3.14"
   dependencies = [
     "configparser>=7.1.0",
     "defusedxml>=0.7.1",

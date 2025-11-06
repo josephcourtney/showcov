@@ -14,6 +14,8 @@ from typing import TYPE_CHECKING, Final
 
 import click
 from defusedxml import ElementTree
+from rich.console import Console
+from rich.table import Table
 
 from showcov import __version__, logger
 from showcov.core import (
@@ -26,6 +28,8 @@ from showcov.core import (
     diff_uncovered_lines,
     gather_uncovered_lines_from_xml,
 )
+from showcov.core.coverage import BranchGap, gather_uncovered_branches_from_xml
+from showcov.core.files import normalize_path
 from showcov.output import render_output
 from showcov.output.base import Format, OutputMeta
 from showcov.output.registry import resolve_formatter
@@ -198,6 +202,25 @@ COMPLETION_TEMPLATES: Final[dict[str, str]] = {
 }
 
 
+def _load_branch_gaps(xml_file: Path | None, *, debug: bool) -> tuple[Path, list[BranchGap]]:
+    """Read branch gaps from the given coverage XML, with CLI-style errors."""
+    try:
+        xml_path = determine_xml_file(str(xml_file) if xml_file else None)
+        gaps: list[BranchGap] = gather_uncovered_branches_from_xml(xml_path)
+    except (ElementTree.ParseError, ET.ParseError, ValueError):
+        click.echo(f"ERROR: failed to read coverage XML (invalid format): {xml_file or '<auto>'}", err=True)
+        if debug:
+            raise
+        sys.exit(EXIT_DATAERR)
+    except CoverageXMLNotFoundError as e:
+        click.echo(f"ERROR: {e}", err=True)
+        if debug:
+            raise
+        sys.exit(EXIT_NOINPUT)
+    else:
+        return xml_path, gaps
+
+
 @click.command()
 @click.option(
     "--shell",
@@ -332,6 +355,87 @@ def show(
     )
 
     write_output(output_text, opts)
+
+
+@cli.command(name="branches")
+@click.argument("paths", nargs=-1, type=click.Path())
+@click.option(
+    "--cov", "xml_file", type=click.Path(path_type=Path, exists=True), help="Path to coverage XML file"
+)
+@click.option("--exclude", multiple=True, help="Glob pattern to exclude (can be repeated)")
+@click.option("--include", "include_", multiple=True, help="Glob pattern to include (can be repeated)")
+@click.option(
+    "--format",
+    "format_",
+    default="human",
+    show_default=True,
+    type=click.Choice([fmt.value for fmt in Format if fmt is not Format.AUTO], case_sensitive=False),
+    help="Output format (human or json)",
+)
+@click.option("--paths/--no-paths", "show_paths", default=True, help="Include file paths in output")
+@click.pass_obj
+def branches(
+    opts: ShowcovOptions,
+    *,
+    paths: Sequence[str],
+    xml_file: Path | None,
+    include_: Sequence[str],
+    exclude: Sequence[str],
+    format_: str,
+    show_paths: bool,
+) -> None:
+    """Show lines and specific branch conditions that are uncovered (0%)."""
+    _configure_runtime(quiet=opts.quiet, verbose=opts.verbose, debug=opts.debug)
+
+    xml_path, gaps = _load_branch_gaps(xml_file, debug=opts.debug)
+
+    # Filter by include/exclude, consistent with `show`
+    pf = PathFilter([*paths, *include_], list(exclude), base=xml_path.parent)
+    gaps = [g for g in gaps if pf.allow(g.file)]
+
+    if not gaps:
+        click.echo("No uncovered branch conditions found")
+        return
+
+    if format_ == Format.JSON.value:
+        # JSON: array of objects
+        base = xml_path.parent
+
+        def norm(p: Path) -> str:
+            return normalize_path(p, base=base).as_posix()
+
+        data = [
+            {
+                "file": norm(g.file) if show_paths else None,
+                "line": g.line,
+                "conditions": [
+                    {"number": c.number, "type": c.type, "coverage": c.coverage} for c in g.conditions
+                ],
+            }
+            for g in gaps
+        ]
+        if not show_paths:
+            for d in data:
+                d.pop("file", None)
+        click.echo(json.dumps(data, indent=2, sort_keys=True))
+        return
+
+    console = Console(force_terminal=opts.use_color, width=sys.maxsize)
+    table = Table(show_header=True, header_style="bold")
+    if show_paths:
+        table.add_column("File", style="yellow")
+    table.add_column("Line", justify="right", style="cyan")
+    table.add_column("Uncovered Conditions", style="magenta")
+
+    base = xml_path.parent.resolve()
+    for g in gaps:
+        file_col = normalize_path(g.file, base=base).as_posix()
+        cond_str = ", ".join(f"{c.number} {c.type or ''} {c.coverage}%".strip() for c in g.conditions)
+        row = ([file_col] if show_paths else []) + [str(g.line), cond_str]
+        table.add_row(*row)
+    with console.capture() as cap:
+        console.print(table)
+    click.echo(cap.get())
 
 
 @cli.command(name="diff")
