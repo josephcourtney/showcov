@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 
 from showcov.core import build_sections
+from showcov.core.coverage import gather_uncovered_branches_from_xml
 from showcov.output import (
     FORMATTERS,
     format_html,
@@ -244,3 +245,33 @@ def test_json_includes_tags(tmp_path: Path) -> None:
     out = format_json(sections, meta)
     data = json.loads(out)
     assert data["files"][0]["uncovered"][0]["source"][0]["tag"] == "no-cover"
+
+
+def test_gather_uncovered_branches_from_xml(tmp_path: Path) -> None:
+    # Build a minimal coverage XML with a branchy line having one 0% condition
+    src = tmp_path / "f.py"
+    src.write_text("if x:\n    pass\n")
+    xml = tmp_path / "cov.xml"
+    xml.write_text(
+        (
+            "<coverage>"
+            "<packages><package><classes>"
+            f'<class filename="{src}"><lines>'
+            '<line number="1" hits="1" branch="true" condition-coverage="50% (1/2)">'
+            "<conditions>"
+            '<condition number="0" type="jump" coverage="0%"/>'
+            '<condition number="1" type="jump" coverage="100%"/>'
+            "</conditions>"
+            "</line>"
+            "</lines></class>"
+            "</classes></package></packages>"
+            "</coverage>"
+        ),
+        encoding="utf-8",
+    )
+    gaps = gather_uncovered_branches_from_xml(xml)
+    assert len(gaps) == 1
+    g = gaps[0]
+    assert g.file.resolve() == src.resolve()
+    assert g.line == 1
+    assert [(c.number, c.coverage) for c in g.conditions] == [(0, 0)]
