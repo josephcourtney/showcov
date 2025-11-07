@@ -30,6 +30,30 @@ if TYPE_CHECKING:
     from showcov.core.types import FilePath, LineRange
 
 
+def _determine_context_offsets(
+    context_lines: int | None,
+    context_before: int | None,
+    context_after: int | None,
+) -> tuple[int, int]:
+    if context_lines is not None and (context_before is not None or context_after is not None):
+        msg = "context_lines cannot be combined with context_before/context_after"
+        raise ValueError(msg)
+
+    if context_lines is not None:
+        if context_lines < 0:
+            msg = "context_lines must be non-negative"
+            raise ValueError(msg)
+        before = after = context_lines
+    else:
+        before = context_before or 0
+        after = context_after or 0
+
+    if before < 0 or after < 0:
+        msg = "context offsets must be non-negative"
+        raise ValueError(msg)
+    return before, after
+
+
 @dataclass(slots=True)
 class UncoveredSection:
     """Structured representation of uncovered code for a single file.
@@ -49,7 +73,9 @@ class UncoveredSection:
         self,
         *,
         with_code: bool = False,
-        context_lines: int = 0,
+        context_lines: int | None = None,
+        context_before: int | None = None,
+        context_after: int | None = None,
         base: Path | None = None,
         show_file: bool = True,
         show_line_numbers: bool = True,
@@ -66,9 +92,7 @@ class UncoveredSection:
             Number of context lines to include before and after each uncovered
             range when ``with_code`` is ``True``.
         """
-        if context_lines < 0:
-            msg = "context_lines must be non-negative"
-            raise ValueError(msg)
+        before, after = _determine_context_offsets(context_lines, context_before, context_after)
 
         file_str = normalize_path(self.file, base=base).as_posix()
 
@@ -79,8 +103,8 @@ class UncoveredSection:
         for start, end in self.ranges:
             entry: dict[str, object] = {"start": start, "end": end}
             if with_code and file_lines:
-                start_idx = max(1, start - context_lines)
-                end_idx = min(len(file_lines), end + context_lines)
+                start_idx = max(1, start - before)
+                end_idx = min(len(file_lines), end + after)
                 source = []
                 for i in range(start_idx, end_idx + 1):
                     code = file_lines[i - 1] if 1 <= i <= len(file_lines) else "<line not found>"

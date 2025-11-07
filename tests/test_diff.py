@@ -37,8 +37,27 @@ def test_cli_diff_json(cli_runner: CliRunner, coverage_xml_file: Callable[..., P
     baseline = coverage_xml_file({a: [1], b: [1]}, filename="base.xml")
     current = coverage_xml_file({a: [1, 2]}, filename="curr.xml")
 
-    result = cli_runner.invoke(cli, ["diff", str(baseline), str(current), "--format", "json"])
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--cov",
+            str(current),
+            "--diff-base",
+            str(baseline),
+            "--sections",
+            "diff",
+            "--format",
+            "json",
+        ],
+    )
     assert result.exit_code == 0
     data = json.loads(result.output)
-    assert data["new"] == [{"file": a.name, "uncovered": [{"start": 2, "end": 2}]}]
-    assert data["resolved"] == [{"file": b.name, "uncovered": [{"start": 1, "end": 1}]}]
+    diff_section = data["sections"]["diff"]
+    assert diff_section["new"] == [
+        {"file": diff_section["new"][0]["file"], "uncovered": [{"start": 2, "end": 2}]}
+    ]
+    assert diff_section["new"][0]["file"].endswith(a.name)
+    assert diff_section["resolved"] == [
+        {"file": diff_section["resolved"][0]["file"], "uncovered": [{"start": 1, "end": 1}]}
+    ]
+    assert diff_section["resolved"][0]["file"].endswith(b.name)
