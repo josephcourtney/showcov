@@ -12,7 +12,8 @@ if TYPE_CHECKING:
 
 
 def format_markdown(sections: list[UncoveredSection], meta: OutputMeta) -> str:
-    context_lines = max(0, meta.context_lines)
+    before = max(0, meta.context_before)
+    after = max(0, meta.context_after)
     parts: list[str] = []
     root = meta.coverage_xml.parent.resolve()
     for section in sections:
@@ -21,8 +22,8 @@ def format_markdown(sections: list[UncoveredSection], meta: OutputMeta) -> str:
             code_blocks: list[str] = []
             file_lines = read_file_lines(section.file)
             for start, end in section.ranges:
-                start_idx = max(1, start - context_lines)
-                end_idx = min(len(file_lines), end + context_lines)
+                start_idx = max(1, start - before)
+                end_idx = min(len(file_lines), end + after)
                 snippet_lines = []
                 for i in range(start_idx, end_idx + 1):
                     code = file_lines[i - 1] if 1 <= i <= len(file_lines) else "<line not found>"
