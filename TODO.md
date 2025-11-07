@@ -3,16 +3,16 @@
 ### unify CLI into a single `report` surface (no backwards-compat required)
 
 #### core model & data flow
-- [ ] introduce `CoverageDataset` (single-pass aggregation of per-line hits, branch totals/covered, source cache)
-- [ ] refactor XML parsing into `coverage.read_coverage_xml_file` → `build_dataset(root)` (pure)
-- [ ] centralize source-line caching (reuse `read_file_lines`, ensure LRU sizing + tests)
-- [ ] add `Section builders`:
-  - [ ] `build_lines(dataset, filters)` → `list[UncoveredSection]`
-  - [ ] `build_branches(dataset, filters, mode)` → `list[BranchGap]` (mode: `missing-only|partial|all`)
-  - [ ] `build_summary(dataset, sort)` → `(rows, totals)`
-  - [ ] `build_diff(base_dataset, cur_dataset)` → `{new: [UncoveredSection], resolved: [UncoveredSection]}`
-- [ ] define `Report` dataclass: `{meta, sections:{lines?, branches?, summary?, diff?}}`
-- [ ] move path normalization and ordering to a single utility used by all sections
+- [x] introduce `CoverageDataset` (single-pass aggregation of per-line hits, branch totals/covered, source cache)
+- [x] refactor XML parsing into `coverage.read_coverage_xml_file` → `build_dataset(root)` (pure)
+- [x] centralize source-line caching (reuse `read_file_lines`, ensure LRU sizing + tests)
+- [x] add `Section builders`:
+  - [x] `build_lines(dataset, filters)` → `list[UncoveredSection]`
+  - [x] `build_branches(dataset, filters, mode)` → `list[BranchGap]` (mode: `missing-only|partial|all`)
+  - [x] `build_summary(dataset, sort)` → `(rows, totals)`
+  - [x] `build_diff(base_dataset, cur_dataset)` → `{new: [UncoveredSection], resolved: [UncoveredSection]}`
+- [x] define `Report` dataclass: `{meta, sections:{lines?, branches?, summary?, diff?}}`
+- [x] move path normalization and ordering to a single utility used by all sections
 
 #### JSON schema v2 (single, versioned document)
 - [ ] add `src/showcov/data/schema.v2.json` covering lines/branches/summary/diff in one shape
@@ -69,9 +69,9 @@
 
 #### tests (replace, not patch)
 - [ ] remove tests tied to deleted subcommands
-- [ ] add unit tests:
-  - [ ] `CoverageDataset` construction from XML (incl. malformed XML)
-  - [ ] builders: lines/branches/summary/diff (filters, sorting, modes)
+- [x] add unit tests:
+  - [x] `CoverageDataset` construction from XML (incl. malformed XML)
+  - [x] builders: lines/branches/summary/diff (filters, sorting, modes)
   - [ ] thresholds evaluation (pass/fail boundaries, mixed constraints)
   - [ ] table width/grouping remains deterministic
   - [ ] color policy (forced vs disabled vs auto)
