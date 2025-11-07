@@ -13,6 +13,8 @@ from showcov.core.dataset import (
     build_lines,
     build_summary,
 )
+from showcov.core.exceptions import InvalidCoverageXMLError
+from showcov.core.types import BranchMode
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -69,12 +71,12 @@ def test_build_dataset_and_lines(tmp_path: Path) -> None:
 @pytest.mark.parametrize(
     ("mode", "expected_counts"),
     [
-        ("missing-only", [0]),
-        ("partial", [0]),
-        ("all", [0, 100]),
+        (BranchMode.MISSING_ONLY, [0]),
+        (BranchMode.PARTIAL, [0]),
+        (BranchMode.ALL, [0, 100]),
     ],
 )
-def test_build_branches_modes(tmp_path: Path, mode: str, expected_counts: list[int]) -> None:
+def test_build_branches_modes(tmp_path: Path, mode: BranchMode, expected_counts: list[int]) -> None:
     src = tmp_path / "sample.py"
     src.write_text("""def f(x):\n    if x:\n        return 1\n    return 0\n""")
 
@@ -151,7 +153,7 @@ def test_build_diff_sections(tmp_path: Path) -> None:
 def test_build_dataset_rejects_invalid_root() -> None:
     root = ElementTree.fromstring("<invalid/>")
     dataset = CoverageDataset()
-    with pytest.raises(ValueError, match="Invalid root element"):
+    with pytest.raises(InvalidCoverageXMLError, match="Invalid root element"):
         dataset.add_root(root)
 
 

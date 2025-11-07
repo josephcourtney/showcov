@@ -1,37 +1,13 @@
-"""Base types and interface for output formatters.
-
-Defines:
-
-- `Format`: Enum of supported output formats (human, json, markdown, html, auto).
-- `OutputMeta`: Container for formatting options shared across all formatters.
-- `Formatter`: Protocol that all formatter functions must implement.
-
-Each formatter takes a list of `UncoveredSection` objects and an `OutputMeta`
-instance, and returns a string suitable for printing or saving.
-
-Formatters are registered in `registry.py` and selected dynamically at runtime.
-"""
+"""Base types and interface for output formatters."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import StrEnum
 from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from showcov.core import UncoveredSection
-
-
-class Format(StrEnum):
-    """Supported output formats."""
-
-    HUMAN = "human"
-    JSON = "json"
-    MARKDOWN = "markdown"
-    HTML = "html"
-    AUTO = "auto"
+    from showcov.core.types import FilePath
 
 
 @dataclass(slots=True)
@@ -40,7 +16,7 @@ class OutputMeta:
 
     context_lines: int
     with_code: bool
-    coverage_xml: Path
+    coverage_xml: FilePath
     color: bool
     show_paths: bool
     show_line_numbers: bool

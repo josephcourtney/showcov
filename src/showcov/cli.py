@@ -44,8 +44,9 @@ from showcov.core.coverage import (
     sort_rows as sort_coverage_rows,
 )
 from showcov.core.files import normalize_path, read_file_lines
+from showcov.core.types import Format
 from showcov.output import render_output
-from showcov.output.base import Format, OutputMeta
+from showcov.output.base import OutputMeta
 from showcov.output.registry import resolve_formatter
 from showcov.output.table import format_table
 

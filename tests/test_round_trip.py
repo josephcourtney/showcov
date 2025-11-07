@@ -6,8 +6,9 @@ import pytest
 from jsonschema import validate
 
 from showcov.core import UncoveredSection, build_sections, get_schema
+from showcov.core.types import Format
 from showcov.output import FORMATTERS
-from showcov.output.base import Format, OutputMeta
+from showcov.output.base import OutputMeta
 
 
 def parse_json_output(data: str) -> list[UncoveredSection]:
