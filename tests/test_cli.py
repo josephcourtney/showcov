@@ -1,3 +1,4 @@
+import json
 from collections.abc import Callable
 from pathlib import Path
 
@@ -17,6 +18,30 @@ def _run(runner: CliRunner, args: list[str]) -> tuple[int, str]:
     """Invoke the CLI and return *(exit_code, output)* for convenience."""
     result = runner.invoke(cli, args)
     return result.exit_code, result.output
+
+
+def _write_summary_fixture(tmp_path: Path) -> tuple[Path, Path, Path]:
+    src_a = tmp_path / "a.py"
+    src_b = tmp_path / "b.py"
+    for path in (src_a, src_b):
+        path.write_text("x = 1\n")
+    xml = tmp_path / "cov.xml"
+    xml.write_text(
+        (
+            "<coverage>"
+            "<packages><package><classes>"
+            f'<class filename="{src_a}"><lines>'
+            '<line number="1" hits="1" branch="true" condition-coverage="100% (2/2)"/>'
+            "</lines></class>"
+            f'<class filename="{src_b}"><lines>'
+            '<line number="1" hits="0" branch="true" condition-coverage="50% (1/2)"/>'
+            "</lines></class>"
+            "</classes></package></packages>"
+            "</coverage>"
+        ),
+        encoding="utf-8",
+    )
+    return xml, src_a, src_b
 
 
 # --------------------------------------------------------------------------- #
@@ -121,6 +146,24 @@ def test_cli_disables_color_when_not_tty(
     code, out = _run(cli_runner, ["show", "--cov", str(xml), str(src), "--format", "human"])
     assert code == 0
     assert "\x1b[" not in out  # colorama disables colours when output captured
+
+
+def test_cli_forces_color_flag(
+    cli_runner: CliRunner,
+    coverage_xml_file: Callable[..., Path],
+    tmp_path: Path,
+) -> None:
+    src = tmp_path / "file.py"
+    src.write_text("print(1)\n")
+    xml = coverage_xml_file({src: [1]})
+
+    result = cli_runner.invoke(
+        cli,
+        ["show", "--cov", str(xml), str(src), "--format", "human", "--color"],
+        color=True,
+    )
+    assert result.exit_code == 0
+    assert "\x1b[" in result.output
 
 
 def test_cli_human_shows_code(
@@ -259,7 +302,7 @@ def test_cli_no_uncovered_message(
     # Pass non-matching path
     code, out = _run(cli_runner, ["show", "--cov", str(xml), "nonexistent", "--format", "human"])
     assert code == 0
-    assert "No uncovered lines found" in out
+    assert "No uncovered lines found (all matched files fully covered)" in out
 
 
 def test_cli_glob_patterns(
@@ -326,8 +369,8 @@ def test_cli_branches_human(cli_runner: CliRunner, tmp_path: Path) -> None:
     )
     result = cli_runner.invoke(cli, ["branches", "--cov", str(xml), "--format", "human"])
     assert result.exit_code == 0
-    assert "Uncovered Conditions" in result.output
-    assert "1" in result.output
+    assert "Uncovered Branches" in result.output
+    assert "jump#0 (0%)" in result.output
 
 
 def test_cli_branches_json(cli_runner: CliRunner, tmp_path: Path) -> None:
@@ -351,3 +394,120 @@ def test_cli_branches_json(cli_runner: CliRunner, tmp_path: Path) -> None:
     result = cli_runner.invoke(cli, ["branches", "--cov", str(xml), "--format", "json"])
     assert result.exit_code == 0
     assert result.output.lstrip().startswith("[")
+
+
+def test_cli_branches_handles_missing_branches_attr(cli_runner: CliRunner, tmp_path: Path) -> None:
+    src = tmp_path / "b.py"
+    src.write_text("if x:\n    pass\n")
+    xml = tmp_path / "cov.xml"
+    xml.write_text(
+        (
+            "<coverage>"
+            "<packages><package><classes>"
+            f'<class filename="{src}"><lines>'
+            '<line number="1" hits="1" branch="true" condition-coverage="50% (1/2)" missing-branches="5, 7"/>'
+            "</lines></class>"
+            "</classes></package></packages>"
+            "</coverage>"
+        ),
+        encoding="utf-8",
+    )
+    result = cli_runner.invoke(cli, ["branches", "--cov", str(xml)])
+    assert result.exit_code == 0
+    assert "5, 7" in result.output
+    assert "line->" not in result.output
+
+
+def test_cli_branches_json_handles_missing_branches_attr(cli_runner: CliRunner, tmp_path: Path) -> None:
+    src = tmp_path / "b.py"
+    src.write_text("if x:\n    pass\n")
+    xml = tmp_path / "cov.xml"
+    xml.write_text(
+        (
+            "<coverage>"
+            "<packages><package><classes>"
+            f'<class filename="{src}"><lines>'
+            '<line number="1" hits="1" branch="true" condition-coverage="50% (1/2)" missing-branches="5"/>'
+            "</lines></class>"
+            "</classes></package></packages>"
+            "</coverage>"
+        ),
+        encoding="utf-8",
+    )
+    result = cli_runner.invoke(cli, ["branches", "--cov", str(xml), "--format", "json"])
+    assert result.exit_code == 0
+    data = json.loads(result.output)
+    assert data[0]["conditions"][0] == {"number": 5, "type": "line", "coverage": None}
+
+
+def test_cli_branches_code_option(cli_runner: CliRunner, tmp_path: Path) -> None:
+    src = tmp_path / "b.py"
+    src.write_text("if x:\n    pass\n")
+    xml = tmp_path / "cov.xml"
+    xml.write_text(
+        (
+            "<coverage>"
+            "<packages><package><classes>"
+            f'<class filename="{src}"><lines>'
+            '<line number="1" hits="1" branch="true" condition-coverage="50% (1/2)" missing-branches="2"/>'
+            "</lines></class>"
+            "</classes></package></packages>"
+            "</coverage>"
+        ),
+        encoding="utf-8",
+    )
+    result = cli_runner.invoke(
+        cli,
+        [
+            "branches",
+            "--cov",
+            str(xml),
+            "--code",
+            "--line-numbers",
+            "--context",
+            "1",
+        ],
+    )
+    assert result.exit_code == 0
+    assert "line->" not in result.output
+    assert ">    1: if x:" in result.output
+    assert "     2:     pass" in result.output
+
+
+def test_cli_summary_outputs_table(cli_runner: CliRunner, tmp_path: Path) -> None:
+    xml, _src_a, _src_b = _write_summary_fixture(tmp_path)
+    result = cli_runner.invoke(cli, ["summary", "--cov", str(xml)])
+    assert result.exit_code == 0
+    out = result.output
+    assert "Coverage Report" in out
+    assert "a.py" in out
+    assert "b.py" in out
+    assert "Overall" in out
+
+
+def test_cli_summary_supports_json_output(cli_runner: CliRunner, tmp_path: Path) -> None:
+    xml, src_a, src_b = _write_summary_fixture(tmp_path)
+    result = cli_runner.invoke(cli, ["summary", "--cov", str(xml), "--format", "json"])
+    assert result.exit_code == 0
+    data = json.loads(result.output)
+    assert {entry["file"] for entry in data["files"]} == {src_a.name, src_b.name}
+    assert data["metadata"]["show_paths"] is True
+    assert data["totals"]["statements"]["total"] == 2
+    assert data["totals"]["branches"]["miss"] == 1
+
+
+def test_cli_summary_auto_format_defaults_to_json_when_not_tty(
+    cli_runner: CliRunner,
+    tmp_path: Path,
+) -> None:
+    xml, _src_a, _src_b = _write_summary_fixture(tmp_path)
+    result = cli_runner.invoke(cli, ["summary", "--cov", str(xml), "--format", "auto"])
+    assert result.exit_code == 0
+    assert json.loads(result.output)["files"]
+
+
+def test_cli_completions_use_showcov(cli_runner: CliRunner) -> None:
+    result = cli_runner.invoke(cli, ["completions", "--shell", "bash"])
+    assert result.exit_code == 0
+    assert "_SHOWCOV_COMPLETE" in result.output
+    assert "showcov" in result.output
