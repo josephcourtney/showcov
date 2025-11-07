@@ -14,13 +14,18 @@ from showcov.output.base import OutputMeta
 def parse_json_output(data: str) -> list[UncoveredSection]:
     """Parse JSON coverage data into :class:`UncoveredSection` instances."""
     obj = json.loads(data)
-    validate(obj, get_schema())
-    base = Path(obj["environment"]["coverage_xml"]).resolve().parent
-    files = obj.get("files", [])
+    validate(obj, get_schema("v2"))
+    meta = obj.get("meta", {})
+    env = cast("dict[str, object]", meta.get("environment", {}))
+    base_path = Path(str(env.get("coverage_xml", "."))).resolve().parent
+    sections_obj = cast("dict[str, object]", obj.get("sections", {}))
+    lines_section = cast("dict[str, object]", sections_obj.get("lines", {}))
+    files = cast("list[dict[str, object]]", lines_section.get("files", []))
     sections = []
     for entry in files:
         item = dict(entry)
-        item["file"] = (base / item["file"]).as_posix()
+        if "file" in item:
+            item["file"] = (base_path / str(item["file"])).as_posix()
         sections.append(UncoveredSection.from_dict(item))
     return sections
 
