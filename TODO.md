@@ -9,30 +9,30 @@
 ### unify CLI into a single `report` surface (no backwards-compat required)
 
 #### renderers (HUMAN/MD/HTML/JSON) for the unified `Report`
-- [ ] create `output/report_render.py` with `render_report(report, fmt, meta)`
-- [ ] HUMAN: section titles, shared table helper, one color policy; reuse `table.py`
-- [ ] MARKDOWN: `<details>` per file per section; reuse code-block logic; align with line numbers flag
-- [ ] HTML: `<section id=...>` structure; minimal inline styles; anchor links per file
-- [ ] JSON: v2 encoder only (v1 removed from CLI path)
+- [x] create `output/report_render.py` with `render_report(report, fmt, meta)`
+- [x] HUMAN: section titles, shared table helper, one color policy; reuse `table.py`
+- [x] MARKDOWN: `<details>` per file per section; reuse code-block logic; align with line numbers flag
+- [x] HTML: `<section id=...>` structure; minimal inline styles; anchor links per file
+- [x] JSON: v2 encoder only (v1 removed from CLI path)
 
 #### CLI surface: `showcov report` (default)
-- [ ] replace `cli.py` subcommands with a single `report` command (make it the default entrypoint)
-- [ ] arguments & options:
-  - [ ] `[PATHS]...`, `--cov PATH`
-  - [ ] `--include GLOB...`, `--exclude GLOB...`
-  - [ ] `--sections S1,S2,...` where S ∈ `{lines,branches,summary,diff}`
-  - [ ] `--diff-base PATH` (required iff `diff` selected)
-  - [ ] `--branches-mode {missing-only,partial,all}` (default: `partial`)
-  - [ ] `--format {human,markdown,html,json,auto}`
-  - [ ] `--output FILE|-`
-  - [ ] `--code/--no-code`, `--context N[,M]`, `--line-numbers`
-  - [ ] `--paths/--no-paths`
-  - [ ] `--sort {file,stmt_cov,br_cov,miss}`
-  - [ ] `--stats` (aggregate counts) and `--file-stats`
-  - [ ] `--threshold stmt=<pct> br=<pct> miss=<n>` (repeatable; parse into policy)
-  - [ ] `--color/--no-color`, `-q/--quiet`, `-v/--verbose`, `--debug`
-- [ ] implement single-pass execution: parse XML once → dataset → build requested sections → render once
-- [ ] make bare `showcov` invoke `report`
+- [x] replace `cli.py` subcommands with a single `report` command (make it the default entrypoint)
+- [x] arguments & options:
+  - [x] `[PATHS]...`, `--cov PATH`
+  - [x] `--include GLOB...`, `--exclude GLOB...`
+  - [x] `--sections S1,S2,...` where S ∈ `{lines,branches,summary,diff}`
+  - [x] `--diff-base PATH` (required iff `diff` selected)
+  - [x] `--branches-mode {missing-only,partial,all}` (default: `partial`)
+  - [x] `--format {human,markdown,html,json,auto}`
+  - [x] `--output FILE|-`
+  - [x] `--code/--no-code`, `--context N[,M]`, `--line-numbers`
+  - [x] `--paths/--no-paths`
+  - [x] `--sort {file,stmt_cov,br_cov,miss}`
+  - [x] `--stats` (aggregate counts) and `--file-stats`
+  - [x] `--threshold stmt=<pct> br=<pct> miss=<n>` (repeatable; parse into policy)
+  - [x] `--color/--no-color`, `-q/--quiet`, `-v/--verbose`, `--debug`
+- [x] implement single-pass execution: parse XML once → dataset → build requested sections → render once
+- [x] make bare `showcov` invoke `report`
 
 #### exit codes & policy
 - [ ] keep existing: `0` ok, `65` data error, `66` input missing, `78` config error, `1` generic

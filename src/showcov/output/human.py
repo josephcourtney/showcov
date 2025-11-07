@@ -59,8 +59,8 @@ def format_human(sections: list[UncoveredSection], meta: OutputMeta) -> str:
             for start, end in section.ranges:
                 heading = f"{rel.as_posix()}:{start}-{end}" if meta.show_paths else f"{start}-{end}"
                 parts.append(heading)
-                start_idx = max(1, start - meta.context_lines)
-                end_idx = min(len(lines), end + meta.context_lines)
+                start_idx = max(1, start - meta.context_before)
+                end_idx = min(len(lines), end + meta.context_after)
                 for i in range(start_idx, end_idx + 1):
                     code = lines[i - 1] if 1 <= i <= len(lines) else "<line not found>"
                     tag = detect_line_tag(lines, i - 1) if 1 <= i <= len(lines) else None

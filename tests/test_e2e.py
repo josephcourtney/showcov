@@ -183,7 +183,14 @@ def test_e2e_show_reports_expected_ranges(
 ) -> None:
     result = cli_runner.invoke(
         cli,
-        ["show", "--cov", str(example_coverage_project.coverage_xml), "--format", "json"],
+        [
+            "--cov",
+            str(example_coverage_project.coverage_xml),
+            "--sections",
+            "lines",
+            "--format",
+            "json",
+        ],
     )
     assert result.exit_code == 0
     data = json.loads(result.output)
@@ -199,15 +206,24 @@ def test_e2e_branches_report_partial_and_missing(
 ) -> None:
     result = cli_runner.invoke(
         cli,
-        ["branches", "--cov", str(example_coverage_project.coverage_xml), "--format", "json"],
+        [
+            "--cov",
+            str(example_coverage_project.coverage_xml),
+            "--sections",
+            "branches",
+            "--format",
+            "json",
+        ],
     )
     assert result.exit_code == 0
     data = json.loads(result.output)
-    logic_lines = {entry["line"]: entry for entry in data if entry.get("file", "").endswith("logic.py")}
+    gaps = data["sections"]["branches"]["gaps"]
+    logic_lines = {entry["line"]: entry for entry in gaps if entry.get("file", "").endswith("logic.py")}
     for line in example_coverage_project.branch_lines.values():
         assert line in logic_lines
         assert all(
-            cond["coverage"] is None or cond["coverage"] < 100 for cond in logic_lines[line]["conditions"]
+            cond.get("coverage") is None or cond.get("coverage") < 100
+            for cond in logic_lines[line]["conditions"]
         )
 
 
@@ -217,9 +233,19 @@ def test_e2e_summary_matches_example_project(
 ) -> None:
     result = cli_runner.invoke(
         cli,
-        ["summary", "--cov", str(example_coverage_project.coverage_xml)],
+        [
+            "--cov",
+            str(example_coverage_project.coverage_xml),
+            "--sections",
+            "summary",
+            "--format",
+            "json",
+        ],
     )
     assert result.exit_code == 0
-    output = result.output
-    assert "logic.py" in output
-    assert "Overall" in output
+    data = json.loads(result.output)
+    summary = data["sections"]["summary"]
+    logic_entry = next(file for file in summary["files"] if file.get("file", "").endswith("logic.py"))
+    totals = summary["totals"]["statements"]
+    assert logic_entry["statements"]["missed"] >= 1
+    assert totals["missed"] >= logic_entry["statements"]["missed"]

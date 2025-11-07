@@ -5,10 +5,10 @@ from typing import cast
 import pytest
 from jsonschema import validate
 
-from showcov.core import UncoveredSection, build_sections, get_schema
+from showcov.core import Report, UncoveredSection, build_sections, get_schema
 from showcov.core.types import Format
-from showcov.output import FORMATTERS
 from showcov.output.base import OutputMeta
+from showcov.output.report_render import render_report
 
 
 def parse_json_output(data: str) -> list[UncoveredSection]:
@@ -35,14 +35,41 @@ def test_json_round_trip(tmp_path: Path) -> None:
     src.write_text("a\nb\n")
     sections = build_sections({src: [1, 2]})
     meta = OutputMeta(
-        context_lines=1,
-        with_code=True,
         coverage_xml=tmp_path / "cov.xml",
+        with_code=True,
         color=False,
         show_paths=True,
         show_line_numbers=True,
+        context_before=1,
+        context_after=1,
     )
-    json_out = FORMATTERS[Format.JSON](sections, meta)
+    files = [
+        sec.to_dict(
+            with_code=meta.with_code,
+            context_before=meta.context_before,
+            context_after=meta.context_after,
+            base=meta.coverage_xml.parent,
+            show_file=meta.show_paths,
+            show_line_numbers=meta.show_line_numbers,
+        )
+        for sec in sections
+    ]
+    report = Report(
+        meta={
+            "environment": {"coverage_xml": meta.coverage_xml.as_posix()},
+            "options": {
+                "context_lines": meta.context_lines,
+                "with_code": meta.with_code,
+                "show_paths": meta.show_paths,
+                "show_line_numbers": meta.show_line_numbers,
+                "aggregate_stats": False,
+                "file_stats": False,
+            },
+        },
+        sections={"lines": {"files": files}},
+        attachments={"lines": {"sections": sections}},
+    )
+    json_out = render_report(report, Format.JSON, meta)
     parsed = parse_json_output(json_out)
     assert parsed == sections
 
