@@ -6,10 +6,11 @@ from typing import TYPE_CHECKING
 
 from showcov import logger
 from showcov.core.files import normalize_path, read_file_lines
-from showcov.output.base import Format, Formatter, OutputMeta
+from showcov.core.types import Format
 
 if TYPE_CHECKING:
     from showcov.core import UncoveredSection
+    from showcov.output.base import Formatter, OutputMeta
 
 
 def render_output(

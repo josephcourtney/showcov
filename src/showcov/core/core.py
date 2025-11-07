@@ -15,19 +15,19 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
-from defusedxml import ElementTree as ET
+from defusedxml import ElementTree as ET  # noqa: N817
 from more_itertools import consecutive_groups
 
 from showcov import logger
+from showcov.core.exceptions import CoverageXMLNotFoundError
 from showcov.core.files import detect_line_tag, normalize_path, read_file_lines
 
 if TYPE_CHECKING:
     from types import SimpleNamespace
-    from xml.etree.ElementTree import Element  # noqa: S405
+    from xml.etree.ElementTree import Element as XmlElement  # noqa: S405
+    from xml.etree.ElementTree import ElementTree as XmlElementTree  # noqa: S405
 
-
-class CoverageXMLNotFoundError(Exception):
-    """Coverage XML file not found."""
+    from showcov.core.types import FilePath, LineRange
 
 
 @dataclass(slots=True)
@@ -42,8 +42,8 @@ class UncoveredSection:
         List of ``(start, end)`` tuples representing uncovered line ranges.
     """
 
-    file: Path
-    ranges: list[tuple[int, int]]
+    file: FilePath
+    ranges: list[LineRange]
 
     def to_dict(
         self,
@@ -214,7 +214,7 @@ def merge_blank_gap_groups(groups: list[list[int]], file_lines: list[str]) -> li
     return merged
 
 
-def gather_uncovered_lines(root: Element) -> dict[Path, list[int]]:
+def gather_uncovered_lines(root: XmlElement) -> dict[Path, list[int]]:
     """Gather uncovered lines per file from the parsed XML tree."""
     uncovered: dict[Path, list[int]] = {}
 
@@ -263,11 +263,11 @@ def build_sections(uncovered: dict[Path, list[int]]) -> list[UncoveredSection]:
     return sections
 
 
-def _parse_coverage_xml(xml_file: Path) -> ET.ElementTree[ET.Element]:
+def _parse_coverage_xml(xml_file: Path) -> XmlElementTree:
     return ET.parse(xml_file)
 
 
-def _get_coverage_root(tree: ET.ElementTree[ET.Element]) -> ET.Element:
+def _get_coverage_root(tree: XmlElementTree) -> XmlElement:
     root = tree.getroot()
     if root is None or root.tag != "coverage":
         msg = f"Invalid root element: expected <coverage>, got <{getattr(root, 'tag', None)}>"
@@ -275,7 +275,7 @@ def _get_coverage_root(tree: ET.ElementTree[ET.Element]) -> ET.Element:
     return root
 
 
-def _extract_uncovered_by_file(root: ET.Element) -> dict[Path, list[int]]:
+def _extract_uncovered_by_file(root: XmlElement) -> dict[Path, list[int]]:
     uncovered: dict[Path, list[int]] = {}
 
     for class_elt in root.findall(".//class"):
@@ -349,7 +349,7 @@ def diff_uncovered_lines(
     return build_sections(new_uncovered), build_sections(resolved)
 
 
-def parse_large_xml(file_path: Path) -> Element | None:
+def parse_large_xml(file_path: Path) -> XmlElement | None:
     """Efficiently parse large XML files with iterparse."""
     context = ET.iterparse(file_path, events=("start", "end"))
     for event, elem in context:

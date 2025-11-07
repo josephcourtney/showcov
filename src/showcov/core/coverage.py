@@ -17,12 +17,15 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from defusedxml import ElementTree as ET
+from defusedxml import ElementTree as ET  # noqa: N817
 
 from showcov.core.files import normalize_path
 
 if TYPE_CHECKING:  # pragma: no cover
     from collections.abc import Callable, Iterable, Mapping, Sequence
+    from xml.etree.ElementTree import Element as XmlElement  # noqa: S405
+
+    from showcov.core.types import CoveragePercent, FilePath
 
 
 # --------------------------- Models ------------------------------------------
@@ -46,12 +49,12 @@ FULL_COVERAGE = 100
 class BranchCondition:
     number: int
     type: str | None
-    coverage: int | None  # percentage, 0..100 (None when unknown)
+    coverage: CoveragePercent | None  # percentage, 0..100 (None when unknown)
 
 
 @dataclass(frozen=True)
 class BranchGap:
-    file: Path
+    file: FilePath
     line: int
     conditions: list[BranchCondition]  # only uncovered (coverage == 0)
 
@@ -69,7 +72,7 @@ def find_coverage_xml_paths(root: Path, patterns: Sequence[str]) -> list[Path]:
     return out
 
 
-def read_coverage_xml_file(path: Path) -> ET.Element | None:
+def read_coverage_xml_file(path: Path) -> XmlElement | None:
     """Parse a coverage XML file, returning its root element or ``None``."""
     try:
         return ET.parse(path).getroot()
@@ -77,9 +80,9 @@ def read_coverage_xml_file(path: Path) -> ET.Element | None:
         return None
 
 
-def read_all_coverage_roots(root: Path, patterns: Sequence[str]) -> list[ET.Element]:
+def read_all_coverage_roots(root: Path, patterns: Sequence[str]) -> list[XmlElement]:
     """Parse all coverage XML files matching *patterns* under *root*."""
-    roots: list[ET.Element] = []
+    roots: list[XmlElement] = []
     for path in find_coverage_xml_paths(root, patterns):
         r = read_coverage_xml_file(path)
         if r is not None:
@@ -98,7 +101,7 @@ def parse_condition_coverage(text: str) -> tuple[int, int] | None:
     return int(m.group(1)), int(m.group(2))
 
 
-def iter_lines(root: ET.Element) -> Iterable[tuple[str, int, int, int, int]]:
+def iter_lines(root: XmlElement) -> Iterable[tuple[str, int, int, int, int]]:
     """Yield per-line stats: (filename, lineno, hits, br_covered, br_total)."""
     for cls in root.findall(".//class"):
         fname = cls.get("filename", "")
@@ -121,7 +124,7 @@ def iter_lines(root: ET.Element) -> Iterable[tuple[str, int, int, int, int]]:
             yield fname, lineno, hits, br_cov, br_tot
 
 
-def _parse_missing_branches(line_elem: ET.Element) -> list[BranchCondition]:
+def _parse_missing_branches(line_elem: XmlElement) -> list[BranchCondition]:
     """Fallback parser that uses ``missing-branches`` when no <conditions> exist."""
     attr = (line_elem.get("missing-branches") or "").strip()
     if not attr:
@@ -139,7 +142,7 @@ def _parse_missing_branches(line_elem: ET.Element) -> list[BranchCondition]:
     return out
 
 
-def _parse_uncovered_conditions(line_elem: ET.Element) -> list[BranchCondition]:
+def _parse_uncovered_conditions(line_elem: XmlElement) -> list[BranchCondition]:
     """Return branch conditions on this line that are not fully covered."""
     out: list[BranchCondition] = []
     conds = line_elem.find("conditions")
@@ -214,7 +217,7 @@ def _compile_filters(include: str | None, exclude: str | None) -> Callable[[Path
 
 
 def aggregate(
-    roots: Sequence[ET.Element],
+    roots: Sequence[XmlElement],
     include: str | None,
     exclude: str | None,
 ) -> dict[str, FileAgg]:

@@ -2,10 +2,10 @@
 
 ### Codebase organization (types & exceptions)
 
-* [ ] Create `showcov/core/types.py` and move shared type definitions and **Enums** there; replace all magic strings (e.g., branch modes, sort keys, formats) with enums.
-* [ ] Create `showcov/core/exceptions.py` and centralize exception classes (e.g., coverage XML not found/invalid).
-* [ ] Introduce `TypeAlias` objects for common primitives (e.g., `FilePath`, `CoveragePercent`, `LineRange`) and use them (or small dataclasses) where justified.
-* [ ] Ensure no circular imports after consolidation; update imports in code and tests accordingly.
+* [x] Create `showcov/core/types.py` and move shared type definitions and **Enums** there; replace all magic strings (e.g., branch modes, sort keys, formats) with enums.
+* [x] Create `showcov/core/exceptions.py` and centralize exception classes (e.g., coverage XML not found/invalid).
+* [x] Introduce `TypeAlias` objects for common primitives (e.g., `FilePath`, `CoveragePercent`, `LineRange`) and use them (or small dataclasses) where justified.
+* [x] Ensure no circular imports after consolidation; update imports in code and tests accordingly.
 
 #### core model & data flow
 - [x] introduce `CoverageDataset` (single-pass aggregation of per-line hits, branch totals/covered, source cache)

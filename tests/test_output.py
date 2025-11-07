@@ -5,6 +5,7 @@ import pytest
 
 from showcov.core import build_sections
 from showcov.core.coverage import gather_uncovered_branches_from_xml
+from showcov.core.types import Format
 from showcov.output import (
     FORMATTERS,
     format_html,
@@ -14,7 +15,7 @@ from showcov.output import (
     render_output,
     resolve_formatter,
 )
-from showcov.output.base import Format, OutputMeta
+from showcov.output.base import OutputMeta
 
 
 def test_format_human_respects_color(tmp_path: Path) -> None:
