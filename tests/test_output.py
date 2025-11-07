@@ -275,3 +275,56 @@ def test_gather_uncovered_branches_from_xml(tmp_path: Path) -> None:
     assert g.file.resolve() == src.resolve()
     assert g.line == 1
     assert [(c.number, c.coverage) for c in g.conditions] == [(0, 0)]
+
+
+def test_gather_uncovered_branches_from_xml_missing_branches_attr(tmp_path: Path) -> None:
+    # Some coverage.py versions omit <conditions> but include missing-branches metadata.
+    src = tmp_path / "f.py"
+    src.write_text("if x:\n    pass\n")
+    xml = tmp_path / "cov.xml"
+    xml.write_text(
+        (
+            "<coverage>"
+            "<packages><package><classes>"
+            f'<class filename="{src}"><lines>'
+            '<line number="1" hits="1" branch="true" '
+            'condition-coverage="50% (1/2)" missing-branches="99, 123"/>'
+            "</lines></class>"
+            "</classes></package></packages>"
+            "</coverage>"
+        ),
+        encoding="utf-8",
+    )
+    gaps = gather_uncovered_branches_from_xml(xml)
+    assert len(gaps) == 1
+    g = gaps[0]
+    assert g.file.resolve() == src.resolve()
+    assert g.line == 1
+    assert [(c.number, c.type, c.coverage) for c in g.conditions] == [(99, "line", None), (123, "line", None)]
+
+
+def test_gather_uncovered_branches_from_xml_partial_condition(tmp_path: Path) -> None:
+    src = tmp_path / "f.py"
+    src.write_text("if x:\n    pass\n")
+    xml = tmp_path / "cov.xml"
+    xml.write_text(
+        (
+            "<coverage>"
+            "<packages><package><classes>"
+            f'<class filename="{src}"><lines>'
+            '<line number="1" hits="1" branch="true" condition-coverage="75% (3/4)">'
+            "<conditions>"
+            '<condition number="0" type="jump" coverage="75%"/>'
+            '<condition number="1" type="jump" coverage="100%"/>'
+            "</conditions>"
+            "</line>"
+            "</lines></class>"
+            "</classes></package></packages>"
+            "</coverage>"
+        ),
+        encoding="utf-8",
+    )
+    gaps = gather_uncovered_branches_from_xml(xml)
+    assert len(gaps) == 1
+    conds = gaps[0].conditions
+    assert [(c.number, c.type, c.coverage) for c in conds] == [(0, "jump", 75)]

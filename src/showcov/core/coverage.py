@@ -37,12 +37,15 @@ class FileAgg:
     lines: dict[int, LineAgg]  # lineno -> agg
 
 
+FULL_COVERAGE = 100
+
+
 # --------------------------- Branch gap models -------------------------------
 @dataclass(frozen=True)
 class BranchCondition:
     number: int
     type: str | None
-    coverage: int  # percentage, 0..100
+    coverage: int | None  # percentage, 0..100 (None when unknown)
 
 
 @dataclass(frozen=True)
@@ -117,29 +120,48 @@ def iter_lines(root: ET.Element) -> Iterable[tuple[str, int, int, int, int]]:
             yield fname, lineno, hits, br_cov, br_tot
 
 
-def _parse_uncovered_conditions(line_elem: ET.Element) -> list[BranchCondition]:
-    """Return branch conditions on this line that have 0% coverage."""
+def _parse_missing_branches(line_elem: ET.Element) -> list[BranchCondition]:
+    """Fallback parser that uses ``missing-branches`` when no <conditions> exist."""
+    attr = (line_elem.get("missing-branches") or "").strip()
+    if not attr:
+        return []
+    tokens = [tok.strip() for tok in attr.split(",") if tok.strip()]
     out: list[BranchCondition] = []
-    conds = line_elem.find("conditions")
-    if conds is None:
-        return out
-    for c in conds.findall("condition"):
-        # Coverage attribute is typically like "0%" or "100%"
-        cov_text = (c.get("coverage") or "").strip().rstrip("%")
+    for raw in tokens:
         try:
-            pct = int(cov_text)
-        except ValueError:
-            continue
-        if pct != 0:
-            continue
-        num = c.get("number")
-        typ = c.get("type")
-        try:
-            idx = int(num) if num is not None else -1
+            idx = int(raw)
+            typ = "line"
         except ValueError:
             idx = -1
-        out.append(BranchCondition(number=idx, type=typ, coverage=pct))
+            typ = raw
+        out.append(BranchCondition(number=idx, type=typ, coverage=None))
     return out
+
+
+def _parse_uncovered_conditions(line_elem: ET.Element) -> list[BranchCondition]:
+    """Return branch conditions on this line that are not fully covered."""
+    out: list[BranchCondition] = []
+    conds = line_elem.find("conditions")
+    if conds is not None:
+        for c in conds.findall("condition"):
+            # Coverage attribute is typically like "0%" or "100%"
+            cov_text = (c.get("coverage") or "").strip().rstrip("%")
+            try:
+                pct = int(cov_text)
+            except ValueError:
+                continue
+            if pct >= FULL_COVERAGE:
+                continue
+            num = c.get("number")
+            typ = c.get("type")
+            try:
+                idx = int(num) if num is not None else -1
+            except ValueError:
+                idx = -1
+            out.append(BranchCondition(number=idx, type=typ, coverage=pct))
+    if out:
+        return out
+    return _parse_missing_branches(line_elem)
 
 
 def gather_uncovered_branches_from_xml(xml_file: Path) -> list[BranchGap]:

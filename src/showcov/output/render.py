@@ -39,7 +39,7 @@ def render_output(
         append a per-file summary with uncovered counts and percentages.
     """
     if not sections:
-        return "No uncovered lines found (0 files matched input patterns)"
+        return "No uncovered lines found (all matched files fully covered)"
 
     if fmt is Format.JSON:
         from showcov.output.json import format_json  # noqa: PLC0415
