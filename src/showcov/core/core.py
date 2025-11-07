@@ -9,14 +9,13 @@ from __future__ import annotations
 
 import operator
 import tomllib
-import xml.etree.ElementTree as ET  # noqa: S405
 from configparser import ConfigParser
 from configparser import Error as ConfigError
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
-from defusedxml import ElementTree
+from defusedxml import ElementTree as ET
 from more_itertools import consecutive_groups
 
 from showcov import logger
@@ -265,7 +264,7 @@ def build_sections(uncovered: dict[Path, list[int]]) -> list[UncoveredSection]:
 
 
 def _parse_coverage_xml(xml_file: Path) -> ET.ElementTree[ET.Element]:
-    return ET.parse(xml_file)  # noqa: S314
+    return ET.parse(xml_file)
 
 
 def _get_coverage_root(tree: ET.ElementTree[ET.Element]) -> ET.Element:
@@ -352,7 +351,7 @@ def diff_uncovered_lines(
 
 def parse_large_xml(file_path: Path) -> Element | None:
     """Efficiently parse large XML files with iterparse."""
-    context = ElementTree.iterparse(file_path, events=("start", "end"))
+    context = ET.iterparse(file_path, events=("start", "end"))
     for event, elem in context:
         if event == "end" and elem.tag == "coverage":
             return elem  # Return root element early to save memory

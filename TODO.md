@@ -1,6 +1,11 @@
 ## TODO
 
-### unify CLI into a single `report` surface (no backwards-compat required)
+### Codebase organization (types & exceptions)
+
+* [ ] Create `showcov/core/types.py` and move shared type definitions and **Enums** there; replace all magic strings (e.g., branch modes, sort keys, formats) with enums.
+* [ ] Create `showcov/core/exceptions.py` and centralize exception classes (e.g., coverage XML not found/invalid).
+* [ ] Introduce `TypeAlias` objects for common primitives (e.g., `FilePath`, `CoveragePercent`, `LineRange`) and use them (or small dataclasses) where justified.
+* [ ] Ensure no circular imports after consolidation; update imports in code and tests accordingly.
 
 #### core model & data flow
 - [x] introduce `CoverageDataset` (single-pass aggregation of per-line hits, branch totals/covered, source cache)
@@ -19,6 +24,8 @@
 - [ ] implement `format_json_v2(report)`; keep v1 encoder as internal helper for tests only
 - [ ] validate v2 with `jsonschema.validate` (update call sites)
 - [ ] embed `schema` and `schema_version` in top-level payload
+
+### unify CLI into a single `report` surface (no backwards-compat required)
 
 #### renderers (HUMAN/MD/HTML/JSON) for the unified `Report`
 - [ ] create `output/report_render.py` with `render_report(report, fmt, meta)`
@@ -66,6 +73,7 @@
 - [ ] standardize color behavior: `--color` forces; `--no-color` disables; `auto` uses TTY
 - [ ] ensure deterministic ordering for files, ranges, branch condition lists
 - [ ] annotate public APIs with Python 3.13 types; satisfy `ty check`
+- [ ] delete legacy code paths in `showcov.core.core` / `showcov.core.coverage` that duplicate dataset/report logic once `report` is live
 
 #### tests (replace, not patch)
 - [ ] remove tests tied to deleted subcommands
@@ -104,3 +112,5 @@
 - [ ] ensure `.venv/bin/ty check` passes with Python 3.13 annotations
 - [ ] ensure `.venv/bin/pytest` green; keep coverage equal or higher
 - [ ] run `just qa` and add any missing recipes if helpful (optional)
+
+
