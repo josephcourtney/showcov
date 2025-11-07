@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+from io import StringIO
 from typing import TYPE_CHECKING
 
 from rich.console import Console
@@ -15,10 +16,23 @@ if TYPE_CHECKING:
     from showcov.output.base import OutputMeta
 
 
+def _render_table(table: Table, *, color: bool) -> str:
+    """Return a string rendering of *table*, preserving ANSI when requested."""
+    buffer = StringIO()
+    console = Console(
+        file=buffer,
+        force_terminal=color,
+        width=sys.maxsize,
+        color_system="standard" if color else None,
+        no_color=not color,
+    )
+    console.print(table)
+    return buffer.getvalue()
+
+
 def format_human(sections: list[UncoveredSection], meta: OutputMeta) -> str:
     """Return uncovered sections in a simple table."""
     root = meta.coverage_xml.parent.resolve()
-    console = Console(force_terminal=meta.color, width=sys.maxsize)
 
     table = Table(show_header=True, header_style="bold")
     if meta.show_paths:
@@ -36,10 +50,7 @@ def format_human(sections: list[UncoveredSection], meta: OutputMeta) -> str:
             row.extend([str(start), str(end), str(end - start + 1)])
             table.add_row(*row)
 
-    parts: list[str] = []
-    with console.capture() as capture:
-        console.print(table)
-    parts.append(capture.get())
+    parts: list[str] = [_render_table(table, color=meta.color)]
 
     if meta.with_code:
         for section in sections:
