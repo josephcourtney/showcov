@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from showcov.output.base import Format, Formatter
+from showcov.core.types import Format
+from showcov.output.base import Formatter
 from showcov.output.html import format_html
 from showcov.output.human import format_human
 from showcov.output.json import format_json

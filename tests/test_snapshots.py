@@ -2,8 +2,9 @@ import json
 from pathlib import Path
 
 from showcov.core import build_sections
+from showcov.core.types import Format
 from showcov.output import FORMATTERS
-from showcov.output.base import Format, OutputMeta
+from showcov.output.base import OutputMeta
 
 
 def _build_sections() -> list:

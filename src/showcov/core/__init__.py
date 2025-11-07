@@ -1,6 +1,5 @@
 from showcov.core.config import LOG_FORMAT, get_schema
 from showcov.core.core import (
-    CoverageXMLNotFoundError,
     UncoveredSection,
     _get_xml_from_config,
     _get_xml_from_pyproject,
@@ -43,19 +42,42 @@ from showcov.core.dataset import (
     build_lines,
     build_summary,
 )
+from showcov.core.exceptions import (
+    CoverageXMLError,
+    CoverageXMLNotFoundError,
+    InvalidCoverageXMLError,
+    ShowcovError,
+)
 from showcov.core.files import detect_line_tag, normalize_path, read_file_lines
 from showcov.core.path_filter import PathFilter
+from showcov.core.types import (
+    BranchMode,
+    CoveragePercent,
+    FilePath,
+    Format,
+    LineRange,
+    SummarySort,
+)
 
 __all__ = [
     "LOG_FORMAT",
+    "BranchMode",
     "CoverageDataset",
+    "CoveragePercent",
+    "CoverageXMLError",
     "CoverageXMLNotFoundError",
     "FileAgg",
     "FileCoverage",
+    "FilePath",
+    "Format",
+    "InvalidCoverageXMLError",
     "LineAgg",
     "LineCoverage",
+    "LineRange",
     "PathFilter",
     "Report",
+    "ShowcovError",
+    "SummarySort",
     "UncoveredSection",
     "_get_xml_from_config",
     "_get_xml_from_pyproject",

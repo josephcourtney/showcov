@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from defusedxml import ElementTree as ET
+from defusedxml import ElementTree as ET  # noqa: N817
 
 from showcov.core.core import (
     UncoveredSection,
@@ -22,10 +22,13 @@ from showcov.core.coverage import (
     parse_condition_coverage,
     read_coverage_xml_file,
 )
+from showcov.core.exceptions import InvalidCoverageXMLError
 from showcov.core.files import normalize_path, read_file_lines
+from showcov.core.types import BranchMode, FilePath, LineRange, SummarySort
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
+    from xml.etree.ElementTree import Element as XmlElement  # noqa: S405
 
     from showcov.core.path_filter import PathFilter
 
@@ -74,15 +77,15 @@ class LineCoverage:
             ),
         )
 
-    def iter_conditions_for_mode(self, mode: str) -> Iterator[BranchCondition]:
-        if mode == "all":
+    def iter_conditions_for_mode(self, mode: BranchMode) -> Iterator[BranchCondition]:
+        if mode is BranchMode.ALL:
             yield from self.iter_conditions()
             return
         for cond in self.iter_conditions():
             coverage = cond.coverage
-            if mode == "missing-only" and (coverage or 0) != 0:
+            if mode is BranchMode.MISSING_ONLY and (coverage or 0) != 0:
                 continue
-            if mode == "partial" and coverage is not None and coverage >= FULL_COVERAGE:
+            if mode is BranchMode.PARTIAL and coverage is not None and coverage >= FULL_COVERAGE:
                 continue
             yield cond
 
@@ -91,7 +94,7 @@ class LineCoverage:
 class FileCoverage:
     """Aggregated coverage information for a file."""
 
-    path: Path
+    path: FilePath
     lines: dict[int, LineCoverage] = field(default_factory=dict)
 
     def line(self, line_no: int) -> LineCoverage:
@@ -100,14 +103,14 @@ class FileCoverage:
     def uncovered_lines(self) -> list[int]:
         return sorted(ln for ln, cov in self.lines.items() if cov.hits == 0)
 
-    def branch_gaps(self, mode: str) -> list[BranchGap]:
+    def branch_gaps(self, mode: BranchMode) -> list[BranchGap]:
         gaps: list[BranchGap] = []
         for line_no in sorted(self.lines):
             cov = self.lines[line_no]
             if cov.branches_total == 0:
                 continue
             conds = list(cov.iter_conditions_for_mode(mode))
-            if not conds and mode != "all":
+            if not conds and mode is not BranchMode.ALL:
                 continue
             gaps.append(BranchGap(file=self.path, line=line_no, conditions=conds))
         return gaps
@@ -134,7 +137,7 @@ def _compile_filters(include: str | None, exclude: str | None) -> Callable[[Path
     return allow
 
 
-def _iter_conditions(line_elem: ET.Element) -> list[BranchCondition]:
+def _iter_conditions(line_elem: XmlElement) -> list[BranchCondition]:
     conds = line_elem.find("conditions")
     out: list[BranchCondition] = []
     if conds is not None:
@@ -173,15 +176,15 @@ def _iter_conditions(line_elem: ET.Element) -> list[BranchCondition]:
 class CoverageDataset:
     """Aggregated coverage data built from one or more XML reports."""
 
-    base_path: Path | None = None
-    files: dict[Path, FileCoverage] = field(default_factory=dict)
+    base_path: FilePath | None = None
+    files: dict[FilePath, FileCoverage] = field(default_factory=dict)
 
     @classmethod
     def from_roots(
         cls,
-        roots: Sequence[ET.Element],
+        roots: Sequence[XmlElement],
         *,
-        base_path: Path | None = None,
+        base_path: FilePath | None = None,
         include: str | None = None,
         exclude: str | None = None,
     ) -> CoverageDataset:
@@ -195,11 +198,11 @@ class CoverageDataset:
         cls,
         files: Iterable[Path],
         *,
-        base_path: Path | None = None,
+        base_path: FilePath | None = None,
         include: str | None = None,
         exclude: str | None = None,
     ) -> CoverageDataset:
-        roots: list[ET.Element] = []
+        roots: list[XmlElement] = []
         for path in files:
             root = read_coverage_xml_file(path)
             if root is None:
@@ -210,14 +213,14 @@ class CoverageDataset:
 
     def add_root(
         self,
-        root: ET.Element,
+        root: XmlElement,
         *,
         include: str | None = None,
         exclude: str | None = None,
     ) -> None:
         if root.tag != "coverage":
             msg = f"Invalid root element: expected <coverage>, got <{root.tag}>"
-            raise ValueError(msg)
+            raise InvalidCoverageXMLError(msg)
 
         allow = _compile_filters(include, exclude)
 
@@ -260,15 +263,15 @@ class CoverageDataset:
         for path in sorted(self.files, key=self._sort_key):
             yield self.files[path]
 
-    def _sort_key(self, path: Path) -> tuple[int, str]:
+    def _sort_key(self, path: FilePath) -> tuple[int, str]:
         normalized = normalize_path(path, base=self.base_path)
         return (0, normalized.as_posix())
 
     @staticmethod
-    def get_source_lines(path: Path) -> list[str]:
+    def get_source_lines(path: FilePath) -> list[str]:
         return read_file_lines(path)
 
-    def display_path(self, path: Path) -> str:
+    def display_path(self, path: FilePath) -> str:
         return normalize_path(path, base=self.base_path).as_posix()
 
 
@@ -280,7 +283,7 @@ class Report:
     sections: Mapping[str, object]
 
 
-def build_dataset(root: ET.Element, *, base_path: Path | None = None) -> CoverageDataset:
+def build_dataset(root: XmlElement, *, base_path: FilePath | None = None) -> CoverageDataset:
     """Build a :class:`CoverageDataset` from a single parsed coverage XML root."""
     dataset = CoverageDataset(base_path=base_path)
     dataset.add_root(root)
@@ -289,7 +292,7 @@ def build_dataset(root: ET.Element, *, base_path: Path | None = None) -> Coverag
 
 def build_lines(dataset: CoverageDataset, filters: PathFilter | None = None) -> list[UncoveredSection]:
     """Return uncovered line sections for *dataset* respecting *filters*."""
-    uncovered: dict[Path, list[int]] = {}
+    uncovered: dict[FilePath, list[int]] = {}
     for file_cov in dataset.iter_files():
         if filters is not None and not filters.allow(file_cov.path):
             continue
@@ -308,7 +311,7 @@ def build_lines(dataset: CoverageDataset, filters: PathFilter | None = None) -> 
         source_lines = dataset.get_source_lines(path)
         if source_lines:
             groups = merge_blank_gap_groups(groups, source_lines)
-        ranges = [(grp[0], grp[-1]) for grp in groups]
+        ranges: list[LineRange] = [(grp[0], grp[-1]) for grp in groups]
         sections.append(UncoveredSection(path, ranges))
     return sections
 
@@ -316,20 +319,23 @@ def build_lines(dataset: CoverageDataset, filters: PathFilter | None = None) -> 
 def build_branches(
     dataset: CoverageDataset,
     filters: PathFilter | None = None,
-    mode: str = "partial",
+    mode: BranchMode | str = BranchMode.PARTIAL,
 ) -> list[BranchGap]:
     """Return branch gaps according to *mode* for the dataset."""
-    allowed = {"missing-only", "partial", "all"}
-    if mode not in allowed:
-        msg = f"mode must be one of {sorted(allowed)}, got {mode!r}"
-        raise ValueError(msg)
+    if isinstance(mode, str):
+        try:
+            mode = BranchMode(mode)
+        except ValueError as exc:
+            choices = ", ".join(sorted(m.value for m in BranchMode))
+            msg = f"mode must be one of [{choices}], got {mode!r}"
+            raise ValueError(msg) from exc
 
     gaps: list[BranchGap] = []
     for file_cov in dataset.iter_files():
         if filters is not None and not filters.allow(file_cov.path):
             continue
         for gap in file_cov.branch_gaps(mode):
-            if mode != "all" and not gap.conditions:
+            if mode is not BranchMode.ALL and not gap.conditions:
                 continue
             gaps.append(
                 BranchGap(
@@ -342,7 +348,8 @@ def build_branches(
 
 
 def build_summary(
-    dataset: CoverageDataset, sort: str = "file"
+    dataset: CoverageDataset,
+    sort: SummarySort | str = SummarySort.FILE,
 ) -> tuple[list[tuple], tuple[int, int, int, int]]:
     """Return summary rows and totals for *dataset*."""
     rows: list[tuple] = []
@@ -369,21 +376,26 @@ def build_summary(
         br_totals += br_tot
         br_hits += br_hit
 
+    if isinstance(sort, str):
+        try:
+            sort = SummarySort(sort)
+        except ValueError as exc:
+            choices = ", ".join(sorted(item.value for item in SummarySort))
+            msg = f"sort must be one of [{choices}], got {sort!r}"
+            raise ValueError(msg) from exc
+
     key_funcs = {
-        "file": lambda row: (row[0],),
-        "stmt_cov": lambda row: (
+        SummarySort.FILE: lambda row: (row[0],),
+        SummarySort.STATEMENT_COVERAGE: lambda row: (
             -((100 * row[2] / row[1]) if row[1] else -1),
             row[0],
         ),
-        "br_cov": lambda row: (
+        SummarySort.BRANCH_COVERAGE: lambda row: (
             -((100 * row[5] / row[4]) if row[4] else -1),
             row[0],
         ),
-        "miss": lambda row: (-(row[3] + row[6]), row[0]),
+        SummarySort.MISSES: lambda row: (-(row[3] + row[6]), row[0]),
     }
-    if sort not in key_funcs:
-        msg = "sort must be one of: file, stmt_cov, br_cov, miss"
-        raise ValueError(msg)
 
     rows.sort(key=key_funcs[sort])
     return rows, (stmt_totals, stmt_hits, br_totals, br_hits)
@@ -395,8 +407,8 @@ def build_diff(
 ) -> dict[str, list[UncoveredSection]]:
     """Return diff between two datasets as new/resolved sections."""
 
-    def _line_map(dataset: CoverageDataset) -> dict[Path, set[int]]:
-        mapping: dict[Path, set[int]] = {}
+    def _line_map(dataset: CoverageDataset) -> dict[FilePath, set[int]]:
+        mapping: dict[FilePath, set[int]] = {}
         for file_cov in dataset.iter_files():
             missing = file_cov.uncovered_lines()
             if missing:
@@ -406,8 +418,8 @@ def build_diff(
     base_lines = _line_map(base_dataset)
     cur_lines = _line_map(current_dataset)
 
-    new_uncovered: dict[Path, list[int]] = {}
-    resolved: dict[Path, list[int]] = {}
+    new_uncovered: dict[FilePath, list[int]] = {}
+    resolved: dict[FilePath, list[int]] = {}
 
     for path, lines in cur_lines.items():
         prev = base_lines.get(path, set())
