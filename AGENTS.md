@@ -67,6 +67,8 @@ If any command fails due to missing executables or environment configuration, em
 * Maintain internal consistency across toolchain and file states
 * Prefer existing, popular, well-supported libraries when appropriate
   * For logic or functionality that is not core to the project, or is not highly customized, add an appropriate dependency rather than writing a custom version.
+* Treat `showcov report` as the sole CLI entrypoint; do not revive legacy subcommands
+* Ensure JSON output conforms to `src/showcov/data/schema.v2.json` and keep schema-aligned snapshots current
 
 ## Logging and Progress Tracking
 

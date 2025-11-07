@@ -1,19 +1,16 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from rich import box
 from rich.console import Console
 from rich.table import Table
 
-from showcov.core import (
-    relativize_path,
-)
+from showcov.core import normalize_path
 
-if TYPE_CHECKING:  # pragma: no cover
+if TYPE_CHECKING:
     from collections.abc import Iterable
-    from pathlib import Path
 
 
 # --------------------------- Formatting --------------------------------------
@@ -97,7 +94,7 @@ def render_coverage_table(
 
     # Convert rows to display rows with styling
     def fmt_row(r: tuple[str, int, int, int, int, int, int]) -> list[str]:
-        file_rel = relativize_path(r[0], rel_to=rel_to)
+        file_rel = normalize_path(Path(r[0]), base=rel_to).as_posix()
         stmt_cov = (100.0 * r[2] / r[1]) if r[1] else None
         br_cov = (100.0 * r[5] / r[4]) if r[4] else None
         return [

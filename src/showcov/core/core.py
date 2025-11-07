@@ -1,8 +1,8 @@
-"""
-Prints out all uncovered lines (grouped into contiguous sections) from a coverage XML report.
+"""Core helpers for working with coverage XML inputs.
 
-If no XML filename is given as a command-line argument, the script will try to read it from
-a configuration file (pyproject.toml, .coveragerc, or setup.cfg).
+Utilities in this module are shared across the unified ``showcov`` pipeline: they resolve the
+coverage XML configured for a project, build structured uncovered sections, and normalise file
+paths in a deterministic way.
 """
 
 from __future__ import annotations
@@ -15,7 +15,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
-from defusedxml import ElementTree as ET  # noqa: N817
 from more_itertools import consecutive_groups
 
 from showcov import logger
@@ -24,8 +23,6 @@ from showcov.core.files import detect_line_tag, normalize_path, read_file_lines
 
 if TYPE_CHECKING:
     from types import SimpleNamespace
-    from xml.etree.ElementTree import Element as XmlElement  # noqa: S405
-    from xml.etree.ElementTree import ElementTree as XmlElementTree  # noqa: S405
 
     from showcov.core.types import FilePath, LineRange
 
@@ -238,41 +235,6 @@ def merge_blank_gap_groups(groups: list[list[int]], file_lines: list[str]) -> li
     return merged
 
 
-def gather_uncovered_lines(root: XmlElement) -> dict[Path, list[int]]:
-    """Gather uncovered lines per file from the parsed XML tree."""
-    uncovered: dict[Path, list[int]] = {}
-
-    # Get all source roots from the XML
-    source_elements = root.findall(".//sources/source")
-    source_roots = [Path(src.text).resolve() for src in source_elements if src.text]
-
-    for cls in root.findall(".//class"):
-        filename_str = cls.get("filename")
-        if not filename_str:
-            continue
-
-        # Try resolving with the source root
-        filename = Path(filename_str)
-        resolved_path = next(
-            (src / filename for src in source_roots if (src / filename).exists()),
-            filename,  # fallback to relative path if none match
-        ).resolve()
-
-        for line in cls.findall("lines/line"):
-            try:
-                hits = int(line.get("hits", "0"))
-                line_no = int(line.get("number", "0"))
-            except (ValueError, TypeError):
-                continue
-
-            if hits == 0:
-                lines = uncovered.setdefault(resolved_path, [])
-                if line_no not in lines:
-                    lines.append(line_no)
-
-    return uncovered
-
-
 def build_sections(uncovered: dict[Path, list[int]]) -> list[UncoveredSection]:
     """Convert mapping of uncovered line numbers to structured sections."""
     sections: list[UncoveredSection] = []
@@ -285,98 +247,3 @@ def build_sections(uncovered: dict[Path, list[int]]) -> list[UncoveredSection]:
         ranges = [(grp[0], grp[-1]) for grp in sorted(groups, key=operator.itemgetter(0))]
         sections.append(UncoveredSection(filename, ranges))
     return sections
-
-
-def _parse_coverage_xml(xml_file: Path) -> XmlElementTree:
-    return ET.parse(xml_file)
-
-
-def _get_coverage_root(tree: XmlElementTree) -> XmlElement:
-    root = tree.getroot()
-    if root is None or root.tag != "coverage":
-        msg = f"Invalid root element: expected <coverage>, got <{getattr(root, 'tag', None)}>"
-        raise ValueError(msg)
-    return root
-
-
-def _extract_uncovered_by_file(root: XmlElement) -> dict[Path, list[int]]:
-    uncovered: dict[Path, list[int]] = {}
-
-    for class_elt in root.findall(".//class"):
-        filename = class_elt.get("filename")
-        if not filename:
-            continue
-
-        path = Path(filename)
-        lines = [
-            int(line.get("number")) for line in class_elt.findall("lines/line") if line.get("hits") == "0"
-        ]
-
-        if lines:
-            uncovered.setdefault(path, []).extend(lines)
-
-    return uncovered
-
-
-def gather_uncovered_lines_from_xml(xml_file: Path) -> dict[Path, list[int]]:
-    """Extract uncovered line numbers for each source file from coverage XML."""
-    try:
-        tree = _parse_coverage_xml(xml_file)
-        root = _get_coverage_root(tree)
-        return _extract_uncovered_by_file(root)
-    except ET.ParseError as exc:
-        msg = f"{xml_file}: failed to parse coverage XML: {exc}"
-        raise ET.ParseError(msg) from exc
-    except OSError as exc:
-        msg = f"{xml_file}: could not read file: {exc}"
-        raise OSError(msg) from exc
-
-
-def diff_uncovered_lines(
-    baseline_xml: Path, current_xml: Path
-) -> tuple[list[UncoveredSection], list[UncoveredSection]]:
-    """Return new and resolved uncovered sections between two coverage reports.
-
-    Parameters
-    ----------
-    baseline_xml:
-        Path to the baseline coverage XML report.
-    current_xml:
-        Path to the current coverage XML report.
-
-    Returns
-    -------
-    tuple[list[UncoveredSection], list[UncoveredSection]]
-        Two lists of :class:`UncoveredSection` objects.  The first contains
-        sections that are newly uncovered in ``current_xml`` compared to the
-        baseline.  The second contains sections that were uncovered in the
-        baseline but have since been resolved.
-    """
-    baseline = gather_uncovered_lines_from_xml(baseline_xml)
-    current = gather_uncovered_lines_from_xml(current_xml)
-
-    new_uncovered: dict[Path, list[int]] = {}
-    resolved: dict[Path, list[int]] = {}
-
-    for file, lines in current.items():
-        prev = set(baseline.get(file, []))
-        added = sorted(set(lines) - prev)
-        if added:
-            new_uncovered[file] = added
-
-    for file, lines in baseline.items():
-        now = set(current.get(file, []))
-        removed = sorted(set(lines) - now)
-        if removed:
-            resolved[file] = removed
-
-    return build_sections(new_uncovered), build_sections(resolved)
-
-
-def parse_large_xml(file_path: Path) -> XmlElement | None:
-    """Efficiently parse large XML files with iterparse."""
-    context = ET.iterparse(file_path, events=("start", "end"))
-    for event, elem in context:
-        if event == "end" and elem.tag == "coverage":
-            return elem  # Return root element early to save memory
-    return None

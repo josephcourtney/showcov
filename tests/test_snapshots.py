@@ -1,6 +1,10 @@
 import json
+from collections.abc import Callable
 from pathlib import Path
 
+from click.testing import CliRunner
+
+from showcov.cli import cli
 from showcov.core import Report, build_sections
 from showcov.core.types import Format
 from showcov.output.base import OutputMeta
@@ -118,3 +122,35 @@ def test_llm_prompt_snapshot() -> None:
     )
 
     assert prompt.rstrip("\n") == expected_prompt.rstrip("\n")
+
+
+def test_cli_json_snapshot(
+    cli_runner: CliRunner, coverage_xml_file: Callable[..., Path], tmp_path: Path
+) -> None:
+    src = tmp_path / "file.py"
+    src.write_text("print('hi')\n")
+    xml = coverage_xml_file({src: [1]})
+
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--cov",
+            str(xml),
+            "--sections",
+            "lines,summary",
+            "--format",
+            "json",
+        ],
+    )
+    assert result.exit_code == 0
+
+    actual = json.loads(result.output)
+    expected_path = Path("tests/snapshots/cli_report.json")
+    expected = json.loads(expected_path.read_text(encoding="utf-8"))
+
+    actual["tool"]["version"] = "IGNORED"
+    expected["tool"]["version"] = "IGNORED"
+    actual["meta"]["environment"]["coverage_xml"] = "IGNORED"
+    expected["meta"]["environment"]["coverage_xml"] = "IGNORED"
+
+    assert actual == expected

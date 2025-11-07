@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.1.0] - 2025-11-08
+
+### Changed
+- replace the multi-command interface with a single `report` entrypoint covering all sections and formats
+- standardize “no results” messaging and ordering across human, markdown, and HTML renderers
+
+### Added
+- add exit-code documentation, color policy checks, and schema-v2 JSON snapshots for the unified CLI
+- add `showcov.scripts` helpers for generating manual pages and shell completion scripts
+
+### Removed
+- remove legacy XML helpers that duplicated the new dataset/report pipeline
+
 ## [0.0.29] - 2025-11-07
 
 ### Added
