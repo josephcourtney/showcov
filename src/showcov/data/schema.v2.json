@@ -1,0 +1,351 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/showcov.schema.v2.json",
+  "title": "Showcov Unified Coverage Report",
+  "type": "object",
+  "properties": {
+    "schema": {
+      "const": "https://example.com/showcov.schema.v2.json"
+    },
+    "schema_version": {
+      "const": 2
+    },
+    "tool": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "const": "showcov"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$"
+        }
+      },
+      "required": ["name", "version"],
+      "additionalProperties": false
+    },
+    "meta": {
+      "type": "object",
+      "properties": {
+        "environment": {
+          "type": "object",
+          "properties": {
+            "coverage_xml": {
+              "type": "string"
+            }
+          },
+          "required": ["coverage_xml"],
+          "additionalProperties": false
+        },
+        "options": {
+          "type": "object",
+          "properties": {
+            "context_lines": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "with_code": {
+              "type": "boolean"
+            },
+            "show_paths": {
+              "type": "boolean"
+            },
+            "show_line_numbers": {
+              "type": "boolean"
+            },
+            "aggregate_stats": {
+              "type": "boolean"
+            },
+            "file_stats": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "context_lines",
+            "with_code",
+            "show_paths",
+            "show_line_numbers",
+            "aggregate_stats",
+            "file_stats"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": ["environment", "options"],
+      "additionalProperties": false
+    },
+    "sections": {
+      "type": "object",
+      "properties": {
+        "lines": {
+          "type": "object",
+          "properties": {
+            "files": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/uncovered_file"
+              }
+            },
+            "summary": {
+              "$ref": "#/$defs/line_summary"
+            }
+          },
+          "required": ["files"],
+          "additionalProperties": false
+        },
+        "branches": {
+          "type": "object",
+          "properties": {
+            "gaps": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/branch_gap"
+              }
+            }
+          },
+          "required": ["gaps"],
+          "additionalProperties": false
+        },
+        "summary": {
+          "type": "object",
+          "properties": {
+            "files": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/summary_row"
+              }
+            },
+            "totals": {
+              "$ref": "#/$defs/summary_totals"
+            }
+          },
+          "required": ["files", "totals"],
+          "additionalProperties": false
+        },
+        "diff": {
+          "type": "object",
+          "properties": {
+            "new": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/uncovered_file"
+              }
+            },
+            "resolved": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/uncovered_file"
+              }
+            }
+          },
+          "required": ["new", "resolved"],
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": ["schema", "schema_version", "tool", "meta", "sections"],
+  "additionalProperties": false,
+  "$defs": {
+    "source_line": {
+      "type": "object",
+      "properties": {
+        "line": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "code": {
+          "type": "string"
+        },
+        "tag": {
+          "type": "string"
+        }
+      },
+      "required": ["code"],
+      "additionalProperties": false
+    },
+    "uncovered_range": {
+      "type": "object",
+      "properties": {
+        "start": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "end": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "source": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/source_line"
+          }
+        }
+      },
+      "required": ["start", "end"],
+      "additionalProperties": false
+    },
+    "uncovered_file": {
+      "type": "object",
+      "properties": {
+        "file": {
+          "type": "string"
+        },
+        "uncovered": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/uncovered_range"
+          }
+        },
+        "counts": {
+          "type": "object",
+          "properties": {
+            "uncovered": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "total": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": ["uncovered", "total"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["uncovered"],
+      "additionalProperties": false
+    },
+    "line_summary": {
+      "type": "object",
+      "properties": {
+        "uncovered": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": ["uncovered"],
+      "additionalProperties": false
+    },
+    "branch_condition": {
+      "type": "object",
+      "properties": {
+        "number": {
+          "type": "integer"
+        },
+        "type": {
+          "type": ["string", "null"]
+        },
+        "coverage": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "maximum": 100
+        }
+      },
+      "required": ["number", "type", "coverage"],
+      "additionalProperties": false
+    },
+    "branch_gap": {
+      "type": "object",
+      "properties": {
+        "file": {
+          "type": "string"
+        },
+        "line": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "conditions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/branch_condition"
+          }
+        }
+      },
+      "required": ["line", "conditions"],
+      "additionalProperties": false
+    },
+    "summary_row": {
+      "type": "object",
+      "properties": {
+        "file": {
+          "type": "string"
+        },
+        "statements": {
+          "type": "object",
+          "properties": {
+            "total": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "covered": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "missed": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": ["total", "covered", "missed"],
+          "additionalProperties": false
+        },
+        "branches": {
+          "type": "object",
+          "properties": {
+            "total": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "covered": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "missed": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": ["total", "covered", "missed"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["file", "statements", "branches"],
+      "additionalProperties": false
+    },
+    "summary_totals": {
+      "type": "object",
+      "properties": {
+        "statements": {
+          "$ref": "#/$defs/summary_counts"
+        },
+        "branches": {
+          "$ref": "#/$defs/summary_counts"
+        }
+      },
+      "required": ["statements", "branches"],
+      "additionalProperties": false
+    },
+    "summary_counts": {
+      "type": "object",
+      "properties": {
+        "total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "covered": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "missed": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": ["total", "covered", "missed"],
+      "additionalProperties": false
+    }
+  }
+}

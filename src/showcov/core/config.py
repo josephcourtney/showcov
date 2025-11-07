@@ -13,10 +13,22 @@ CONSECUTIVE_STEP = 1
 LOG_FORMAT = "%(levelname)s: %(message)s"
 
 
+_SCHEMA_FILES: dict[str, str] = {
+    "v1": "schema.json",
+    "v2": "schema.v2.json",
+}
+
+
 @cache
-def get_schema() -> dict[str, object]:
+def get_schema(version: str = "v1") -> dict[str, object]:
     """Load and cache the JSON schema for structured output."""
-    return json.loads(resources.files("showcov.data").joinpath("schema.json").read_text(encoding="utf-8"))
+    try:
+        filename = _SCHEMA_FILES[version]
+    except KeyError as exc:
+        choices = ", ".join(sorted(_SCHEMA_FILES))
+        msg = f"Unsupported schema version: {version!r}. Available versions: {choices}"
+        raise ValueError(msg) from exc
+    return json.loads(resources.files("showcov.data").joinpath(filename).read_text(encoding="utf-8"))
 
 
 __all__ = ["CONSECUTIVE_STEP", "LOG_FORMAT", "get_schema"]

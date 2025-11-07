@@ -2,8 +2,10 @@ import json
 from pathlib import Path
 
 import pytest
+from jsonschema import validate
 
-from showcov.core import build_sections
+from showcov import __version__
+from showcov.core import Report, build_sections, get_schema
 from showcov.core.coverage import gather_uncovered_branches_from_xml
 from showcov.core.types import Format
 from showcov.output import (
@@ -16,6 +18,7 @@ from showcov.output import (
     resolve_formatter,
 )
 from showcov.output.base import OutputMeta
+from showcov.output.json import format_json_v2
 
 
 def test_format_human_respects_color(tmp_path: Path) -> None:
@@ -210,8 +213,10 @@ def test_json_stats(tmp_path: Path) -> None:
         file_stats=True,
     )
     data = json.loads(out)
-    assert data["summary"]["uncovered"] == 1
-    assert data["files"][0]["counts"]["uncovered"] == 1
+    lines = data["sections"]["lines"]
+    assert lines["summary"]["uncovered"] == 1
+    assert lines["files"][0]["counts"]["uncovered"] == 1
+    assert data["schema_version"] == 2
 
 
 def test_json_no_paths(tmp_path: Path) -> None:
@@ -228,7 +233,8 @@ def test_json_no_paths(tmp_path: Path) -> None:
     )
     out = format_json(sections, meta)
     data = json.loads(out)
-    assert "file" not in data["files"][0]
+    files = data["sections"]["lines"]["files"]
+    assert "file" not in files[0]
 
 
 def test_json_includes_tags(tmp_path: Path) -> None:
@@ -245,7 +251,50 @@ def test_json_includes_tags(tmp_path: Path) -> None:
     )
     out = format_json(sections, meta)
     data = json.loads(out)
-    assert data["files"][0]["uncovered"][0]["source"][0]["tag"] == "no-cover"
+    files = data["sections"]["lines"]["files"]
+    assert files[0]["uncovered"][0]["source"][0]["tag"] == "no-cover"
+
+
+def test_format_json_v2_schema(tmp_path: Path) -> None:
+    src = tmp_path / "x.py"
+    src.write_text("a\n")
+    sections = build_sections({src: [1]})
+    meta = OutputMeta(
+        context_lines=0,
+        with_code=False,
+        coverage_xml=tmp_path / "cov.xml",
+        color=False,
+        show_paths=True,
+        show_line_numbers=True,
+    )
+    files = [
+        sec.to_dict(
+            with_code=meta.with_code,
+            context_lines=meta.context_lines,
+            base=meta.coverage_xml.parent,
+            show_file=meta.show_paths,
+            show_line_numbers=meta.show_line_numbers,
+        )
+        for sec in sections
+    ]
+    report = Report(
+        meta={
+            "environment": {"coverage_xml": meta.coverage_xml.as_posix()},
+            "options": {
+                "context_lines": meta.context_lines,
+                "with_code": meta.with_code,
+                "show_paths": meta.show_paths,
+                "show_line_numbers": meta.show_line_numbers,
+                "aggregate_stats": False,
+                "file_stats": False,
+            },
+        },
+        sections={"lines": {"files": files}},
+    )
+    out = format_json_v2(report)
+    data = json.loads(out)
+    validate(data, get_schema("v2"))
+    assert data["tool"] == {"name": "showcov", "version": __version__}
 
 
 def test_gather_uncovered_branches_from_xml(tmp_path: Path) -> None:

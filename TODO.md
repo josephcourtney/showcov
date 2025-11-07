@@ -1,10 +1,10 @@
 ## TODO
 
 #### JSON schema v2 (single, versioned document)
-- [ ] add `src/showcov/data/schema.v2.json` covering lines/branches/summary/diff in one shape
-- [ ] implement `format_json_v2(report)`; keep v1 encoder as internal helper for tests only
-- [ ] validate v2 with `jsonschema.validate` (update call sites)
-- [ ] embed `schema` and `schema_version` in top-level payload
+- [x] add `src/showcov/data/schema.v2.json` covering lines/branches/summary/diff in one shape
+- [x] implement `format_json_v2(report)`; keep v1 encoder as internal helper for tests only
+- [x] validate v2 with `jsonschema.validate` (update call sites)
+- [x] embed `schema` and `schema_version` in top-level payload
 
 ### unify CLI into a single `report` surface (no backwards-compat required)
 
