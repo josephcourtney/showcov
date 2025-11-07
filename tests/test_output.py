@@ -192,6 +192,25 @@ def test_file_stats_summary(tmp_path: Path) -> None:
     assert "x.py: 1 uncovered (100%)" in out
 
 
+def test_render_output_human_deterministic(tmp_path: Path) -> None:
+    src = tmp_path / "y.py"
+    src.write_text("line1\nline2\nline3\nline4\n")
+    sections = build_sections({src: [1, 2, 4]})
+    meta = OutputMeta(
+        context_lines=0,
+        with_code=False,
+        coverage_xml=tmp_path / "cov.xml",
+        color=False,
+        show_paths=True,
+        show_line_numbers=False,
+    )
+    first = render_output(sections, Format.HUMAN, FORMATTERS[Format.HUMAN], meta)
+    second = render_output(sections, Format.HUMAN, FORMATTERS[Format.HUMAN], meta)
+    assert first == second
+    assert "y.py" in first
+    assert "# Lines" in first
+
+
 def test_json_stats(tmp_path: Path) -> None:
     src = tmp_path / "x.py"
     src.write_text("a\n")

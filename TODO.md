@@ -37,7 +37,7 @@
 #### exit codes & policy
 - [ ] keep existing: `0` ok, `65` data error, `66` input missing, `78` config error, `1` generic
 - [ ] add `2` when thresholds fail (document in help)
-- [ ] implement threshold evaluation over summary + lines counts (stmt%, branch%, total misses)
+- [x] implement threshold evaluation over summary + lines counts (stmt%, branch%, total misses)
 
 #### deletion of old subcommands
 - [ ] remove `show`, `branches`, `summary`, `diff` entrypoints and their tests
@@ -61,8 +61,8 @@
 - [x] add unit tests:
   - [x] `CoverageDataset` construction from XML (incl. malformed XML)
   - [x] builders: lines/branches/summary/diff (filters, sorting, modes)
-  - [ ] thresholds evaluation (pass/fail boundaries, mixed constraints)
-  - [ ] table width/grouping remains deterministic
+  - [x] thresholds evaluation (pass/fail boundaries, mixed constraints)
+  - [x] table width/grouping remains deterministic
   - [ ] color policy (forced vs disabled vs auto)
 - [ ] add JSON v2 snapshot tests (stable ordering, numeric precision)
 - [ ] e2e tests:

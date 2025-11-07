@@ -50,6 +50,13 @@ from showcov.core.exceptions import (
 )
 from showcov.core.files import detect_line_tag, normalize_path, read_file_lines
 from showcov.core.path_filter import PathFilter
+from showcov.core.thresholds import (
+    Threshold,
+    ThresholdFailure,
+    ThresholdsResult,
+    evaluate_thresholds,
+    parse_threshold,
+)
 from showcov.core.types import (
     BranchMode,
     CoveragePercent,
@@ -78,6 +85,9 @@ __all__ = [
     "Report",
     "ShowcovError",
     "SummarySort",
+    "Threshold",
+    "ThresholdFailure",
+    "ThresholdsResult",
     "UncoveredSection",
     "_get_xml_from_config",
     "_get_xml_from_pyproject",
@@ -92,6 +102,7 @@ __all__ = [
     "detect_line_tag",
     "determine_xml_file",
     "diff_uncovered_lines",
+    "evaluate_thresholds",
     "find_coverage_xml_paths",
     "gather_uncovered_lines",
     "gather_uncovered_lines_from_xml",
@@ -103,6 +114,7 @@ __all__ = [
     "normalize_path",
     "parse_condition_coverage",
     "parse_large_xml",
+    "parse_threshold",
     "read_all_coverage_roots",
     "read_file_lines",
     "relativize_path",
