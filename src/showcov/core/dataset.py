@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from defusedxml import ElementTree as ET  # noqa: N817
 
@@ -279,8 +279,9 @@ class CoverageDataset:
 class Report:
     """Container for the unified report surface."""
 
-    meta: Mapping[str, object]
-    sections: Mapping[str, object]
+    meta: Mapping[str, Any]
+    sections: Mapping[str, Any]
+    attachments: Mapping[str, Any] = field(default_factory=dict)
 
 
 def build_dataset(root: XmlElement, *, base_path: FilePath | None = None) -> CoverageDataset:

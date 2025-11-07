@@ -109,12 +109,13 @@ def test_format_human(tmp_path: Path, *, color: bool) -> None:
     source_file.write_text("def foo():\n    pass\n\ndef bar():\n    return 42")
     sections = build_sections({source_file: [2, 4, 5]})
     meta = OutputMeta(
-        context_lines=0,
-        with_code=False,
         coverage_xml=tmp_path / "cov.xml",
+        with_code=False,
         color=color,
         show_paths=True,
         show_line_numbers=False,
+        context_before=0,
+        context_after=0,
     )
     out = format_human(sections, meta)
     assert "File" in out
@@ -134,12 +135,13 @@ def test_format_human_sorted_files(tmp_path: Path) -> None:
     file_b.write_text("b=1\n")
     sections = build_sections({file_b: [1], file_a: [1]})
     meta = OutputMeta(
-        context_lines=0,
-        with_code=False,
         coverage_xml=tmp_path / "cov.xml",
+        with_code=False,
         color=False,
         show_paths=True,
         show_line_numbers=False,
+        context_before=0,
+        context_after=0,
     )
     out = format_human(sections, meta)
 
@@ -332,12 +334,13 @@ def test_format_human_file_open_error(tmp_path: Path) -> None:
     fake_file = tmp_path / "nonexistent.py"
     sections = build_sections({fake_file: [1, 2]})
     meta = OutputMeta(
-        context_lines=0,
-        with_code=False,
         coverage_xml=tmp_path / "cov.xml",
+        with_code=False,
         color=True,
         show_paths=True,
         show_line_numbers=False,
+        context_before=0,
+        context_after=0,
     )
     out = format_human(sections, meta)
     assert "nonexistent.py" in out
@@ -367,7 +370,7 @@ def test_cli_coverage_xml_not_found(cli_runner: CliRunner, monkeypatch: MonkeyPa
         raise CoverageXMLNotFoundError(msg)
 
     monkeypatch.setattr("showcov.cli.determine_xml_file", fail)
-    code, _ = _invoke(cli_runner, ["show"])
+    code, _ = _invoke(cli_runner, [])
     assert code == 66
 
 
@@ -377,13 +380,13 @@ def test_cli_parse_error(cli_runner: CliRunner, monkeypatch: MonkeyPatch, tmp_pa
 
     monkeypatch.setattr("showcov.cli.determine_xml_file", lambda *_: fake_xml)
 
-    def explode(_):
+    def explode(*_args, **_kwargs):
         msg = "broken"
         raise ElementTree.ParseError(msg)
 
-    monkeypatch.setattr("showcov.cli.gather_uncovered_lines_from_xml", explode)
+    monkeypatch.setattr("showcov.cli.CoverageDataset.from_xml_files", explode)
 
-    code, _ = _invoke(cli_runner, ["show", "--cov", str(fake_xml)])
+    code, _ = _invoke(cli_runner, ["--cov", str(fake_xml)])
     assert code == 65
 
 
@@ -393,11 +396,11 @@ def test_cli_os_error(cli_runner: CliRunner, monkeypatch: MonkeyPatch, tmp_path:
 
     monkeypatch.setattr("showcov.cli.determine_xml_file", lambda *_: fake_xml)
 
-    def explode(_):
+    def explode(*_args, **_kwargs):
         msg = "disk failure"
         raise OSError(msg)
 
-    monkeypatch.setattr("showcov.cli.gather_uncovered_lines_from_xml", explode)
+    monkeypatch.setattr("showcov.cli.CoverageDataset.from_xml_files", explode)
 
-    code, _ = _invoke(cli_runner, ["show", "--cov", str(fake_xml)])
-    assert code == 1
+    code, _ = _invoke(cli_runner, ["--cov", str(fake_xml)])
+    assert code == 66

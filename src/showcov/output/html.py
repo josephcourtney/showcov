@@ -12,7 +12,8 @@ if TYPE_CHECKING:  # pragma: no cover
 
 def format_html(sections: list[UncoveredSection], meta: OutputMeta) -> str:
     """Return an HTML report for *sections*."""
-    context_lines = max(0, meta.context_lines)
+    before = max(0, meta.context_before)
+    after = max(0, meta.context_after)
     root = meta.coverage_xml.parent.resolve()
     parts: list[str] = ["<html>", "<body>"]
     for section in sections:
@@ -27,8 +28,8 @@ def format_html(sections: list[UncoveredSection], meta: OutputMeta) -> str:
             else:
                 parts.append(f"<p>{header}</p>")
             if meta.with_code and file_lines:
-                start_idx = max(1, start - context_lines)
-                end_idx = min(len(file_lines), end + context_lines)
+                start_idx = max(1, start - before)
+                end_idx = min(len(file_lines), end + after)
                 snippet = []
                 for ln in range(start_idx, end_idx + 1):
                     code = file_lines[ln - 1] if 1 <= ln <= len(file_lines) else "<line not found>"
