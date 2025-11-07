@@ -1,45 +1,62 @@
 {
-  "environment": {
-    "context_lines": 1,
-    "coverage_xml": "coverage.xml",
-    "with_code": true
+  "meta": {
+    "environment": {
+      "coverage_xml": "/workspace/showcov/coverage.xml"
+    },
+    "options": {
+      "aggregate_stats": false,
+      "context_lines": 1,
+      "file_stats": false,
+      "show_line_numbers": true,
+      "show_paths": true,
+      "with_code": true
+    }
   },
-  "files": [
-    {
-      "file": "tests/data/sample.py",
-      "uncovered": [
+  "schema": "https://example.com/showcov.schema.v2.json",
+  "schema_version": 2,
+  "sections": {
+    "lines": {
+      "files": [
         {
-          "end": 5,
-          "source": [
+          "file": "tests/data/sample.py",
+          "uncovered": [
             {
-              "code": "def foo() -> None:",
-              "line": 1
-            },
-            {
-              "code": "    pass",
-              "line": 2
-            },
-            {
-              "code": "",
-              "line": 3
-            },
-            {
-              "code": "",
-              "line": 4
-            },
-            {
-              "code": "def bar() -> int:",
-              "line": 5
-            },
-            {
-              "code": "    return 42",
-              "line": 6
+              "end": 5,
+              "source": [
+                {
+                  "code": "def foo() -> None:",
+                  "line": 1
+                },
+                {
+                  "code": "    pass",
+                  "line": 2
+                },
+                {
+                  "code": "",
+                  "line": 3
+                },
+                {
+                  "code": "",
+                  "line": 4
+                },
+                {
+                  "code": "def bar() -> int:",
+                  "line": 5
+                },
+                {
+                  "code": "    return 42",
+                  "line": 6
+                }
+              ],
+              "start": 2
             }
-          ],
-          "start": 2
+          ]
         }
       ]
     }
-  ],
-  "version": "0.0.6"
+  },
+  "tool": {
+    "name": "showcov",
+    "version": "0.0.29"
+  }
 }

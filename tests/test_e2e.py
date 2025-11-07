@@ -187,7 +187,10 @@ def test_e2e_show_reports_expected_ranges(
     )
     assert result.exit_code == 0
     data = json.loads(result.output)
-    logic_entry = next(file for file in data["files"] if file["file"].endswith("logic.py"))
+    lines_section = data["sections"]["lines"]
+    logic_entry = next(
+        file for file in lines_section["files"] if file.get("file", "").endswith("logic.py")
+    )
     ranges = {(item["start"], item["end"]) for item in logic_entry["uncovered"]}
     assert example_coverage_project.expected_ranges <= ranges
 
