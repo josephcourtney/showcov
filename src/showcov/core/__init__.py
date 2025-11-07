@@ -32,20 +32,40 @@ from showcov.core.coverage import (
 from showcov.core.coverage import (
     sort_rows as sort_coverage_rows,
 )
+from showcov.core.dataset import (
+    CoverageDataset,
+    FileCoverage,
+    LineCoverage,
+    Report,
+    build_branches,
+    build_dataset,
+    build_diff,
+    build_lines,
+    build_summary,
+)
 from showcov.core.files import detect_line_tag, normalize_path, read_file_lines
 from showcov.core.path_filter import PathFilter
 
 __all__ = [
     "LOG_FORMAT",
+    "CoverageDataset",
     "CoverageXMLNotFoundError",
     "FileAgg",
+    "FileCoverage",
     "LineAgg",
+    "LineCoverage",
     "PathFilter",
+    "Report",
     "UncoveredSection",
     "_get_xml_from_config",
     "_get_xml_from_pyproject",
     "aggregate_coverage",
+    "build_branches",
+    "build_dataset",
+    "build_diff",
+    "build_lines",
     "build_sections",
+    "build_summary",
     "compute_file_rows",
     "detect_line_tag",
     "determine_xml_file",

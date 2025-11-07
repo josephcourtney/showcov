@@ -1,16 +1,13 @@
 from __future__ import annotations
 
-import operator
-import re
-import xml.etree.ElementTree as ET  # noqa: S405 - coverage XML is locally generated and trusted
 from collections.abc import Callable, Iterable, Mapping
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING
 
 import pytest
 from click.testing import CliRunner
 
-from showcov.output.table import format_table
+if TYPE_CHECKING:
+    from pathlib import Path
 
 LinesSpec = Mapping[int, str | int] | Iterable[int]
 
