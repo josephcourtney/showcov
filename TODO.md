@@ -1,24 +1,5 @@
 ## TODO
 
-### Codebase organization (types & exceptions)
-
-* [x] Create `showcov/core/types.py` and move shared type definitions and **Enums** there; replace all magic strings (e.g., branch modes, sort keys, formats) with enums.
-* [x] Create `showcov/core/exceptions.py` and centralize exception classes (e.g., coverage XML not found/invalid).
-* [x] Introduce `TypeAlias` objects for common primitives (e.g., `FilePath`, `CoveragePercent`, `LineRange`) and use them (or small dataclasses) where justified.
-* [x] Ensure no circular imports after consolidation; update imports in code and tests accordingly.
-
-#### core model & data flow
-- [x] introduce `CoverageDataset` (single-pass aggregation of per-line hits, branch totals/covered, source cache)
-- [x] refactor XML parsing into `coverage.read_coverage_xml_file` → `build_dataset(root)` (pure)
-- [x] centralize source-line caching (reuse `read_file_lines`, ensure LRU sizing + tests)
-- [x] add `Section builders`:
-  - [x] `build_lines(dataset, filters)` → `list[UncoveredSection]`
-  - [x] `build_branches(dataset, filters, mode)` → `list[BranchGap]` (mode: `missing-only|partial|all`)
-  - [x] `build_summary(dataset, sort)` → `(rows, totals)`
-  - [x] `build_diff(base_dataset, cur_dataset)` → `{new: [UncoveredSection], resolved: [UncoveredSection]}`
-- [x] define `Report` dataclass: `{meta, sections:{lines?, branches?, summary?, diff?}}`
-- [x] move path normalization and ordering to a single utility used by all sections
-
 #### JSON schema v2 (single, versioned document)
 - [ ] add `src/showcov/data/schema.v2.json` covering lines/branches/summary/diff in one shape
 - [ ] implement `format_json_v2(report)`; keep v1 encoder as internal helper for tests only
