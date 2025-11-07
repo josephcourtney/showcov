@@ -17,12 +17,9 @@ from showcov.core import (
     _get_xml_from_pyproject,
     build_sections,
     determine_xml_file,
-    gather_uncovered_lines,
-    gather_uncovered_lines_from_xml,
     get_config_xml_file,
     group_consecutive_numbers,
     merge_blank_gap_groups,
-    parse_large_xml,
     read_file_lines,
 )
 from showcov.output import format_human
@@ -149,56 +146,6 @@ def test_format_human_sorted_files(tmp_path: Path) -> None:
         ln.replace("│", " ").replace("┃", " ").split()[0] for ln in out.splitlines() if ".py" in ln
     ]
     assert files_shown == [file_a.name, file_b.name]
-
-
-# --- Tests for `gather_uncovered_lines` ---
-
-
-def test_gather_uncovered_lines_invalid_hits(coverage_xml_content: Callable[..., str]) -> None:
-    xml_content = coverage_xml_content({"dummy.py": {1: "notanumber", 2: 0}})
-    root = ElementTree.fromstring(xml_content)
-    uncovered = gather_uncovered_lines(root)
-    key = next(iter(uncovered))
-    assert key.name == "dummy.py"
-    assert uncovered[key] == [2]
-
-
-# --- Tests for `parse_large_xml` ---
-
-
-def test_parse_large_xml(coverage_xml_file: Callable[..., Path]) -> None:
-    xml_file = coverage_xml_file({"dummy.py": [3, 5]})
-    root = parse_large_xml(xml_file)
-    assert root is not None
-    uncovered = gather_uncovered_lines(root)
-    key = next(iter(uncovered))
-    assert key.name == "dummy.py"
-    assert uncovered[key] == [3, 5]
-
-
-def test_gather_uncovered_lines_resolves_paths(
-    tmp_path: Path, coverage_xml_content: Callable[..., str]
-) -> None:
-    pkg = tmp_path / "pkg"
-    pkg.mkdir()
-    source_file = pkg / "dummy.py"
-    source_file.write_text("print('hi')\n")
-    xml_content = coverage_xml_content({"pkg/dummy.py": [1]}, sources=tmp_path)
-    root = ElementTree.fromstring(xml_content)
-    uncovered = gather_uncovered_lines(root)
-    key = next(iter(uncovered))
-    assert key.is_absolute()
-    assert key.as_posix().endswith("pkg/dummy.py")
-
-
-def test_gather_uncovered_lines_from_xml(tmp_path: Path, coverage_xml_file: Callable[..., Path]) -> None:
-    src = tmp_path / "dummy.py"
-    src.write_text("print('hi')\n")
-    xml_file = coverage_xml_file({src: [1]})
-    uncovered = gather_uncovered_lines_from_xml(xml_file)
-    key = next(iter(uncovered))
-    assert key == src.resolve()
-    assert uncovered[key] == [1]
 
 
 def test_read_file_lines_handles_unicode_error(tmp_path: Path) -> None:
@@ -346,17 +293,6 @@ def test_format_human_file_open_error(tmp_path: Path) -> None:
     assert "nonexistent.py" in out
     assert "1" in out
     assert "2" in out
-
-
-# --- Test for parse_large_xml fallback (line 218) ---
-
-
-def test_parse_large_xml_no_coverage(tmp_path):
-    # Provide an XML file that does not contain a <coverage> element. parse_large_xml should return None.
-    xml_file = tmp_path / "bad.xml"
-    xml_file.write_text("<root></root>")
-    result = parse_large_xml(xml_file)
-    assert result is None
 
 
 # --- Tests for cli() error-handling branches ---
