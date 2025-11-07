@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import re
-import xml.etree.ElementTree as ET  # noqa: S405 - trusted coverage XML input
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
+
+from defusedxml import ElementTree as ET
 
 from showcov.core.core import (
     UncoveredSection,

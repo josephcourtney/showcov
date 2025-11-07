@@ -13,10 +13,11 @@ CLI commands or output formatters without pulling in Rich or Click.
 from __future__ import annotations
 
 import re
-import xml.etree.ElementTree as ET  # noqa: S405
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
+
+from defusedxml import ElementTree as ET
 
 from showcov.core.files import normalize_path
 
@@ -71,7 +72,7 @@ def find_coverage_xml_paths(root: Path, patterns: Sequence[str]) -> list[Path]:
 def read_coverage_xml_file(path: Path) -> ET.Element | None:
     """Parse a coverage XML file, returning its root element or ``None``."""
     try:
-        return ET.parse(path).getroot()  # noqa: S314 (trusted local file)
+        return ET.parse(path).getroot()
     except ET.ParseError:
         return None
 
@@ -167,7 +168,7 @@ def _parse_uncovered_conditions(line_elem: ET.Element) -> list[BranchCondition]:
 def gather_uncovered_branches_from_xml(xml_file: Path) -> list[BranchGap]:
     """Extract lines and specific branch conditions that are uncovered (0%)."""
     try:
-        tree = ET.parse(xml_file)  # noqa: S314
+        tree = ET.parse(xml_file)
     except ET.ParseError as exc:
         msg = f"{xml_file}: failed to parse coverage XML: {exc}"
         raise ET.ParseError(msg) from exc
