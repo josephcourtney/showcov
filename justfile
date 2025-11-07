@@ -41,7 +41,7 @@ test:
 
 # ---- Coverage ----
 cov:
-  showcov show --code --color --line-numbers --file-stats --stats --paths
+  showcov report --sections lines,summary --code --color --line-numbers --file-stats --stats --paths
 
 # ---- Build ----
 build:

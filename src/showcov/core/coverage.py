@@ -19,26 +19,11 @@ from typing import TYPE_CHECKING
 
 from defusedxml import ElementTree as ET  # noqa: N817
 
-from showcov.core.files import normalize_path
-
 if TYPE_CHECKING:  # pragma: no cover
-    from collections.abc import Callable, Iterable, Mapping, Sequence
+    from collections.abc import Iterable, Sequence
     from xml.etree.ElementTree import Element as XmlElement  # noqa: S405
 
     from showcov.core.types import CoveragePercent, FilePath
-
-
-# --------------------------- Models ------------------------------------------
-@dataclass(frozen=True)
-class LineAgg:
-    hits: int = 0
-    br_cov: int = 0
-    br_tot: int = 0
-
-
-@dataclass
-class FileAgg:
-    lines: dict[int, LineAgg]  # lineno -> agg
 
 
 FULL_COVERAGE = 100
@@ -202,115 +187,13 @@ def gather_uncovered_branches_from_xml(xml_file: Path) -> list[BranchGap]:
     return gaps
 
 
-# --------------------------- Aggregation -------------------------------------
-def _compile_filters(include: str | None, exclude: str | None) -> Callable[[Path], bool]:
-    inc = re.compile(include) if include else None
-    exc = re.compile(exclude) if exclude else None
-
-    def ok(p: Path) -> bool:
-        s = str(p)
-        if inc and not inc.search(s):
-            return False
-        return not (exc and exc.search(s))
-
-    return ok
-
-
-def aggregate(
-    roots: Sequence[XmlElement],
-    include: str | None,
-    exclude: str | None,
-) -> dict[str, FileAgg]:
-    """Aggregate per-line stats across multiple coverage roots.
-
-    For each file+line:
-      * hits      = max(hits across reports)
-      * br_cov    = max(covered branches across reports)
-      * br_tot    = max(total branches across reports)
-    """
-    ok = _compile_filters(include, exclude)
-    acc: dict[str, FileAgg] = {}
-    for root in roots:
-        for fname, lineno, hits, br_cov, br_tot in iter_lines(root):
-            fpath = Path(fname).resolve()
-            if not ok(fpath):
-                continue
-            key = str(fpath)
-            fa = acc.setdefault(key, FileAgg(lines={}))
-            la = fa.lines.get(lineno, LineAgg())
-            fa.lines[lineno] = LineAgg(
-                hits=max(la.hits, hits),
-                br_cov=max(la.br_cov, br_cov),
-                br_tot=max(la.br_tot, br_tot),
-            )
-    return acc
-
-
-# --------------------------- Summarisation -----------------------------------
-def compute_file_rows(
-    acc: Mapping[str, FileAgg],
-) -> tuple[list[tuple], tuple[int, int, int, int]]:
-    """Return per-file rows and global (stmt_tot, stmt_hit, br_tot, br_hit)."""
-    rows_raw: list[tuple] = []
-    sum_stmt_tot = sum_stmt_hit = sum_br_tot = sum_br_hit = 0
-    for fpath, fa in acc.items():
-        stmt_tot = len(fa.lines)
-        stmt_hit = sum(1 for la in fa.lines.values() if la.hits > 0)
-        br_tot = sum(la.br_tot for la in fa.lines.values())
-        br_hit = sum(la.br_cov for la in fa.lines.values())
-        rows_raw.append((fpath, stmt_tot, stmt_hit, stmt_tot - stmt_hit, br_tot, br_hit, br_tot - br_hit))
-        sum_stmt_tot += stmt_tot
-        sum_stmt_hit += stmt_hit
-        sum_br_tot += br_tot
-        sum_br_hit += br_hit
-    return rows_raw, (sum_stmt_tot, sum_stmt_hit, sum_br_tot, sum_br_hit)
-
-
-def sort_rows(
-    rows_raw: list[tuple],
-    *,
-    key: str = "file",
-) -> None:
-    """Sort *rows_raw* in-place by one of: file | stmt_cov | br_cov | miss."""
-
-    def stmt_cov(row: tuple) -> float | None:
-        tot, hit = row[1], row[2]
-        return (100.0 * hit / tot) if tot else None
-
-    def br_cov(row: tuple) -> float | None:
-        tot, hit = row[4], row[5]
-        return (100.0 * hit / tot) if tot else None
-
-    keyfuncs = {
-        "file": lambda r: (Path(r[0]), r[0]),
-        "stmt_cov": lambda r: (-(stmt_cov(r) or -1), r[0]),
-        "br_cov": lambda r: (-(br_cov(r) or -1), r[0]),
-        "miss": lambda r: (-(r[3] + r[6]), r[0]),
-    }
-    rows_raw.sort(key=keyfuncs[key])
-
-
-def relativize(path_str: str, *, rel_to: Path | None) -> str:
-    """Return *path_str* made relative to *rel_to* when possible."""
-    p = Path(path_str)
-    if rel_to is None:
-        return p.as_posix()
-    return normalize_path(p, base=rel_to).as_posix()
-
-
 __all__ = [
     "BranchCondition",
     "BranchGap",
-    "FileAgg",
-    "LineAgg",
-    "aggregate",
-    "compute_file_rows",
     "find_coverage_xml_paths",
     "gather_uncovered_branches_from_xml",
     "iter_lines",
     "parse_condition_coverage",
     "read_all_coverage_roots",
     "read_coverage_xml_file",
-    "relativize",
-    "sort_rows",
 ]

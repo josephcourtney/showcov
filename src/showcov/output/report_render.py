@@ -14,6 +14,12 @@ from showcov.output.json import format_json_v2
 from showcov.output.markdown import format_markdown
 from showcov.output.table import format_table
 
+_NO_LINES = "No uncovered lines."
+_NO_BRANCHES = "No uncovered branches."
+_NO_SUMMARY = "No summary data."
+_NO_DIFF_NEW = "No new uncovered lines."
+_NO_DIFF_RESOLVED = "No resolved uncovered lines."
+
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
@@ -54,11 +60,11 @@ def _render_markdown(report: Report, meta: OutputMeta) -> str:
     parts: list[str] = []
     for name in report.sections:
         if name == "lines":
-            parts.extend(("## Lines", _render_lines_markdown(report, meta) or "_No uncovered lines._"))
+            parts.extend(("## Lines", _render_lines_markdown(report, meta) or f"_{_NO_LINES}_"))
         elif name == "branches":
             parts.append("## Branches")
             rendered = _render_branches_markdown(report, meta)
-            parts.append(rendered or "_No uncovered branches._")
+            parts.append(rendered or f"_{_NO_BRANCHES}_")
         elif name == "summary":
             parts.extend(("## Summary", _render_summary_markdown(report)))
         elif name == "diff":
@@ -91,7 +97,7 @@ def _render_lines_human(report: Report, meta: OutputMeta) -> str:
     attachments = _as_mapping(report.attachments.get("lines"))
     sections_raw = _as_list(attachments.get("sections"))
     sections = cast("list[UncoveredSection]", sections_raw)
-    body = format_human(sections, meta) if sections else "No uncovered lines."
+    body = format_human(sections, meta) if sections else _NO_LINES
     data = report.sections.get("lines")
     details = _summarize_line_sections(data)
     return "\n".join([part for part in [body, *details] if part])
@@ -102,7 +108,7 @@ def _render_branches_human(report: Report, meta: OutputMeta) -> str:
     gaps_raw = _as_list(attachments.get("gaps"))
     gaps = cast("list[BranchGap]", gaps_raw)
     if not gaps:
-        return "No uncovered branches."
+        return _NO_BRANCHES
     base = meta.coverage_xml.parent
     headers: list[tuple[str, ...]] = []
     if meta.show_paths:
@@ -120,7 +126,7 @@ def _render_branches_human(report: Report, meta: OutputMeta) -> str:
             row.extend([str(gap.line), condition_label, coverage])
             rows.append(row)
     table = format_table(headers, rows) if rows else ""
-    return table or "No uncovered branches."
+    return table or _NO_BRANCHES
 
 
 def _render_summary_human(report: Report) -> str:  # noqa: PLR0914
@@ -181,12 +187,12 @@ def _render_diff_human(report: Report, meta: OutputMeta) -> str:
     if new_sections:
         parts.append(format_human(list(new_sections), meta))
     else:
-        parts.append("No new uncovered lines.")
+        parts.append(_NO_DIFF_NEW)
     parts.append(_subheading("Resolved", meta))
     if resolved_sections:
         parts.append(format_human(list(resolved_sections), meta))
     else:
-        parts.append("No resolved uncovered lines.")
+        parts.append(_NO_DIFF_RESOLVED)
     return "\n".join(parts)
 
 
@@ -225,7 +231,7 @@ def _render_branches_markdown(report: Report, meta: OutputMeta) -> str:
 def _render_summary_markdown(report: Report) -> str:
     data = report.sections.get("summary")
     if not isinstance(data, dict):
-        return "_No summary data._"
+        return f"_{_NO_SUMMARY}_"
     headers = [
         ("File",),
         ("Statements", "Total"),
@@ -259,11 +265,9 @@ def _render_diff_markdown(report: Report, meta: OutputMeta) -> str:
     resolved_sections = cast("list[UncoveredSection]", _as_list(diff_data.get("resolved")))
     parts: list[str] = ["### New"]
     parts.extend([
-        format_markdown(list(new_sections), meta) if new_sections else "_No new uncovered lines._",
+        format_markdown(list(new_sections), meta) if new_sections else f"_{_NO_DIFF_NEW}_",
         "### Resolved",
-        format_markdown(list(resolved_sections), meta)
-        if resolved_sections
-        else "_No resolved uncovered lines._",
+        format_markdown(list(resolved_sections), meta) if resolved_sections else f"_{_NO_DIFF_RESOLVED}_",
     ])
     return "\n\n".join(parts)
 
@@ -273,7 +277,7 @@ def _render_lines_html(report: Report, meta: OutputMeta) -> str:  # noqa: PLR091
     sections = cast("list[UncoveredSection]", _as_list(attachments.get("sections")))
     parts: list[str] = ['<section id="lines">', "<h2>Lines</h2>"]
     if not sections:
-        parts.append("<p>No uncovered lines.</p>")
+        parts.append(f"<p>{_NO_LINES}</p>")
     else:
         base = meta.coverage_xml.parent
         for section in sections:
@@ -312,7 +316,7 @@ def _render_branches_html(report: Report, meta: OutputMeta) -> str:
     gaps = cast("list[BranchGap]", _as_list(attachments.get("gaps")))
     parts: list[str] = ['<section id="branches">', "<h2>Branches</h2>"]
     if not gaps:
-        parts.append("<p>No uncovered branches.</p>")
+        parts.append(f"<p>{_NO_BRANCHES}</p>")
     else:
         base = meta.coverage_xml.parent
         parts.append("<table>")
@@ -343,12 +347,12 @@ def _render_summary_html(report: Report) -> str:
     data = report.sections.get("summary")
     parts: list[str] = ['<section id="summary">', "<h2>Summary</h2>"]
     if not isinstance(data, Mapping):
-        parts.append("<p>No summary data.</p>")
+        parts.append(f"<p>{_NO_SUMMARY}</p>")
     else:
         summary = cast("Mapping[str, Any]", data)
         files = _as_list(summary.get("files"))
         if not files:
-            parts.append("<p>No summary data.</p>")
+            parts.append(f"<p>{_NO_SUMMARY}</p>")
             return "\n".join(parts)
         parts.append("<table>")
         headers = [
@@ -393,12 +397,12 @@ def _render_diff_html(report: Report, meta: OutputMeta) -> str:
     if new_sections:
         parts.append(_render_sections_html(new_sections, meta))
     else:
-        parts.append("<p>No new uncovered lines.</p>")
+        parts.append(f"<p>{_NO_DIFF_NEW}</p>")
     parts.extend(("</article>", '<article id="diff-resolved">', "<h3>Resolved</h3>"))
     if resolved_sections:
         parts.append(_render_sections_html(resolved_sections, meta))
     else:
-        parts.append("<p>No resolved uncovered lines.</p>")
+        parts.append(f"<p>{_NO_DIFF_RESOLVED}</p>")
     parts.extend(("</article>", "</section>"))
     return "\n".join(parts)
 

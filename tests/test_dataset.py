@@ -169,3 +169,54 @@ def test_build_dataset_helper(tmp_path: Path) -> None:
     sections = build_lines(dataset)
     assert len(sections) == 1
     assert sections[0].ranges == [(1, 1)]
+
+
+def test_build_lines_deterministic_order(tmp_path: Path) -> None:
+    first = tmp_path / "a.py"
+    second = tmp_path / "b.py"
+    first.write_text("line1\nline2\n")
+    second.write_text("line1\nline2\n")
+    xml = f"""
+    <coverage><packages><package><classes>
+      <class filename="{second}">
+        <lines>
+          <line number="2" hits="0" />
+          <line number="1" hits="0" />
+        </lines>
+      </class>
+      <class filename="{first}">
+        <lines><line number="2" hits="0" /></lines>
+      </class>
+    </classes></package></packages></coverage>
+    """
+    dataset = CoverageDataset.from_roots([_build_root(xml)], base_path=tmp_path)
+    sections = build_lines(dataset)
+    assert [dataset.display_path(sec.file) for sec in sections] == [
+        dataset.display_path(first.resolve()),
+        dataset.display_path(second.resolve()),
+    ]
+    assert sections[1].ranges == [(1, 2)]
+
+
+def test_build_branches_sorts_conditions(tmp_path: Path) -> None:
+    src = tmp_path / "branchy.py"
+    src.write_text("""def f(x):\n    if x:\n        return 1\n    return 0\n""")
+    xml = f"""
+    <coverage><packages><package><classes>
+      <class filename="{src}">
+        <lines>
+          <line number="2" hits="1" branch="true" condition-coverage="0% (0/2)" missing-branches="foo, 3">
+            <conditions>
+              <condition number="7" type="beta" coverage="50%" />
+              <condition number="2" type="alpha" coverage="0%" />
+            </conditions>
+          </line>
+        </lines>
+      </class>
+    </classes></package></packages></coverage>
+    """
+    dataset = CoverageDataset.from_roots([_build_root(xml)], base_path=tmp_path)
+    gaps = build_branches(dataset, mode=BranchMode.ALL)
+    assert len(gaps) == 1
+    condition_keys = [(cond.type, cond.number) for cond in gaps[0].conditions]
+    assert condition_keys == [("alpha", 2), ("beta", 7), ("line", 3)]

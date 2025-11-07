@@ -154,7 +154,6 @@ def _iter_conditions(line_elem: XmlElement) -> list[BranchCondition]:
             except ValueError:
                 coverage = None
             out.append(BranchCondition(number=number, type=typ, coverage=coverage))
-        return out
 
     missing = (line_elem.get("missing-branches") or "").strip()
     if not missing:
@@ -164,11 +163,9 @@ def _iter_conditions(line_elem: XmlElement) -> list[BranchCondition]:
             continue
         try:
             number = int(token)
-            typ = "line"
         except ValueError:
-            number = -1
-            typ = token
-        out.append(BranchCondition(number=number, type=typ, coverage=None))
+            continue
+        out.append(BranchCondition(number=number, type="line", coverage=None))
     return out
 
 

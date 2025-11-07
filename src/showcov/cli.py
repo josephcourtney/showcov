@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import click
+import click.utils as click_utils
 from defusedxml import ElementTree
 
 from showcov import __version__, logger
@@ -412,6 +413,16 @@ def cli(  # noqa: C901, PLR0912, PLR0914, PLR0915
     verbose: bool = False,
     debug: bool = False,
 ) -> None:
+    """Generate unified coverage reports from one or more coverage XML files.
+
+    Exit status codes:
+        0  - success
+        1  - generic error (unexpected failure)
+        2  - one or more coverage thresholds were not met
+        65 - malformed coverage XML data
+        66 - required coverage XML input missing
+        78 - configuration error (e.g. invalid --config references)
+    """
     if maybe_command == "report":
         positional_paths = extra_paths
     else:
@@ -461,7 +472,9 @@ def cli(  # noqa: C901, PLR0912, PLR0914, PLR0915
         msg = "--format"
         raise click.BadOptionUsage(msg, "--format=auto cannot be used with --output")
 
-    use_color = True if color else False if no_color else sys.stdout.isatty()
+    ansi_allowed = not click_utils.should_strip_ansi(sys.stdout)
+    color_support = ctx.color if ctx.color is not None else ansi_allowed
+    use_color = True if color else False if no_color else color_support
     meta = OutputMeta(
         coverage_xml=coverage_paths[0],
         with_code=with_code,
@@ -545,7 +558,9 @@ def cli(  # noqa: C901, PLR0912, PLR0914, PLR0915
 
     report = Report(meta=report_meta, sections=report_sections, attachments=attachments)
 
-    fmt = _resolve_format(format_option, is_tty=sys.stdout.isatty() and output in {None, Path("-")})
+    allow_tty_output = output in {None, Path("-")}
+    format_supports_tty = (ctx.color is True or ansi_allowed) if allow_tty_output else False
+    fmt = _resolve_format(format_option, is_tty=format_supports_tty)
     rendered = render_report(report, fmt, meta)
     _write_output(rendered, output)
 
