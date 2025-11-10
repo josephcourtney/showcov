@@ -67,6 +67,7 @@ class _ContextType(click.ParamType):
     def convert(self, value, param, ctx):
         if not value:
             return (0, 0)
+        print(f"{value=}")
         parts = [p.strip() for p in value.replace(",", " ").split() if p.strip()]
         try:
             if len(parts) == 1:
@@ -432,7 +433,7 @@ def cli(  # noqa: C901, PLR0912, PLR0914, PLR0915
         msg = "--quiet"
         raise click.BadOptionUsage(msg, "--quiet and --verbose cannot be combined")
 
-    before, after = context_option or (0, 0)
+    before, after = tuple([int(e.strip()) for e in context_option.split(",")]) if context_option else (0, 0)
     sections_requested = sections_option or ("lines",)
     thresholds = threshold_options
 
