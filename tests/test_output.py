@@ -1,5 +1,4 @@
 import json
-from html import unescape
 from pathlib import Path
 
 from jsonschema import validate
@@ -10,10 +9,8 @@ from showcov.core.core import UncoveredSection
 from showcov.core.coverage import gather_uncovered_branches_from_xml
 from showcov.core.types import Format
 from showcov.output.base import OutputMeta
-from showcov.output.html import format_html
 from showcov.output.human import format_human
 from showcov.output.json import format_json_v2
-from showcov.output.markdown import format_markdown
 from showcov.output.report_render import render_report
 
 
@@ -71,26 +68,6 @@ def test_format_human_respects_color(tmp_path: Path) -> None:
     assert "\x1b" not in plain
 
 
-def test_format_markdown_includes_details(tmp_path: Path) -> None:
-    src = tmp_path / "x.py"
-    src.write_text("a\n")
-    sections = build_sections({src: [1]})
-    meta = _make_meta(tmp_path, with_code=True)
-    out = format_markdown(sections, meta)
-    assert "<details>" in out
-    assert "```" in out
-
-
-def test_format_html_mentions_file(tmp_path: Path) -> None:
-    src = tmp_path / "x.py"
-    src.write_text("a\n")
-    sections = build_sections({src: [1]})
-    meta = _make_meta(tmp_path)
-    out = format_html(sections, meta)
-    assert "<html>" in out
-    assert "x.py" in out
-
-
 def test_render_report_human_sections(tmp_path: Path) -> None:
     src = tmp_path / "f.py"
     src.write_text("print(1)\n")
@@ -100,28 +77,6 @@ def test_render_report_human_sections(tmp_path: Path) -> None:
     output = render_report(report, Format.HUMAN, meta)
     assert "Lines" in output
     assert "Total uncovered lines: 1" in output
-
-
-def test_render_report_markdown(tmp_path: Path) -> None:
-    src = tmp_path / "f.py"
-    src.write_text("print(1)\n")
-    sections = build_sections({src: [1]})
-    meta = _make_meta(tmp_path, with_code=True)
-    report = _make_report(meta, sections)
-    rendered = render_report(report, Format.MARKDOWN, meta)
-    assert rendered.startswith("## Lines")
-    assert "```" in rendered
-
-
-def test_render_report_html(tmp_path: Path) -> None:
-    src = tmp_path / "f.py"
-    src.write_text("print(1)\n")
-    sections = build_sections({src: [1]})
-    meta = _make_meta(tmp_path, with_code=True)
-    report = _make_report(meta, sections)
-    rendered = render_report(report, Format.HTML, meta)
-    assert '<section id="lines">' in rendered
-    assert "print(1)" in unescape(rendered)
 
 
 def test_render_report_json_schema(tmp_path: Path) -> None:

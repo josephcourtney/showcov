@@ -30,20 +30,17 @@ class PathFilter:
 
     def _prepare_patterns(self, patterns: Sequence[str | Path], *, expand_dirs: bool) -> list[str]:
         """Normalize patterns and resolve concrete paths."""
-        prepared: list[str] = []
+        out: list[str] = []
         for pat in patterns:
-            s = str(pat)
-            if any(ch in s for ch in "*?[]"):
-                p = Path(s)
-                if p.is_absolute():
-                    s = normalize_path(p, base=self._base).as_posix()
-                prepared.append(s.replace("\\", "/"))
-                continue
+            s = str(pat).replace("\\", "/")
             p = Path(s)
+            if any(ch in s for ch in "*?[]"):
+                out.append(normalize_path(p, base=self._base).as_posix() if p.is_absolute() else s)
+                continue
             if p.is_dir() and expand_dirs:
                 p /= "**/*"
-            prepared.append(normalize_path(p, base=self._base).as_posix())
-        return prepared
+            out.append(normalize_path(p, base=self._base).as_posix())
+        return out
 
     def _match_includes(self, path: Path) -> bool:
         if not self._has_includes:

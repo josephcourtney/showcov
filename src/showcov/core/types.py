@@ -46,9 +46,8 @@ class Format(StrEnum):
     """Supported output formats."""
 
     HUMAN = "human"
+    RG = "rg"
     JSON = "json"
-    MARKDOWN = "markdown"
-    HTML = "html"
     AUTO = "auto"
 
 

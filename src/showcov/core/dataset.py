@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from contextlib import suppress
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -12,8 +13,6 @@ from defusedxml import ElementTree as ET  # noqa: N817
 from showcov.core.core import (
     UncoveredSection,
     build_sections,
-    group_consecutive_numbers,
-    merge_blank_gap_groups,
 )
 from showcov.core.coverage import (
     FULL_COVERAGE,
@@ -24,7 +23,7 @@ from showcov.core.coverage import (
 )
 from showcov.core.exceptions import InvalidCoverageXMLError
 from showcov.core.files import normalize_path, read_file_lines
-from showcov.core.types import BranchMode, FilePath, LineRange, SummarySort
+from showcov.core.types import BranchMode, FilePath, SummarySort
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
@@ -169,6 +168,12 @@ def _iter_conditions(line_elem: XmlElement) -> list[BranchCondition]:
     return out
 
 
+def _to_int(text: str | None, *, default: int = 0) -> int:
+    with suppress(ValueError, TypeError):
+        return int(text)  # type: ignore[arg-type]
+    return default
+
+
 @dataclass(slots=True)
 class CoverageDataset:
     """Aggregated coverage data built from one or more XML reports."""
@@ -230,15 +235,10 @@ class CoverageDataset:
                 continue
 
             for line_elem in cls_elem.findall("lines/line"):
-                try:
-                    line_no = int(line_elem.get("number", "0"))
-                except ValueError:
+                line_no = _to_int(line_elem.get("number"), default=-1)
+                if line_no < 0:
                     continue
-                hits_raw = line_elem.get("hits", "0") or "0"
-                try:
-                    hits = int(hits_raw)
-                except ValueError:
-                    continue
+                hits = _to_int(line_elem.get("hits"), default=0)
 
                 branches_covered = branches_total = 0
                 if line_elem.get("branch") == "true":
@@ -301,17 +301,8 @@ def build_lines(dataset: CoverageDataset, filters: PathFilter | None = None) -> 
 
     if not uncovered:
         return []
-
-    sections: list[UncoveredSection] = []
-    for path in sorted(uncovered, key=dataset.display_path):
-        lines = uncovered[path]
-        groups = group_consecutive_numbers(lines)
-        source_lines = dataset.get_source_lines(path)
-        if source_lines:
-            groups = merge_blank_gap_groups(groups, source_lines)
-        ranges: list[LineRange] = [(grp[0], grp[-1]) for grp in groups]
-        sections.append(UncoveredSection(path, ranges))
-    return sections
+    # Delegate range grouping + blank-gap merging to the shared helper.
+    return build_sections(uncovered)
 
 
 def build_branches(

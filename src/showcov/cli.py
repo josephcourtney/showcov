@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 import click
 import click.utils as click_utils
@@ -35,7 +35,6 @@ if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
 
     from showcov.core.dataset import FileCoverage
-    from showcov.core.thresholds import Threshold
 
 CONTEXT_SETTINGS = {
     "help_option_names": ["-h", "--help"],
@@ -62,64 +61,60 @@ def _configure_logging(*, quiet: bool, verbose: bool, debug: bool) -> None:
         logger.debug("debug logging enabled")
 
 
-def _resolve_context(value: str | None) -> tuple[int, int]:
-    if not value:
-        return 0, 0
-    parts = [token.strip() for token in value.replace(",", " ").split() if token.strip()]
-    if len(parts) == 1:
+class _ContextType(click.ParamType):
+    name = "context"
+
+    def convert(self, value, param, ctx):
+        if not value:
+            return (0, 0)
+        parts = [p.strip() for p in value.replace(",", " ").split() if p.strip()]
         try:
-            amount = int(parts[0])
-        except ValueError as exc:  # pragma: no cover - defensive
-            msg = "context must be an integer"
-            raise click.BadParameter(msg) from exc
-        return amount, amount
-    if len(parts) == CONTEXT_PAIR_SIZE:
-        try:
-            before, after = (int(parts[0]), int(parts[1]))
-        except ValueError as exc:
-            msg = "context values must be integers"
-            raise click.BadParameter(msg) from exc
-        return before, after
-    msg = "--context expects N or N,M"
-    raise click.BadParameter(msg)
+            if len(parts) == 1:
+                n = int(parts[0])
+                return (n, n)
+            if len(parts) == 2:
+                return (int(parts[0]), int(parts[1]))
+        except ValueError:
+            self.fail("expects N or N,M", param, ctx)
+        self.fail("expects N or N,M", param, ctx)
+        return None
 
 
-def _resolve_sections(value: str | None) -> tuple[str, ...]:
-    if not value:
-        return ("lines",)
-    parts = [item.strip().lower() for item in value.split(",") if item.strip()]
-    invalid = [item for item in parts if item not in SECTIONS]
-    if invalid:
-        choices = ", ".join(SECTIONS)
-        msg = f"unknown section(s): {', '.join(invalid)} (choose from {choices})"
-        raise click.BadParameter(msg)
-    seen: list[str] = []
-    for item in parts:
-        if item not in seen:
-            seen.append(item)
-    return tuple(seen)
+_CONTEXT = _ContextType()
 
 
-def _resolve_format(value: str, *, is_tty: bool) -> Format:
+class _SectionsType(click.ParamType):
+    name = "sections"
+    _choices: ClassVar[set] = set(SECTIONS)
+
+    def convert(self, value, param, ctx):
+        if not value:
+            return ("lines",)
+        parts = [p.strip().lower() for p in value.split(",") if p.strip()]
+        bad = [p for p in parts if p not in self._choices]
+        if bad:
+            self.fail(f"unknown section(s): {', '.join(bad)}", param, ctx)
+        # de-dupe while preserving order
+        seen = []
+        for p in parts:
+            if p not in seen:
+                seen.append(p)
+        return tuple(seen)
+
+
+_SECTIONS_TYPE = _SectionsType()
+
+
+def _resolve_format_auto(value: str, *, is_tty: bool) -> Format:
+    fmt = Format(value.lower())
+    return (Format.HUMAN if is_tty else Format.JSON) if fmt is Format.AUTO else fmt
+
+
+def _thresholds_cb(ctx, param, values):
     try:
-        fmt = Format(value.lower())
+        return tuple(parse_threshold(v) for v in values)
     except ValueError as exc:
-        choices = ", ".join(fmt.value for fmt in Format)
-        msg = f"unsupported format: {value!r}; choose from {choices}"
-        raise click.BadParameter(msg) from exc
-    if fmt is Format.AUTO:
-        return Format.HUMAN if is_tty else Format.JSON
-    return fmt
-
-
-def _parse_threshold_options(values: Sequence[str]) -> tuple[Threshold, ...]:
-    parsed: list[Threshold] = []
-    for expr in values:
-        try:
-            parsed.append(parse_threshold(expr))
-        except ValueError as exc:
-            raise click.BadParameter(str(exc)) from exc
-    return tuple(parsed)
+        raise click.BadParameter(str(exc)) from exc
 
 
 def _resolve_filters(
@@ -152,7 +147,7 @@ def _build_lines_section(
     attachments: dict[str, Any],
 ) -> Mapping[str, object]:
     files_payload: list[dict[str, object]] = []
-    total_uncovered = 0
+    total_uncovered: int | None = 0 if aggregate_stats else None
     for section in sections:
         section_dict = section.to_dict(
             with_code=meta.with_code,
@@ -164,14 +159,13 @@ def _build_lines_section(
         )
         if file_stats:
             uncovered = sum(end - start + 1 for start, end in section.ranges)
-            total = len(read_file_lines(section.file))
-            section_dict["counts"] = {"uncovered": uncovered, "total": total}
-            total_uncovered += uncovered
-        else:
+            section_dict["counts"] = {"uncovered": uncovered, "total": len(read_file_lines(section.file))}
+        if total_uncovered is not None:
             total_uncovered += sum(end - start + 1 for start, end in section.ranges)
+
         files_payload.append(section_dict)
     payload: dict[str, object] = {"files": files_payload}
-    if aggregate_stats:
+    if aggregate_stats and total_uncovered is not None:
         payload["summary"] = {"uncovered": total_uncovered}
     attachments["lines"] = {"sections": list(sections)}
     return payload
@@ -344,6 +338,7 @@ def _write_output(text: str, destination: Path | None) -> None:
 @click.option(
     "--sections",
     "sections_option",
+    type=_SECTIONS_TYPE,
     help="Comma separated list of sections (lines, branches, summary, diff)",
 )
 @click.option(
@@ -362,7 +357,7 @@ def _write_output(text: str, destination: Path | None) -> None:
     "format_option",
     default="auto",
     show_default=True,
-    help="Output format (human, markdown, html, json, auto)",
+    help="Output format (human, json, auto)",
 )
 @click.option("--output", type=click.Path(path_type=Path), help="Write report to file instead of stdout")
 @click.option("--code/--no-code", "with_code", default=False, show_default=True, help="Include code snippets")
@@ -378,7 +373,9 @@ def _write_output(text: str, destination: Path | None) -> None:
 )
 @click.option("--stats", is_flag=True, help="Include aggregate uncovered counts for lines")
 @click.option("--file-stats", is_flag=True, help="Include per-file counts for lines")
-@click.option("--threshold", "threshold_options", multiple=True, help="Coverage thresholds")
+@click.option(
+    "--threshold", "threshold_options", multiple=True, callback=_thresholds_cb, help="Coverage thresholds"
+)
 @click.option("--color", is_flag=True, help="Force coloured output")
 @click.option("--no-color", is_flag=True, help="Disable coloured output")
 @click.option("-q", "--quiet", is_flag=True, help="Suppress non-essential output")
@@ -435,9 +432,9 @@ def cli(  # noqa: C901, PLR0912, PLR0914, PLR0915
         msg = "--quiet"
         raise click.BadOptionUsage(msg, "--quiet and --verbose cannot be combined")
 
-    before, after = _resolve_context(context_option)
-    sections_requested = _resolve_sections(sections_option)
-    thresholds = _parse_threshold_options(threshold_options)
+    before, after = context_option or (0, 0)
+    sections_requested = sections_option or ("lines",)
+    thresholds = threshold_options
 
     if "diff" in sections_requested and diff_base is None:
         msg = "--diff-base"
@@ -483,6 +480,7 @@ def cli(  # noqa: C901, PLR0912, PLR0914, PLR0915
         show_line_numbers=line_numbers,
         context_before=max(0, before),
         context_after=max(0, after),
+        is_tty=(ctx.color is True or ansi_allowed),
     )
 
     attachments: dict[str, Any] = {}
@@ -560,7 +558,7 @@ def cli(  # noqa: C901, PLR0912, PLR0914, PLR0915
 
     allow_tty_output = output in {None, Path("-")}
     format_supports_tty = (ctx.color is True or ansi_allowed) if allow_tty_output else False
-    fmt = _resolve_format(format_option, is_tty=format_supports_tty)
+    fmt = _resolve_format_auto(format_option, is_tty=format_supports_tty)
     rendered = render_report(report, fmt, meta)
     _write_output(rendered, output)
 

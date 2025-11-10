@@ -2,16 +2,15 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-from html import escape
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
-from showcov.core.files import normalize_path, read_file_lines
+from showcov.core.files import normalize_path
 from showcov.core.types import Format
 from showcov.output.human import format_human
 from showcov.output.json import format_json_v2
-from showcov.output.markdown import format_markdown
+from showcov.output.rg import format_rg
 from showcov.output.table import format_table
 
 _NO_LINES = "No uncovered lines."
@@ -21,8 +20,6 @@ _NO_DIFF_NEW = "No new uncovered lines."
 _NO_DIFF_RESOLVED = "No resolved uncovered lines."
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
-
     from showcov.core import Report, UncoveredSection
     from showcov.core.coverage import BranchCondition, BranchGap
     from showcov.output.base import OutputMeta
@@ -32,59 +29,31 @@ def render_report(report: Report, fmt: Format, meta: OutputMeta) -> str:
     """Render *report* using *fmt* and *meta*."""
     if fmt is Format.JSON:
         return format_json_v2(report)
+    if fmt is Format.RG:
+        return format_rg(report, meta)
     if fmt is Format.HUMAN:
         return _render_human(report, meta)
-    if fmt is Format.MARKDOWN:
-        return _render_markdown(report, meta)
-    if fmt is Format.HTML:
-        return _render_html(report, meta)
     msg = f"Unsupported format: {fmt!r}"
     raise ValueError(msg)
 
 
 def _render_human(report: Report, meta: OutputMeta) -> str:
-    sections: list[str] = []
-    for name in report.sections:
-        if name == "lines":
-            sections.extend((_heading("Lines", meta), _render_lines_human(report, meta)))
-        elif name == "branches":
-            sections.extend((_heading("Branches", meta), _render_branches_human(report, meta)))
-        elif name == "summary":
-            sections.extend((_heading("Summary", meta), _render_summary_human(report)))
-        elif name == "diff":
-            sections.extend((_heading("Diff", meta), _render_diff_human(report, meta)))
-    return "\n\n".join(part for part in sections if part)
-
-
-def _render_markdown(report: Report, meta: OutputMeta) -> str:
+    registry: dict[str, tuple[str, Callable]] = {
+        "lines": ("Uncovered Lines", lambda: _render_lines_human(report, meta)),
+        "branches": ("Uncovered Branches", lambda: _render_branches_human(report, meta)),
+        "summary": ("Summary", lambda: _render_summary_human(report)),
+        "diff": ("Diff", lambda: _render_diff_human(report, meta)),
+    }
     parts: list[str] = []
     for name in report.sections:
-        if name == "lines":
-            parts.extend(("## Lines", _render_lines_markdown(report, meta) or f"_{_NO_LINES}_"))
-        elif name == "branches":
-            parts.append("## Branches")
-            rendered = _render_branches_markdown(report, meta)
-            parts.append(rendered or f"_{_NO_BRANCHES}_")
-        elif name == "summary":
-            parts.extend(("## Summary", _render_summary_markdown(report)))
-        elif name == "diff":
-            parts.extend(("## Diff", _render_diff_markdown(report, meta)))
-    return "\n\n".join(part for part in parts if part)
-
-
-def _render_html(report: Report, meta: OutputMeta) -> str:
-    sections: list[str] = ["<!DOCTYPE html>", "<html>", "<body>"]
-    for name in report.sections:
-        if name == "lines":
-            sections.append(_render_lines_html(report, meta))
-        elif name == "branches":
-            sections.append(_render_branches_html(report, meta))
-        elif name == "summary":
-            sections.append(_render_summary_html(report))
-        elif name == "diff":
-            sections.append(_render_diff_html(report, meta))
-    sections.extend(["</body>", "</html>"])
-    return "\n".join(sections)
+        entry = registry.get(name)
+        if not entry:
+            continue
+        title, render = entry
+        body = render()
+        if body:
+            parts.extend((_heading(title, meta), body))
+    return "\n\n".join(parts)
 
 
 def _heading(text: str, meta: OutputMeta) -> str:
@@ -94,19 +63,18 @@ def _heading(text: str, meta: OutputMeta) -> str:
 
 
 def _render_lines_human(report: Report, meta: OutputMeta) -> str:
-    attachments = _as_mapping(report.attachments.get("lines"))
-    sections_raw = _as_list(attachments.get("sections"))
-    sections = cast("list[UncoveredSection]", sections_raw)
+    attachments = cast("dict[str, Any]", report.attachments.get("lines"))
+    sections = cast("list[UncoveredSection]", attachments.get("sections", []))
     body = format_human(sections, meta) if sections else _NO_LINES
-    data = report.sections.get("lines")
-    details = _summarize_line_sections(data)
+    data = cast("dict[str, Any]", report.sections.get("lines"))
+    options = cast("dict[str, Any]", cast("dict[str, Any]", report.meta)["options"])
+    details = _summarize_line_sections(data, options)
     return "\n".join([part for part in [body, *details] if part])
 
 
 def _render_branches_human(report: Report, meta: OutputMeta) -> str:
-    attachments = _as_mapping(report.attachments.get("branches"))
-    gaps_raw = _as_list(attachments.get("gaps"))
-    gaps = cast("list[BranchGap]", gaps_raw)
+    attachments = cast("dict[str, Any]", report.attachments.get("branches"))
+    gaps = cast("list[BranchGap]", attachments.get("gaps", []))
     if not gaps:
         return _NO_BRANCHES
     base = meta.coverage_xml.parent
@@ -130,10 +98,7 @@ def _render_branches_human(report: Report, meta: OutputMeta) -> str:
 
 
 def _render_summary_human(report: Report) -> str:  # noqa: PLR0914
-    data = report.sections.get("summary")
-    if not isinstance(data, Mapping):
-        return ""
-    summary = cast("Mapping[str, Any]", data)
+    summary = cast("dict[str, Any]", report.sections.get("summary"))
     headers = [
         ("File",),
         ("Statements", "Total"),
@@ -196,244 +161,6 @@ def _render_diff_human(report: Report, meta: OutputMeta) -> str:
     return "\n".join(parts)
 
 
-def _render_lines_markdown(report: Report, meta: OutputMeta) -> str:
-    attachments = _as_mapping(report.attachments.get("lines"))
-    sections = cast("list[UncoveredSection]", _as_list(attachments.get("sections")))
-    if not sections:
-        return ""
-    return format_markdown(list(sections), meta)
-
-
-def _render_branches_markdown(report: Report, meta: OutputMeta) -> str:
-    attachments = _as_mapping(report.attachments.get("branches"))
-    gaps = cast("list[BranchGap]", _as_list(attachments.get("gaps")))
-    if not gaps:
-        return ""
-    base = meta.coverage_xml.parent
-    headers: list[tuple[str, ...]] = []
-    if meta.show_paths:
-        headers.append(("File",))
-    headers.extend([("Line",), ("Condition",), ("Coverage",)])
-    rows: list[list[str]] = []
-    for gap in gaps:
-        file_label = normalize_path(Path(gap.file), base=base).as_posix() if meta.show_paths else ""
-        for cond in gap.conditions:
-            coverage = f"{cond.coverage}%" if cond.coverage is not None else "missing"
-            condition_label = _format_condition(cond)
-            row: list[str] = []
-            if meta.show_paths:
-                row.append(file_label)
-            row.extend([str(gap.line), condition_label, coverage])
-            rows.append(row)
-    return format_table(headers, rows)
-
-
-def _render_summary_markdown(report: Report) -> str:
-    data = report.sections.get("summary")
-    if not isinstance(data, dict):
-        return f"_{_NO_SUMMARY}_"
-    headers = [
-        ("File",),
-        ("Statements", "Total"),
-        ("Statements", "Covered"),
-        ("Statements", "Missed"),
-        ("Branches", "Total"),
-        ("Branches", "Covered"),
-        ("Branches", "Missed"),
-    ]
-    rows: list[list[str]] = []
-    for entry in data.get("files", []):
-        if not isinstance(entry, dict):
-            continue
-        stmt = entry.get("statements", {})
-        br = entry.get("branches", {})
-        rows.append([
-            str(entry.get("file", "")),
-            str(stmt.get("total", 0)),
-            str(stmt.get("covered", 0)),
-            str(stmt.get("missed", 0)),
-            str(br.get("total", 0)),
-            str(br.get("covered", 0)),
-            str(br.get("missed", 0)),
-        ])
-    return format_table(headers, rows)
-
-
-def _render_diff_markdown(report: Report, meta: OutputMeta) -> str:
-    diff_data = _as_mapping(report.attachments.get("diff"))
-    new_sections = cast("list[UncoveredSection]", _as_list(diff_data.get("new")))
-    resolved_sections = cast("list[UncoveredSection]", _as_list(diff_data.get("resolved")))
-    parts: list[str] = ["### New"]
-    parts.extend([
-        format_markdown(list(new_sections), meta) if new_sections else f"_{_NO_DIFF_NEW}_",
-        "### Resolved",
-        format_markdown(list(resolved_sections), meta) if resolved_sections else f"_{_NO_DIFF_RESOLVED}_",
-    ])
-    return "\n\n".join(parts)
-
-
-def _render_lines_html(report: Report, meta: OutputMeta) -> str:  # noqa: PLR0914
-    attachments = _as_mapping(report.attachments.get("lines"))
-    sections = cast("list[UncoveredSection]", _as_list(attachments.get("sections")))
-    parts: list[str] = ['<section id="lines">', "<h2>Lines</h2>"]
-    if not sections:
-        parts.append(f"<p>{_NO_LINES}</p>")
-    else:
-        base = meta.coverage_xml.parent
-        for section in sections:
-            rel = (
-                normalize_path(Path(section.file), base=base).as_posix()
-                if meta.show_paths
-                else "Uncovered lines"
-            )
-            anchor = _slugify(rel)
-            parts.extend((f'<article id="lines-{escape(anchor)}">', f"<h3>{escape(rel)}</h3>", "<ul>"))
-            for start, end in section.ranges:
-                label = f"Line {start}" if start == end else f"Lines {start}-{end}"
-                parts.append(f"<li>{escape(label)}</li>")
-            parts.append("</ul>")
-            if meta.with_code:
-                lines = read_file_lines(section.file)
-                for start, end in section.ranges:
-                    before = meta.context_before
-                    after = meta.context_after
-                    start_idx = max(1, start - before)
-                    end_idx = min(len(lines), end + after)
-                    snippet: list[str] = []
-                    for idx in range(start_idx, end_idx + 1):
-                        prefix = f"{idx}: " if meta.show_line_numbers else ""
-                        text = lines[idx - 1] if 1 <= idx <= len(lines) else "<line not found>"
-                        snippet.append(escape(f"{prefix}{text}"))
-                    code = "\n".join(snippet)
-                    parts.append(f"<pre><code>{code}</code></pre>")
-            parts.append("</article>")
-    parts.append("</section>")
-    return "\n".join(parts)
-
-
-def _render_branches_html(report: Report, meta: OutputMeta) -> str:
-    attachments = _as_mapping(report.attachments.get("branches"))
-    gaps = cast("list[BranchGap]", _as_list(attachments.get("gaps")))
-    parts: list[str] = ['<section id="branches">', "<h2>Branches</h2>"]
-    if not gaps:
-        parts.append(f"<p>{_NO_BRANCHES}</p>")
-    else:
-        base = meta.coverage_xml.parent
-        parts.append("<table>")
-        headers = ["Line", "Condition", "Coverage"]
-        if meta.show_paths:
-            headers.insert(0, "File")
-        header_html = "".join(f"<th>{escape(h)}</th>" for h in headers)
-        parts.extend((f"<thead><tr>{header_html}</tr></thead>", "<tbody>"))
-        for gap in gaps:
-            file_label = normalize_path(Path(gap.file), base=base).as_posix() if meta.show_paths else ""
-            for cond in gap.conditions:
-                coverage = f"{cond.coverage}%" if cond.coverage is not None else "missing"
-                cells = []
-                if meta.show_paths:
-                    cells.append(escape(file_label))
-                cells.extend([
-                    escape(str(gap.line)),
-                    escape(_format_condition(cond)),
-                    escape(coverage),
-                ])
-                parts.append("<tr>" + "".join(f"<td>{cell}</td>" for cell in cells) + "</tr>")
-        parts.extend(("</tbody>", "</table>"))
-    parts.append("</section>")
-    return "\n".join(parts)
-
-
-def _render_summary_html(report: Report) -> str:
-    data = report.sections.get("summary")
-    parts: list[str] = ['<section id="summary">', "<h2>Summary</h2>"]
-    if not isinstance(data, Mapping):
-        parts.append(f"<p>{_NO_SUMMARY}</p>")
-    else:
-        summary = cast("Mapping[str, Any]", data)
-        files = _as_list(summary.get("files"))
-        if not files:
-            parts.append(f"<p>{_NO_SUMMARY}</p>")
-            return "\n".join(parts)
-        parts.append("<table>")
-        headers = [
-            "File",
-            "Statements total",
-            "Statements covered",
-            "Statements missed",
-            "Branches total",
-            "Branches covered",
-            "Branches missed",
-        ]
-        parts.extend((
-            "<thead><tr>" + "".join(f"<th>{escape(h)}</th>" for h in headers) + "</tr></thead>",
-            "<tbody>",
-        ))
-        for entry in files:
-            if not isinstance(entry, Mapping):
-                continue
-            stmt = _as_mapping(entry.get("statements"))
-            br = _as_mapping(entry.get("branches"))
-            cells = [
-                escape(str(entry.get("file", ""))),
-                escape(str(stmt.get("total", 0))),
-                escape(str(stmt.get("covered", 0))),
-                escape(str(stmt.get("missed", 0))),
-                escape(str(br.get("total", 0))),
-                escape(str(br.get("covered", 0))),
-                escape(str(br.get("missed", 0))),
-            ]
-            parts.append("<tr>" + "".join(f"<td>{cell}</td>" for cell in cells) + "</tr>")
-        parts.extend(("</tbody>", "</table>"))
-    parts.append("</section>")
-    return "\n".join(parts)
-
-
-def _render_diff_html(report: Report, meta: OutputMeta) -> str:
-    diff_data = _as_mapping(report.attachments.get("diff"))
-    new_sections = cast("list[UncoveredSection]", _as_list(diff_data.get("new")))
-    resolved_sections = cast("list[UncoveredSection]", _as_list(diff_data.get("resolved")))
-    parts: list[str] = ['<section id="diff">', "<h2>Diff</h2>"]
-    parts.extend(('<article id="diff-new">', "<h3>New</h3>"))
-    if new_sections:
-        parts.append(_render_sections_html(new_sections, meta))
-    else:
-        parts.append(f"<p>{_NO_DIFF_NEW}</p>")
-    parts.extend(("</article>", '<article id="diff-resolved">', "<h3>Resolved</h3>"))
-    if resolved_sections:
-        parts.append(_render_sections_html(resolved_sections, meta))
-    else:
-        parts.append(f"<p>{_NO_DIFF_RESOLVED}</p>")
-    parts.extend(("</article>", "</section>"))
-    return "\n".join(parts)
-
-
-def _render_sections_html(sections: Iterable, meta: OutputMeta) -> str:
-    base = meta.coverage_xml.parent
-    parts: list[str] = []
-    for section in sections:
-        rel = (
-            normalize_path(Path(section.file), base=base).as_posix() if meta.show_paths else "Uncovered lines"
-        )
-        parts.extend((f"<h4>{escape(rel)}</h4>", "<ul>"))
-        for start, end in section.ranges:
-            label = f"Lines {start}-{end}" if start != end else f"Line {start}"
-            parts.append(f"<li>{escape(label)}</li>")
-        parts.append("</ul>")
-        if meta.with_code:
-            lines = read_file_lines(section.file)
-            for start, end in section.ranges:
-                start_idx = max(1, start - meta.context_before)
-                end_idx = min(len(lines), end + meta.context_after)
-                snippet: list[str] = []
-                for idx in range(start_idx, end_idx + 1):
-                    prefix = f"{idx}: " if meta.show_line_numbers else ""
-                    text = lines[idx - 1] if 1 <= idx <= len(lines) else "<line not found>"
-                    snippet.append(escape(f"{prefix}{text}"))
-                code = "\n".join(snippet)
-                parts.append(f"<pre><code>{code}</code></pre>")
-    return "\n".join(parts)
-
-
 def _subheading(text: str, meta: OutputMeta) -> str:
     if meta.color:
         return f"\x1b[1m{text}\x1b[0m"
@@ -457,25 +184,44 @@ def _slugify(text: str) -> str:
     return "".join(ch if ch.isalnum() else "-" for ch in text)
 
 
-def _summarize_line_sections(data: object) -> list[str]:
+def _summarize_line_sections(data: object, options: Mapping[str, Any]) -> list[str]:
+    """Render optional line stats, guarded by flags from report.meta['options'].
+
+    Rules:
+      - Only show aggregate total if options['aggregate_stats'] is True and a
+        valid 'summary.uncovered' value exists.
+      - Only show per-file stats if options['file_stats'] is True and a 'counts'
+        object exists for that file. Do not fabricate zeros.
+    """
     mapping = _as_mapping(data)
     if not mapping:
         return []
     extras: list[str] = []
-    summary = _as_mapping(mapping.get("summary"))
-    if "uncovered" in summary:
-        extras.append(f"Total uncovered lines: {summary['uncovered']}")
-    for entry in _as_list(mapping.get("files")):
-        if not isinstance(entry, Mapping):
-            continue
-        counts = _as_mapping(entry.get("counts"))
-        file_label = entry.get("file")
-        if not file_label:
-            continue
-        total = cast("int", counts.get("total", 0))
-        uncovered = cast("int", counts.get("uncovered", 0))
-        pct = (uncovered / total * 100) if total else 0
-        extras.append(f"{file_label}: {uncovered} uncovered ({pct:.0f}% of {total})")
+
+    # Aggregate uncovered lines
+    if bool(options.get("aggregate_stats")):
+        summary = _as_mapping(mapping.get("summary"))
+        if "uncovered" in summary:
+            extras.append(f"Total uncovered lines: {summary['uncovered']}")
+
+    # Per-file counts
+    if bool(options.get("file_stats")):
+        for entry in _as_list(mapping.get("files")):
+            if not isinstance(entry, Mapping):
+                continue
+            counts = _as_mapping(entry.get("counts"))
+            # Only render when counts are present; no defaulting to zeros.
+            if not counts:
+                continue
+            file_label = entry.get("file")
+            if not file_label:
+                continue
+            total = counts.get("total")
+            uncovered = counts.get("uncovered")
+            # Both numbers must exist to compute a percentage.
+            if isinstance(total, int) and isinstance(uncovered, int) and total >= 0 and uncovered >= 0:
+                pct = (uncovered / total * 100) if total else 0
+                extras.append(f"{file_label}: {uncovered} uncovered ({pct:.0f}% of {total})")
     return extras
 
 

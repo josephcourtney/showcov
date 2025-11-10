@@ -18,6 +18,7 @@ class OutputMeta:
     with_code: bool
     color: bool
     show_paths: bool
+    is_tty: bool
     show_line_numbers: bool
     context_before: int = 0
     context_after: int = 0

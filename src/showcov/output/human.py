@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+from collections import defaultdict
 from io import StringIO
 from typing import TYPE_CHECKING
 
@@ -31,26 +32,36 @@ def _render_table(table: Table, *, color: bool) -> str:
 
 
 def format_human(sections: list[UncoveredSection], meta: OutputMeta) -> str:
-    """Return uncovered sections in a simple table."""
+    """Return uncovered sections; compact when showing paths by grouping per file."""
     root = meta.coverage_xml.parent.resolve()
+    parts: list[str] = []
 
-    table = Table(show_header=True, header_style="bold")
     if meta.show_paths:
-        table.add_column("File", style="yellow")
-    table.add_column("Start", justify="right", style="cyan")
-    table.add_column("End", justify="right", style="cyan")
-    table.add_column("# Lines", justify="right", style="magenta")
-
-    for section in sections:
-        rel = normalize_path(section.file, base=root)
-        for start, end in section.ranges:
-            row = []
-            if meta.show_paths:
-                row.append(rel.as_posix())
-            row.extend([str(start), str(end), str(end - start + 1)])
-            table.add_row(*row)
-
-    parts: list[str] = [_render_table(table, color=meta.color)]
+        # Group by file; render one compact table per file (no repeated path column).
+        by_file: dict[str, list[tuple[int, int]]] = defaultdict(list)
+        for section in sections:
+            rel = normalize_path(section.file, base=root).as_posix()
+            for start, end in section.ranges:
+                by_file[rel].append((start, end))
+        for rel_path in sorted(by_file):
+            table = Table(show_header=True, header_style="bold")
+            table.add_column("Start", justify="right", style="cyan")
+            table.add_column("End", justify="right", style="cyan")
+            table.add_column("# Lines", justify="right", style="magenta")
+            for start, end in by_file[rel_path]:
+                table.add_row(str(start), str(end), str(end - start + 1))
+            parts.append(rel_path)  # heading line; no ANSI here (human formatter adds color elsewhere)
+            parts.append(_render_table(table, color=meta.color))
+    else:
+        # Previous single-table layout without file column.
+        table = Table(show_header=True, header_style="bold")
+        table.add_column("Start", justify="right", style="cyan")
+        table.add_column("End", justify="right", style="cyan")
+        table.add_column("# Lines", justify="right", style="magenta")
+        for section in sections:
+            for start, end in section.ranges:
+                table.add_row(str(start), str(end), str(end - start + 1))
+        parts.append(_render_table(table, color=meta.color))
 
     if meta.with_code:
         for section in sections:
