@@ -51,6 +51,8 @@ setup:
 
 # Bootstrap: set up venv obeying lockfile (soft: skip if uv missing)
 setup-frozen:
+  @if command -v {{UV}} >/dev/null 2>&1; then \
+     {{UV}} sync --frozen || {{UV}} sync --locked || {{UV}} sync; \
    else \
      echo "[setup-frozen] skipping: uv ({{UV}}) not found"; \
    fi

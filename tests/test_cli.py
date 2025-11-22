@@ -1,14 +1,24 @@
-import json
-from collections.abc import Callable
-from pathlib import Path
-from xml.etree.ElementTree import Element  # noqa: S405
+from __future__ import annotations
 
-from _pytest.monkeypatch import MonkeyPatch
-from click.testing import CliRunner
+import json
+from typing import TYPE_CHECKING
 
 from showcov import __version__
 from showcov.cli import EXIT_NOINPUT, EXIT_THRESHOLD, cli
 from showcov.core import dataset
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from pathlib import Path
+    from xml.etree.ElementTree import Element
+
+    from _pytest.monkeypatch import MonkeyPatch
+    from click.testing import CliRunner
+
+
+def _invoke(runner: CliRunner, args: list[str], *, color: bool = False) -> tuple[int, str]:
+    res = runner.invoke(cli, args, color=color)
+    return res.exit_code, res.output
 
 
 def _run(runner: CliRunner, args: list[str]) -> tuple[int, str]:
@@ -210,3 +220,58 @@ def test_cli_missing_coverage_file(cli_runner: CliRunner, tmp_path: Path) -> Non
     code, output = _run(cli_runner, ["--cov", str(missing)])
     assert code == EXIT_NOINPUT
     assert "ERROR" in output
+
+
+def test_line_stats_flags_gate_output(
+    cli_runner: CliRunner, coverage_xml_file: Callable[..., Path], tmp_path: Path
+) -> None:
+    # Source with 3 lines, 2 misses → uncovered = {1, 3}
+    src = tmp_path / "m.py"
+    src.write_text("a = 1\nb = 2\nc = 3\n", encoding="utf-8")
+    xml = coverage_xml_file({src: {1: 0, 2: 1, 3: 0}})
+
+    # Baseline: no stats lines at all.
+    code, out = _invoke(
+        cli_runner,
+        ["--cov", str(xml), "--sections", "lines", "--format", "human"],
+    )
+    assert code == 0
+    assert "Total uncovered lines:" not in out
+    assert "uncovered (" not in out  # guards per-file counts like "foo.py: 2 uncovered (..)"
+
+    # Aggregate only with --stats.
+    code, out = _invoke(
+        cli_runner,
+        ["--cov", str(xml), "--sections", "lines", "--format", "human", "--stats"],
+    )
+    assert code == 0
+    assert "Total uncovered lines: 2" in out
+    assert "uncovered (" not in out
+
+    # Per-file only with --file-stats (and do not fabricate zeros).
+    code, out = _invoke(
+        cli_runner,
+        ["--cov", str(xml), "--sections", "lines", "--format", "human", "--file-stats"],
+    )
+    assert code == 0
+    # The label uses a base-relative path; check suffix to avoid tmp prefix coupling.
+    assert any(ln.strip().endswith("m.py: 2 uncovered (67% of 3)") for ln in out.splitlines()), out
+    assert "Total uncovered lines:" not in out
+
+    # Both flags together: show both lines.
+    code, out = _invoke(
+        cli_runner,
+        [
+            "--cov",
+            str(xml),
+            "--sections",
+            "lines",
+            "--format",
+            "human",
+            "--stats",
+            "--file-stats",
+        ],
+    )
+    assert code == 0
+    assert "Total uncovered lines: 2" in out
+    assert any(ln.strip().endswith("m.py: 2 uncovered (67% of 3)") for ln in out.splitlines()), out

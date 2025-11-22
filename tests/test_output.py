@@ -1,17 +1,27 @@
+from __future__ import annotations
+
 import json
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from jsonschema import validate
 
 from showcov import __version__
+from showcov.cli import cli
 from showcov.core import Report, build_sections, get_schema
-from showcov.core.core import UncoveredSection
 from showcov.core.coverage import gather_uncovered_branches_from_xml
 from showcov.core.types import Format
 from showcov.output.base import OutputMeta
 from showcov.output.human import format_human
 from showcov.output.json import format_json_v2
 from showcov.output.report_render import render_report
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from pathlib import Path
+
+    from click.testing import CliRunner
+
+    from showcov.core.core import UncoveredSection
 
 
 def _make_meta(
@@ -206,3 +216,26 @@ def test_gather_uncovered_branches_from_xml_partial_condition(tmp_path: Path) ->
     assert len(gaps) == 1
     conds = gaps[0].conditions
     assert [(c.number, c.type, c.coverage) for c in conds] == [(0, "jump", 75)]
+
+
+def test_rg_lines_heading_mode(
+    cli_runner: CliRunner, coverage_xml_file: Callable[..., Path], tmp_path: Path
+) -> None:
+    src = tmp_path / "rg.py"
+    src.write_text("a\nb\nc\n", encoding="utf-8")
+    # two disjoint misses → two groups
+    xml = coverage_xml_file({src: {1: 0, 2: 1, 3: 0}})
+
+    # color=True makes Click think it's a TTY; rg formatter uses heading mode on a TTY
+    result = cli_runner.invoke(
+        cli,
+        ["--cov", str(xml), "--sections", "lines", "--format", "rg"],
+        color=True,
+    )
+    assert result.exit_code == 0
+    out = result.output.splitlines()
+    # First non-empty line should be the relative path heading.
+    first = next((ln for ln in out if ln.strip()), "")
+    assert first.endswith("rg.py")
+    # Expect at least one match line with "N:" (match separator) present.
+    assert any("1:" in ln or "3:" in ln for ln in out)
