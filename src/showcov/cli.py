@@ -7,8 +7,8 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar
 
-import click
 import click.utils as click_utils
+import rich_click as click
 from defusedxml import ElementTree
 
 from showcov import __version__, logger
@@ -39,9 +39,82 @@ if TYPE_CHECKING:
 CONTEXT_SETTINGS = {
     "help_option_names": ["-h", "--help"],
     "auto_envvar_prefix": "SHOWCOV",
+    "max_content_width": 100,
 }
 
+# --- rich-click configuration ---
+click.rich_click.USE_RICH_MARKUP = True
+click.rich_click.SHOW_ARGUMENTS = True
+click.rich_click.GROUP_ARGUMENTS_OPTIONS = True
+click.rich_click.MAX_WIDTH = CONTEXT_SETTINGS["max_content_width"]
+
+# Group options into logical sections in the help output
+_OPTION_GROUPS_BASE = [
+    {
+        "name": "Input & selection",
+        "options": [
+            "--cov",
+            "--diff-base",
+            "--include",
+            "--exclude",
+        ],
+    },
+    {
+        "name": "Report content & layout",
+        "options": [
+            "--sections",
+            "--branches-mode",
+            "--code",
+            "--no-code",
+            "--context",
+            "--line-numbers",
+            "--paths",
+            "--no-paths",
+            "--sort",
+        ],
+    },
+    {
+        "name": "Thresholds & stats (for CI)",
+        "options": [
+            "--threshold",
+            "--stats",
+            "--file-stats",
+        ],
+    },
+    {
+        "name": "Output format & presentation",
+        "options": [
+            "--format",
+            "--output",
+            "--color",
+            "--no-color",
+        ],
+    },
+    {
+        "name": "Logging & misc",
+        "options": [
+            "-q",
+            "--quiet",
+            "-v",
+            "--verbose",
+            "--debug",
+            "--version",
+            "--help",
+        ],
+    },
+]
+
+click.rich_click.OPTION_GROUPS = {
+    # If the installed entry-point name is "showcov" (typical)
+    "showcov": _OPTION_GROUPS_BASE,
+    # Fallback if Click's internal command name is "cli"
+    "cli": _OPTION_GROUPS_BASE,
+}
+# ---------------------------------
+
+
 SECTIONS = ("lines", "branches", "summary", "diff")
+DEFAULT_SECTIONS = ("lines", "branches", "summary")  # effective default when --sections is omitted
 CONTEXT_PAIR_SIZE = 2
 
 EXIT_OK = 0
@@ -67,7 +140,6 @@ class _ContextType(click.ParamType):
     def convert(self, value, param, ctx):
         if not value:
             return (0, 0)
-        print(f"{value=}")
         parts = [p.strip() for p in value.replace(",", " ").split() if p.strip()]
         try:
             if len(parts) == 1:
@@ -90,13 +162,13 @@ class _SectionsType(click.ParamType):
 
     def convert(self, value, param, ctx):
         if not value:
-            return ("lines",)
+            return DEFAULT_SECTIONS
         parts = [p.strip().lower() for p in value.split(",") if p.strip()]
         bad = [p for p in parts if p not in self._choices]
         if bad:
             self.fail(f"unknown section(s): {', '.join(bad)}", param, ctx)
         # de-dupe while preserving order
-        seen = []
+        seen: list[str] = []
         for p in parts:
             if p not in seen:
                 seen.append(p)
@@ -160,7 +232,10 @@ def _build_lines_section(
         )
         if file_stats:
             uncovered = sum(end - start + 1 for start, end in section.ranges)
-            section_dict["counts"] = {"uncovered": uncovered, "total": len(read_file_lines(section.file))}
+            section_dict["counts"] = {
+                "uncovered": uncovered,
+                "total": len(read_file_lines(section.file)),
+            }
         if total_uncovered is not None:
             total_uncovered += sum(end - start + 1 for start, end in section.ranges)
 
@@ -248,7 +323,7 @@ def _build_summary_section(
         stmt_tot = len(file_cov.lines)
         stmt_cov = sum(1 for cov in file_cov.lines.values() if cov.hits > 0)
         br_tot = sum(cov.branches_total for cov in file_cov.lines.values())
-        br_cov = sum(cov.branches_covered for cov in file_cov.lines.values())
+        br_cov = sum(cov.branches_covered for cov in fc.lines.values())
         rows.append({
             "file": dataset.display_path(file_cov.path),
             "statements": {
@@ -269,11 +344,22 @@ def _build_summary_section(
     payload = {
         "files": rows,
         "totals": {
-            "statements": {"total": stmt_total, "covered": stmt_hit, "missed": stmt_total - stmt_hit},
-            "branches": {"total": br_total, "covered": br_hit, "missed": br_total - br_hit},
+            "statements": {
+                "total": stmt_total,
+                "covered": stmt_hit,
+                "missed": stmt_total - stmt_hit,
+            },
+            "branches": {
+                "total": br_total,
+                "covered": br_hit,
+                "missed": br_total - br_hit,
+            },
         },
     }
-    attachments["summary"] = {"rows": rows, "totals": (stmt_total, stmt_hit, br_total, br_hit)}
+    attachments["summary"] = {
+        "rows": rows,
+        "totals": (stmt_total, stmt_hit, br_total, br_hit),
+    }
     return payload, (stmt_total, stmt_hit, br_total, br_hit)
 
 
@@ -330,58 +416,179 @@ def _write_output(text: str, destination: Path | None) -> None:
     destination.write_text(text, encoding="utf-8")
 
 
-@click.command(context_settings=CONTEXT_SETTINGS)
+@click.command(
+    context_settings=CONTEXT_SETTINGS,
+    help=(
+        "\b"
+        "Generate unified coverage reports from one or more coverage XML files.\n\n"
+        "Common examples:\n"
+        "  showcov --cov coverage.xml\n"
+        "  showcov --cov coverage.xml --threshold lines=90\n"
+        "  showcov --cov py.xml --cov js.xml --sections summary,branches\n"
+        "  showcov --cov coverage.xml --diff-base baseline.xml --sections diff,summary\n\n"
+        "EXTRA_PATHS are optional extra source paths used when resolving files. "
+        "Most users can ignore them.\n"
+    ),
+    epilog=(
+        "\b\n"
+        "Exit status (for CI):\n"
+        "  Code  Description\n"
+        "  ----  -----------\n"
+        "  0     success\n"
+        "  2     coverage thresholds not met (--threshold)\n"
+        "\n"
+        "Other errors:\n"
+        "  Code  Description\n"
+        "  ----  -----------\n"
+        "  1     unexpected failure\n"
+        "  65    malformed coverage XML data\n"
+        "  66    required coverage XML input missing (--cov)\n"
+        "  78    configuration error (e.g. invalid --config references)\n"
+    ),
+)
 @click.argument("maybe_command", required=False)
 @click.argument("extra_paths", nargs=-1)
-@click.option("--cov", "cov_paths", multiple=True, type=click.Path(path_type=Path), help="Coverage XML file")
-@click.option("--include", "include_patterns", multiple=True, help="Glob of files to include")
-@click.option("--exclude", "exclude_patterns", multiple=True, help="Glob of files to exclude")
+@click.option(
+    "--cov",
+    "cov_paths",
+    multiple=True,
+    type=click.Path(path_type=Path),
+    help="Coverage XML file. Can be passed multiple times.",
+)
+@click.option(
+    "--include",
+    "include_patterns",
+    multiple=True,
+    help="Glob of source files to include (can repeat).",
+)
+@click.option(
+    "--exclude",
+    "exclude_patterns",
+    multiple=True,
+    help="Glob of source files to exclude (can repeat).",
+)
 @click.option(
     "--sections",
     "sections_option",
     type=_SECTIONS_TYPE,
-    help="Comma separated list of sections (lines, branches, summary, diff)",
+    help=(
+        "Comma-separated list of sections to include. "
+        "Available: lines, branches, summary, diff. "
+        "Defaults to 'lines,branches,summary'."
+    ),
 )
 @click.option(
     "--diff-base",
     type=click.Path(path_type=Path),
-    help="Coverage XML to compare against for diff section",
+    help="Coverage XML to compare against when using the diff section.",
 )
 @click.option(
     "--branches-mode",
     type=click.Choice([mode.value for mode in BranchMode], case_sensitive=False),
     default=BranchMode.PARTIAL.value,
     show_default=True,
+    help=(
+        "Which branches count as uncovered:\n"
+        "  missing-only  only missing branches\n"
+        "  partial       missing + partial branches\n"
+        "  all           all branches"
+    ),
 )
 @click.option(
     "--format",
     "format_option",
     default="auto",
     show_default=True,
-    help="Output format (human, json, auto)",
+    help="Output format: human, json, or auto (TTY → human, non-TTY → json).",
 )
-@click.option("--output", type=click.Path(path_type=Path), help="Write report to file instead of stdout")
-@click.option("--code/--no-code", "with_code", default=False, show_default=True, help="Include code snippets")
-@click.option("--context", "context_option", help="Context lines before/after uncovered ranges")
-@click.option("--line-numbers", is_flag=True, help="Show line numbers alongside code snippets")
-@click.option("--paths/--no-paths", "show_paths", default=True, show_default=True, help="Show file paths")
+@click.option(
+    "--output",
+    type=click.Path(path_type=Path),
+    help="Write report to PATH instead of stdout (use '-' for stdout).",
+)
+@click.option(
+    "--code/--no-code",
+    "with_code",
+    default=False,
+    show_default=True,
+    help="Show code snippets around uncovered ranges.",
+)
+@click.option(
+    "--context",
+    "context_option",
+    type=_CONTEXT,
+    help="Lines before/after uncovered ranges as N or N,M (implies --code).",
+)
+@click.option(
+    "--line-numbers",
+    is_flag=True,
+    help="Show line numbers alongside code snippets.",
+)
+@click.option(
+    "--paths/--no-paths",
+    "show_paths",
+    default=True,
+    show_default=True,
+    help="Show file paths in report output.",
+)
 @click.option(
     "--sort",
     type=click.Choice([choice.value for choice in SummarySort], case_sensitive=False),
     default=SummarySort.FILE.value,
     show_default=True,
-    help="Ordering for summary section",
+    help=(
+        "Ordering for the summary section: by file name, statement coverage, "
+        "branch coverage, or total misses."
+    ),
 )
-@click.option("--stats", is_flag=True, help="Include aggregate uncovered counts for lines")
-@click.option("--file-stats", is_flag=True, help="Include per-file counts for lines")
 @click.option(
-    "--threshold", "threshold_options", multiple=True, callback=_thresholds_cb, help="Coverage thresholds"
+    "--stats",
+    is_flag=True,
+    help="Include aggregate uncovered line counts across all files.",
 )
-@click.option("--color", is_flag=True, help="Force coloured output")
-@click.option("--no-color", is_flag=True, help="Disable coloured output")
-@click.option("-q", "--quiet", is_flag=True, help="Suppress non-essential output")
-@click.option("-v", "--verbose", is_flag=True, help="Verbose logging")
-@click.option("--debug", is_flag=True, help="Enable debug logging")
+@click.option(
+    "--file-stats",
+    is_flag=True,
+    help="Include per-file uncovered line counts.",
+)
+@click.option(
+    "--threshold",
+    "threshold_options",
+    multiple=True,
+    callback=_thresholds_cb,
+    help=(
+        "Coverage thresholds; can be passed multiple times. "
+        "Each value is SPEC like lines=90,branches=80. "
+        "Exit status 2 if any threshold is not met."
+    ),
+)
+@click.option(
+    "--color",
+    is_flag=True,
+    help="Force coloured output even if stdout is not a TTY.",
+)
+@click.option(
+    "--no-color",
+    is_flag=True,
+    help="Disable coloured output.",
+)
+@click.option(
+    "-q",
+    "--quiet",
+    is_flag=True,
+    help="Suppress non-essential output (errors only).",
+)
+@click.option(
+    "-v",
+    "--verbose",
+    is_flag=True,
+    help="Verbose logging.",
+)
+@click.option(
+    "--debug",
+    is_flag=True,
+    help="Enable debug logging (includes tracebacks on errors).",
+)
 @click.version_option(__version__)
 @click.pass_context
 def cli(  # noqa: C901, PLR0912, PLR0914, PLR0915
@@ -391,14 +598,14 @@ def cli(  # noqa: C901, PLR0912, PLR0914, PLR0915
     cov_paths: tuple[Path, ...],
     include_patterns: tuple[str, ...],
     exclude_patterns: tuple[str, ...],
-    sections_option: str | None,
+    sections_option: tuple[str, ...] | None,
     diff_base: Path | None,
     branches_mode: str,
     format_option: str,
     output: Path | None,
     *,
     with_code: bool = False,
-    context_option: str | None = None,
+    context_option: tuple[int, int] | None = None,
     line_numbers: bool = False,
     show_paths: bool = True,
     sort: str = SummarySort.FILE.value,
@@ -411,16 +618,7 @@ def cli(  # noqa: C901, PLR0912, PLR0914, PLR0915
     verbose: bool = False,
     debug: bool = False,
 ) -> None:
-    """Generate unified coverage reports from one or more coverage XML files.
-
-    Exit status codes:
-        0  - success
-        1  - generic error (unexpected failure)
-        2  - one or more coverage thresholds were not met
-        65 - malformed coverage XML data
-        66 - required coverage XML input missing
-        78 - configuration error (e.g. invalid --config references)
-    """
+    """Unified coverage reporting for multiple XML files."""
     if maybe_command == "report":
         positional_paths = extra_paths
     else:
@@ -433,9 +631,13 @@ def cli(  # noqa: C901, PLR0912, PLR0914, PLR0915
         msg = "--quiet"
         raise click.BadOptionUsage(msg, "--quiet and --verbose cannot be combined")
 
-    before, after = tuple([int(e.strip()) for e in context_option.split(",")]) if context_option else (0, 0)
-    sections_requested = sections_option or ("lines",)
+    before, after = context_option or (0, 0)
+    sections_requested = sections_option or DEFAULT_SECTIONS
     thresholds = threshold_options
+
+    # If user requested context but did not explicitly enable code, turn it on.
+    if context_option is not None and not with_code:
+        with_code = True
 
     if "diff" in sections_requested and diff_base is None:
         msg = "--diff-base"
@@ -531,7 +733,6 @@ def cli(  # noqa: C901, PLR0912, PLR0914, PLR0915
         except (ElementTree.ParseError, InvalidCoverageXMLError) as exc:
             if debug:
                 raise
-
             click.echo(f"ERROR: failed to parse diff base XML: {exc}", err=True)
             ctx.exit(EXIT_DATAERR)
         report_sections["diff"] = _build_diff_section(
