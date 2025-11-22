@@ -38,12 +38,12 @@ def format_rg(report: Report, meta: OutputMeta) -> str:
             parts.extend((_heading("Uncovered Branches", meta), _render_branches_rg(report, meta)))
         elif name == "summary":
             # fall back to the existing human summary table for now
-            from .report_render import _render_summary_human  # local import to avoid cycle
+            from .report_render import _render_summary_human  # noqa: PLC0415 # local import to avoid cycle
 
             parts.extend((_heading("Summary", meta), _render_summary_human(report)))
         elif name == "diff":
             # diff uses the lines renderer for each side, preserve existing human diff structure
-            from .report_render import _subheading  # reuse styling helper
+            from .report_render import _subheading  # noqa: PLC0415 # local import to avoid cycle
 
             attachments = _as_mapping(report.attachments.get("diff"))
             newer = cast("list[UncoveredSection]", _as_list(attachments.get("new")))
@@ -90,16 +90,50 @@ def _render_file_block(sec: UncoveredSection, base_dir: Path, meta: OutputMeta) 
     rel = normalize_path(Path(sec.file), base=base_dir).as_posix()
     lines = read_file_lines(Path(sec.file))
 
-    # If code is disabled, print a compact per-range summary for the file.
     if not want_code:
-        if use_heading and show_path:
-            header = rel
-            body = [f"{_range_label(start, end)}" for (start, end) in sec.ranges]
-            return "\n".join([header, *body])
-        # grep-like path:range form
-        prefix = f"{rel}:" if (show_path and not use_heading) else ""
-        return "\n".join([f"{prefix}{_range_label(s, e)}" for (s, e) in sec.ranges])
+        return _render_file_block_without_code(sec, rel, use_heading=use_heading, show_path=show_path)
 
+    return _render_file_block_with_code(
+        sec,
+        rel,
+        lines,
+        use_heading=use_heading,
+        show_path=show_path,
+        show_lineno=show_lineno,
+        ctx_before=ctx_before,
+        ctx_after=ctx_after,
+    )
+
+
+def _render_file_block_without_code(
+    sec: UncoveredSection,
+    rel: str,
+    *,
+    use_heading: bool,
+    show_path: bool,
+) -> str:
+    """Compact per-range summary for a file when code snippets are disabled."""
+    if use_heading and show_path:
+        header = rel
+        body = [f"{_range_label(start, end)}" for (start, end) in sec.ranges]
+        return "\n".join([header, *body])
+    # grep-like path:range form
+    prefix = f"{rel}:" if (show_path and not use_heading) else ""
+    return "\n".join([f"{prefix}{_range_label(s, e)}" for (s, e) in sec.ranges])
+
+
+def _render_file_block_with_code(
+    sec: UncoveredSection,
+    rel: str,
+    lines: list[str],
+    *,
+    use_heading: bool,
+    show_path: bool,
+    show_lineno: bool,
+    ctx_before: int,
+    ctx_after: int,
+) -> str:
+    """Full ripgrep-style block with context and match lines."""
     out: list[str] = []
     if use_heading and show_path:
         out.append(rel)
@@ -114,23 +148,18 @@ def _render_file_block(sec: UncoveredSection, base_dir: Path, meta: OutputMeta) 
             code = lines[i - 1] if 1 <= i <= len(lines) else ""
             is_match = start <= i <= end
             sep = ":" if is_match else "-"
-            parts: list[str] = []
-            if not use_heading and show_path:
-                parts.append(rel)
-            if show_lineno:
-                parts.extend((str(i), sep))
-            # When no line numbers, still include the separator for match lines to mirror rg feel.
-            elif is_match:
-                parts.append(sep)
-            # Join prefix ➜ append text
-            prefix = ":".join(parts) if parts and parts[-1] != sep else "".join(parts)
-            # Ensure exactly one ':' or '-' between (line) and text
-            if parts and parts[-1] == sep:
-                out.append(f"{prefix}{code}")
-            else:
-                # either "path:line:code" or "line:code" or ":code"
-                delimiter = "" if (prefix.endswith((":", "-")) or not prefix) else ":"
-                out.append(f"{prefix}{delimiter}{code}")
+            out.append(
+                _format_code_line(
+                    rel=rel,
+                    code=code,
+                    lineno=i,
+                    separator=sep,
+                    is_match=is_match,
+                    use_heading=use_heading,
+                    show_path=show_path,
+                    show_lineno=show_lineno,
+                )
+            )
     return "\n".join(out)
 
 
@@ -182,9 +211,37 @@ def _format_condition(number: int, typ: str | None) -> str:
 
 
 # ---------------------------- helpers ----------------------------------------
+def _format_code_line(
+    *,
+    rel: str,
+    code: str,
+    lineno: int,
+    separator: str,
+    is_match: bool,
+    use_heading: bool,
+    show_path: bool,
+    show_lineno: bool,
+) -> str:
+    """Format a single code line prefix + text, mirroring ripgrep behaviour."""
+    parts: list[str] = []
+    if not use_heading and show_path:
+        parts.append(rel)
+    if show_lineno:
+        parts.extend((str(lineno), separator))
+    # When no line numbers, still include the separator for match lines to mirror rg feel.
+    elif is_match:
+        parts.append(separator)
+    prefix = ":".join(parts) if parts and parts[-1] != separator else "".join(parts)
+    if parts and parts[-1] == separator:
+        return f"{prefix}{code}"
+    # either "path:line:code" or "line:code" or ":code"
+    delimiter = "" if (prefix.endswith((":", "-")) or not prefix) else ":"
+    return f"{prefix}{delimiter}{code}"
+
+
 def _as_mapping(value: object) -> Mapping[str, Any]:
     if isinstance(value, dict):
-        return value
+        return cast("Mapping[str, Any]", value)
     return cast("Mapping[str, Any]", {})
 
 

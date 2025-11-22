@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 import click.utils as click_utils
 import rich_click as click
@@ -18,6 +18,7 @@ from showcov.core import (
     PathFilter,
     Report,
     SummarySort,
+    Threshold,
     build_branches,
     build_diff,
     build_lines,
@@ -46,10 +47,10 @@ CONTEXT_SETTINGS = {
 click.rich_click.USE_RICH_MARKUP = True
 click.rich_click.SHOW_ARGUMENTS = True
 click.rich_click.GROUP_ARGUMENTS_OPTIONS = True
-click.rich_click.MAX_WIDTH = CONTEXT_SETTINGS["max_content_width"]
+click.rich_click.MAX_WIDTH = cast("int | None", CONTEXT_SETTINGS["max_content_width"])
 
 # Group options into logical sections in the help output
-_OPTION_GROUPS_BASE = [
+_OPTION_GROUPS_BASE: list[click.rich_click.OptionGroupDict] = [
     {
         "name": "Input & selection",
         "options": [
@@ -145,7 +146,7 @@ class _ContextType(click.ParamType):
             if len(parts) == 1:
                 n = int(parts[0])
                 return (n, n)
-            if len(parts) == 2:
+            if len(parts) == 2:  # noqa: PLR2004
                 return (int(parts[0]), int(parts[1]))
         except ValueError:
             self.fail("expects N or N,M", param, ctx)
@@ -183,7 +184,11 @@ def _resolve_format_auto(value: str, *, is_tty: bool) -> Format:
     return (Format.HUMAN if is_tty else Format.JSON) if fmt is Format.AUTO else fmt
 
 
-def _thresholds_cb(ctx, param, values):
+def _thresholds_cb(
+    _ctx: click.Context,
+    _param: click.Parameter | None,
+    values: tuple[str, ...],
+) -> tuple[Threshold, ...]:
     try:
         return tuple(parse_threshold(v) for v in values)
     except ValueError as exc:
@@ -323,7 +328,7 @@ def _build_summary_section(
         stmt_tot = len(file_cov.lines)
         stmt_cov = sum(1 for cov in file_cov.lines.values() if cov.hits > 0)
         br_tot = sum(cov.branches_total for cov in file_cov.lines.values())
-        br_cov = sum(cov.branches_covered for cov in fc.lines.values())
+        br_cov = sum(cov.branches_covered for cov in file_cov.lines.values())
         rows.append({
             "file": dataset.display_path(file_cov.path),
             "statements": {
@@ -611,7 +616,7 @@ def cli(  # noqa: C901, PLR0912, PLR0914, PLR0915
     sort: str = SummarySort.FILE.value,
     stats: bool = False,
     file_stats: bool = False,
-    threshold_options: tuple[str, ...] = (),
+    threshold_options: tuple[Threshold, ...] = (),
     color: bool = False,
     no_color: bool = False,
     quiet: bool = False,

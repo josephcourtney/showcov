@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+
+## [0.1.4] - 2025-11-22
+
+### Changed
+- refactor human output formatter into smaller helpers for improved readability
+- refactor ripgrep-style line renderer into smaller helpers for improved readability
+
+### Fixed
+- fix CLI threshold option typing so typecheck passes when evaluating thresholds
+- fix typing in ripgrep renderer mapping helper to satisfy static type checker
+- add a default for `OutputMeta.is_tty` so existing tests and callers do not need to pass it explicitly
+
 ## [0.1.0] - 2025-11-08
 
 ### Changed

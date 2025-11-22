@@ -44,10 +44,28 @@ _EXIT_STATUS = """\
 """
 
 
+def _build_plain_command() -> click.Command:
+    """Return a plain Click command mirroring :data:`cli`.
+
+    This avoids the rich-click `RichCommand` help machinery, which expects a
+    Rich-specific formatter object with extra attributes (like ``config``).
+    For man-page generation we only need a stable, plain-text help string.
+    """
+    return click.Command(
+        name="showcov",
+        callback=cli.callback,
+        params=cli.params,
+        help=cli.help,
+        epilog=cli.epilog,
+        context_settings=cli.context_settings,
+    )
+
+
 def build_man_page() -> str:
     """Return a plain-text manual page for :mod:`showcov`'s CLI."""
-    ctx = click.Context(cli, info_name="showcov")
-    help_text = cli.get_help(ctx).strip()
+    plain_cmd = _build_plain_command()
+    ctx = click.Context(plain_cmd, info_name="showcov")
+    help_text = plain_cmd.get_help(ctx).strip()
     sections = [
         "SHOWCOV(1)\n",
         "NAME\n----\nshowcov - unified coverage report generator\n\n",
