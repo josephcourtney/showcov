@@ -8,4 +8,7 @@
 - [ ] make "human" printout more compact by separating table listing uncovered lines  by file so that the path does not need to be repeated
 
 - [ ] improve code printout by mimicking ripgrep output:
-
+- [ ] switch to `rich` for table rendering. make responsive to terminal width
+- [ ] implement history tracking
+- [ ] implement per-marker coverage breakout
+- [ ] left-align file name in output table
