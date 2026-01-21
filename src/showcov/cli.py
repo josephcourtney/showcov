@@ -180,8 +180,15 @@ _SECTIONS_TYPE = _SectionsType()
 
 
 def _resolve_format_auto(value: str, *, is_tty: bool) -> Format:
-    fmt = Format(value.lower())
-    return (Format.HUMAN if is_tty else Format.JSON) if fmt is Format.AUTO else fmt
+    # Be defensive: Click may pass unexpected values in tests/mocks.
+    try:
+        fmt = Format(value.lower())
+    except ValueError:
+        fmt = Format.AUTO
+
+    if fmt == Format.AUTO:
+        return Format.HUMAN if is_tty else Format.JSON
+    return fmt
 
 
 def _thresholds_cb(
@@ -677,8 +684,14 @@ def cli(  # noqa: C901, PLR0912, PLR0914, PLR0915
         msg = "--format"
         raise click.BadOptionUsage(msg, "--format=auto cannot be used with --output")
 
+    # "ansi_allowed" answers "should we strip ANSI?" not "is this a TTY?".
     ansi_allowed = not click_utils.should_strip_ansi(sys.stdout)
+    # Treat "ANSI allowed" as "TTY-like" for presentation decisions (e.g. rg heading mode).
+    # Under click.testing.CliRunner(color=True), sys.stdout.isatty() may still be False, but
+    # Click will not strip ANSI, so we should behave like a TTY.
+    stdout_is_tty = bool(getattr(sys.stdout, "isatty", lambda: False)()) or ansi_allowed
     color_support = ctx.color if ctx.color is not None else ansi_allowed
+
     use_color = True if color else False if no_color else color_support
     meta = OutputMeta(
         coverage_xml=coverage_paths[0],
@@ -688,7 +701,7 @@ def cli(  # noqa: C901, PLR0912, PLR0914, PLR0915
         show_line_numbers=line_numbers,
         context_before=max(0, before),
         context_after=max(0, after),
-        is_tty=(ctx.color is True or ansi_allowed),
+        is_tty=stdout_is_tty,
     )
 
     attachments: dict[str, Any] = {}

@@ -33,14 +33,14 @@ def format_rg(report: Report, meta: OutputMeta) -> str:
     parts: list[str] = []
     for name in report.sections:
         if name == "lines":
-            parts.extend((_heading("Uncovered Lines", meta), _render_lines_rg(report, meta)))
+            parts.append(_render_lines_rg(report, meta))
         elif name == "branches":
-            parts.extend((_heading("Uncovered Branches", meta), _render_branches_rg(report, meta)))
+            parts.append(_render_branches_rg(report, meta))
         elif name == "summary":
             # fall back to the existing human summary table for now
             from .report_render import _render_summary_human  # noqa: PLC0415 # local import to avoid cycle
 
-            parts.extend((_heading("Summary", meta), _render_summary_human(report)))
+            parts.append(_render_summary_human(report, meta))
         elif name == "diff":
             # diff uses the lines renderer for each side, preserve existing human diff structure
             from .report_render import _subheading  # noqa: PLC0415 # local import to avoid cycle
@@ -58,7 +58,7 @@ def format_rg(report: Report, meta: OutputMeta) -> str:
 
 
 def _heading(text: str, meta: OutputMeta) -> str:
-    if meta.color:
+    if meta.color and meta.is_tty:
         return f"\x1b[1m{text}\x1b[0m"
     return text
 
@@ -83,16 +83,20 @@ def _render_file_block(sec: UncoveredSection, base_dir: Path, meta: OutputMeta) 
     """Render one file's uncovered lines."""
     use_heading = meta.is_tty  # heading on a TTY by default
     show_path = meta.show_paths
-    show_lineno = meta.show_line_numbers
-    ctx_before, ctx_after = meta.context_before, meta.context_after
-    want_code = meta.with_code
+    # rg-style output always includes line numbers on match lines
+    show_lineno = True
+
+    # Always show match lines (line:code). Only include context lines when the user
+    # explicitly enabled code/context via CLI flags.
+    want_context = meta.with_code
+    ctx_before = meta.context_before if want_context else 0
+    ctx_after = meta.context_after if want_context else 0
 
     rel = normalize_path(Path(sec.file), base=base_dir).as_posix()
     lines = read_file_lines(Path(sec.file))
 
-    if not want_code:
-        return _render_file_block_without_code(sec, rel, use_heading=use_heading, show_path=show_path)
-
+    # Always render with the code-path so we emit match lines like "N:code".
+    # With ctx_before/after == 0 this prints only the uncovered lines (no context).
     return _render_file_block_with_code(
         sec,
         rel,

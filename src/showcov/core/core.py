@@ -124,7 +124,17 @@ class UncoveredSection:
         """Create an :class:`UncoveredSection` from a dictionary."""
         file = Path(str(data["file"]))
         items = cast("list[dict[str, object]]", data.get("uncovered", []))
-        ranges = [(int(item["start"]), int(item["end"])) for item in items]
+        ranges: list[LineRange] = []
+        for item in items:
+            start_raw = item.get("start")
+            end_raw = item.get("end")
+            # Accept ints or numeric strings; ignore malformed entries.
+            try:
+                start = int(start_raw)  # type: ignore[arg-type]
+                end = int(end_raw)  # type: ignore[arg-type]
+            except (TypeError, ValueError):
+                continue
+            ranges.append((start, end))
         return cls(file.resolve(), ranges)
 
 

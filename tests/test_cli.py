@@ -10,7 +10,7 @@ from showcov.core import dataset
 if TYPE_CHECKING:
     from collections.abc import Callable
     from pathlib import Path
-    from xml.etree.ElementTree import Element
+    from xml.etree.ElementTree import Element  # noqa: S405
 
     from _pytest.monkeypatch import MonkeyPatch
     from click.testing import CliRunner

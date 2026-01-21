@@ -1,91 +1,66 @@
-"""Helpers for rendering grouped Markdown tables."""
+"""Helpers for rendering grouped tables."""
 
 from __future__ import annotations
 
+import sys
+from io import StringIO
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-
-def _normalize_headers(headers: Sequence[Sequence[str]]) -> list[tuple[str, ...]]:
-    max_depth = max((len(h) for h in headers), default=0)
-    return [tuple(("",) * (max_depth - len(h)) + tuple(h)) for h in headers]
+from rich.console import Console
+from rich.table import Table
 
 
-def _compute_col_widths(headers: Sequence[Sequence[str]], rows: Sequence[Sequence[Any]]) -> list[int]:
-    norm_headers = _normalize_headers(headers)
-    ncols = len(headers)
-    widths: list[int] = []
-    for col in range(ncols):
-        col_texts = [str(r[col]) for r in rows]
-        col_texts.append(str(norm_headers[col][-1]) if norm_headers else "")
-        widths.append(max((len(text) for text in col_texts), default=0))
-    return widths
+def _header_text(parts: Sequence[str]) -> str:
+    r"""Convert a grouped header tuple like ('Statements','Covered') to 'Statements\\nCovered'."""
+    items = [str(p) for p in parts if str(p).strip()]
+    return "\n".join(items) if items else ""
 
 
-def _adjust_widths_for_grouping(norm_headers: list[tuple[str, ...]], col_widths: list[int]) -> None:
-    if not norm_headers:
-        return
-    max_depth = len(norm_headers[0])
-    ncols = len(norm_headers)
-    for level in range(max_depth):
-        level_values = [norm_headers[col][level] for col in range(ncols)]
-        start = 0
-        while start < ncols:
-            label = str(level_values[start])
-            end = start
-            while end < ncols and level_values[end] == label:
-                end += 1
-            span = end - start
-            if label.strip() and span > 0:
-                span_width = sum(col_widths[start:end]) + (span - 1) * 3
-                label_len = len(label)
-                if label_len > span_width:
-                    extra = label_len - span_width
-                    base_add = extra // span
-                    rem = extra % span
-                    for idx in range(start, end):
-                        col_widths[idx] += base_add + (1 if (idx - start) < rem else 0)
-            start = end
+def _render_rich_table(
+    headers: Sequence[Sequence[str]], rows: Sequence[Sequence[Any]], *, color: bool
+) -> str:
+    r"""Render a Rich table captured to a string.
+
+    Notes
+    -----
+    Rich doesn't support true column-spanning grouped headers in a single
+    header row; we encode grouping as multi-line column headers:
+      ('Statements','Total') -> "Statements\\nTotal"
+    """
+    table = Table(show_header=True, header_style="bold")
+    for h in headers:
+        table.add_column(_header_text(h), justify="right")
+
+    # Heuristic: left-align first column (usually file path / label)
+    if table.columns:
+        table.columns[0].justify = "left"
+
+    for r in rows:
+        table.add_row(*[str(v) for v in r])
+
+    buf = StringIO()
+    console = Console(
+        file=buf,
+        force_terminal=color,
+        width=sys.maxsize,
+        color_system="standard" if color else None,
+        no_color=not color,
+    )
+    console.print(table)
+    return buf.getvalue().rstrip()
 
 
-def _render_header_level(level_values: Sequence[str], col_widths: Sequence[int]) -> str:
-    parts: list[str] = []
-    idx = 0
-    n = len(level_values)
-    while idx < n:
-        label = str(level_values[idx])
-        end = idx
-        while end < n and level_values[end] == label:
-            end += 1
-        span_width = sum(col_widths[idx:end]) + (end - idx - 1) * 3
-        cell = " " * span_width if not label.strip() else label.center(span_width)
-        parts.append(cell)
-        idx = end
-    return "| " + " | ".join(parts) + " |"
+def format_table(
+    headers: Sequence[Sequence[str]], rows: Sequence[Sequence[Any]], *, color: bool = True
+) -> str:
+    """Render a Rich table captured to text.
 
-
-def format_table(headers: Sequence[Sequence[str]], rows: Sequence[Sequence[Any]]) -> str:
-    """Render a Markdown table with grouped headers."""
+    Kept as `format_table(...)` to preserve the existing call sites in
+    `report_render.py`.
+    """
     if not headers or not rows:
         return ""
-    norm_headers = _normalize_headers(headers)
-    col_widths = _compute_col_widths(headers, rows)
-    _adjust_widths_for_grouping(norm_headers, col_widths)
-
-    header_lines: list[str] = []
-    max_depth = len(norm_headers[0]) if norm_headers else 0
-    for level in range(max_depth):
-        level_values = [norm_headers[col][level] for col in range(len(norm_headers))]
-        header_lines.append(_render_header_level(level_values, col_widths))
-
-    sep_parts = ["-" * width for width in col_widths]
-    sep_line = "| " + " | ".join(sep_parts) + " |"
-
-    body_lines: list[str] = []
-    for row in rows:
-        cells = [str(val).rjust(width) for val, width in zip(row, col_widths, strict=False)]
-        body_lines.append("| " + " | ".join(cells) + " |")
-
-    return "\n".join([*header_lines, sep_line, *body_lines])
+    return _render_rich_table(headers, rows, color=color)

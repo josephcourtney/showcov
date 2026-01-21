@@ -41,7 +41,7 @@ def _render_human(report: Report, meta: OutputMeta) -> str:
     registry: dict[str, tuple[str, Callable]] = {
         "lines": ("Uncovered Lines", lambda: _render_lines_human(report, meta)),
         "branches": ("Uncovered Branches", lambda: _render_branches_human(report, meta)),
-        "summary": ("Summary", lambda: _render_summary_human(report)),
+        "summary": ("Summary", lambda: _render_summary_human(report, meta)),
         "diff": ("Diff", lambda: _render_diff_human(report, meta)),
     }
     parts: list[str] = []
@@ -57,7 +57,7 @@ def _render_human(report: Report, meta: OutputMeta) -> str:
 
 
 def _heading(text: str, meta: OutputMeta) -> str:
-    if meta.color:
+    if meta.color and meta.is_tty:
         return f"\x1b[1m{text}\x1b[0m"
     return text
 
@@ -93,11 +93,11 @@ def _render_branches_human(report: Report, meta: OutputMeta) -> str:
                 row.append(file_label)
             row.extend([str(gap.line), condition_label, coverage])
             rows.append(row)
-    table = format_table(headers, rows) if rows else ""
+    table = format_table(headers, rows, color=meta.color) if rows else ""
     return table or _NO_BRANCHES
 
 
-def _render_summary_human(report: Report) -> str:  # noqa: PLR0914
+def _render_summary_human(report: Report, meta: OutputMeta) -> str:  # noqa: PLR0914
     summary = cast("dict[str, Any]", report.sections.get("summary"))
     headers = [
         ("File",),
@@ -123,7 +123,8 @@ def _render_summary_human(report: Report) -> str:  # noqa: PLR0914
             str(br.get("covered", 0)),
             str(br.get("missed", 0)),
         ])
-    table = format_table(headers, rows) if rows else ""
+    # Summary rendering doesn't currently receive `meta`; default to colored table.
+    table = format_table(headers, rows, color=meta.color) if rows else ""
     totals = _as_mapping(summary.get("totals"))
     stmt_tot = _as_mapping(totals.get("statements"))
     br_tot = _as_mapping(totals.get("branches"))
@@ -162,7 +163,7 @@ def _render_diff_human(report: Report, meta: OutputMeta) -> str:
 
 
 def _subheading(text: str, meta: OutputMeta) -> str:
-    if meta.color:
+    if meta.color and meta.is_tty:
         return f"\x1b[1m{text}\x1b[0m"
     return text
 

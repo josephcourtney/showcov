@@ -24,8 +24,8 @@ class PathFilter:
         self._base = base or Path.cwd()
         include_patterns = self._prepare_patterns(includes, expand_dirs=True)
         exclude_patterns = self._prepare_patterns(excludes, expand_dirs=False)
-        self._include_spec = PathSpec.from_lines("gitwildmatch", include_patterns)
-        self._exclude_spec = PathSpec.from_lines("gitwildmatch", exclude_patterns)
+        self._include_spec = PathSpec.from_lines("gitignore", include_patterns)
+        self._exclude_spec = PathSpec.from_lines("gitignore", exclude_patterns)
         self._has_includes = bool(include_patterns)
 
     def _prepare_patterns(self, patterns: Sequence[str | Path], *, expand_dirs: bool) -> list[str]:
