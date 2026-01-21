@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
+## [0.2.0] - 2026-01-21
+
+### Changed
+- reorganize the core pipeline into dedicated `coverage`, `engine`, `render`, and `model` packages that drive the new report-building workflow
+- replace assertion guards with explicit exceptions and refactor branch/summary helpers so errors surface deterministically and branch aggregation stays typed
+- tighten XML parsing/JSON rendering by introducing typed coverage contracts, routing all XML access through `defusedxml`, and centralizing metadata setup in `showcov._meta`
+
+
 ## [0.1.4] - 2025-11-22
 
 ### Changed

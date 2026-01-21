@@ -1,7 +1,7 @@
 # =================================== project ====================================
 [project]
   name = "showcov"
-  version = "0.1.7"
+  version = "0.2.0"
   description = "Print out uncovered code."
   readme = "README.md"
   authors = [
@@ -21,10 +21,9 @@
     "jsonschema>=4.26.0",
     "more-itertools>=10.8.0",
     "pathspec>=1.0.3",
-    "pytest-rich>=0.2.0",
     "rich-click>=1.9.5",
     "typer>=0.21.1",
-]
+  ]
 
   [project.scripts]
     showcov = "showcov.cli:cli"
@@ -48,11 +47,11 @@
     "import-linter>=2.9",
     "mkdocs>=1.6.1",
     "mkdocs-material>=9.7.1",
-    "pytest-rich>=0.2.0",
-    "pytest-sugar>=1.1.1",
-    "pytest-clarity>=1.0.1",
-    "pytest-instafail>=0.5.0",
-    "pytest-tldr>=0.2.6",
+    # "pytest-rich>=0.2.0",
+    # "pytest-sugar>=1.1.1",
+    # "pytest-clarity>=1.0.1",
+    # "pytest-instafail>=0.5.0",
+    # "pytest-tldr>=0.2.6",
   ]
   docs = [
     "mkdocs-material>=9.7.0",
