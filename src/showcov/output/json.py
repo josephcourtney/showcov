@@ -9,7 +9,7 @@ from jsonschema import validate
 from showcov import __version__
 from showcov.core import Report, get_schema
 
-SCHEMA_V2_ID = "https://example.com/showcov.schema.v2.json"
+SCHEMA_ID = "https://example.com/showcov.schema.json"
 
 
 def _normalize(obj: object) -> object:
@@ -20,16 +20,16 @@ def _normalize(obj: object) -> object:
     return obj
 
 
-def format_json_v2(report: Report) -> str:
+def format_json(report: Report) -> str:
     payload: dict[str, Any] = {
-        "schema": SCHEMA_V2_ID,
-        "schema_version": 2,
+        "schema": SCHEMA_ID,
+        "schema_version": 1,
         "tool": {"name": "showcov", "version": __version__},
         "meta": _normalize(report.meta),
         "sections": _normalize(report.sections),
     }
-    validate(payload, get_schema("v2"))
+    validate(payload, get_schema("v1"))
     return json.dumps(payload, indent=2, sort_keys=True)
 
 
-__all__ = ["SCHEMA_V2_ID", "format_json_v2"]
+__all__ = ["SCHEMA_ID", "format_json"]

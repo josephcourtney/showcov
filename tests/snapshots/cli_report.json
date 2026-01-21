@@ -12,8 +12,8 @@
       "with_code": false
     }
   },
-  "schema": "https://example.com/showcov.schema.v2.json",
-  "schema_version": 2,
+  "schema": "https://example.com/showcov.schema.json",
+  "schema_version": 1,
   "sections": {
     "lines": {
       "files": [

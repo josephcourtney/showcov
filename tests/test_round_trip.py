@@ -14,7 +14,7 @@ from showcov.output.report_render import render_report
 def parse_json_output(data: str) -> list[UncoveredSection]:
     """Parse JSON coverage data into :class:`UncoveredSection` instances."""
     obj = json.loads(data)
-    validate(obj, get_schema("v2"))
+    validate(obj, get_schema("v1"))
     meta = obj.get("meta", {})
     env = cast("dict[str, object]", meta.get("environment", {}))
     base_path = Path(str(env.get("coverage_xml", "."))).resolve().parent

@@ -12,7 +12,7 @@ from showcov.core.coverage import gather_uncovered_branches_from_xml
 from showcov.core.types import Format
 from showcov.output.base import OutputMeta
 from showcov.output.human import format_human
-from showcov.output.json import format_json_v2
+from showcov.output.json import format_json
 from showcov.output.report_render import render_report
 
 if TYPE_CHECKING:
@@ -97,11 +97,11 @@ def test_render_report_json_schema(tmp_path: Path) -> None:
     report = _make_report(meta, sections)
     rendered = render_report(report, Format.JSON, meta)
     data = json.loads(rendered)
-    validate(data, get_schema("v2"))
+    validate(data, get_schema("v1"))
     assert data["tool"] == {"name": "showcov", "version": __version__}
 
 
-def test_format_json_v2_schema(tmp_path: Path) -> None:
+def test_format_json_schema(tmp_path: Path) -> None:
     src = tmp_path / "x.py"
     src.write_text("a\n")
     sections = build_sections({src: [1]})
@@ -132,9 +132,9 @@ def test_format_json_v2_schema(tmp_path: Path) -> None:
         sections={"lines": {"files": files}},
         attachments={"lines": {"sections": sections}},
     )
-    out = format_json_v2(report)
+    out = format_json(report)
     data = json.loads(out)
-    validate(data, get_schema("v2"))
+    validate(data, get_schema("v1"))
     assert data["tool"] == {"name": "showcov", "version": __version__}
 
 

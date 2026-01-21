@@ -15,7 +15,6 @@ LOG_FORMAT = "%(levelname)s: %(message)s"
 
 _SCHEMA_FILES: dict[str, str] = {
     "v1": "schema.json",
-    "v2": "schema.v2.json",
 }
 
 

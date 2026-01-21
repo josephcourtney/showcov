@@ -20,10 +20,11 @@
     "defusedxml>=0.7.1",
     "jsonschema>=4.26.0",
     "more-itertools>=10.8.0",
+    "pathspec>=1.0.3",
     "pytest-rich>=0.2.0",
     "rich-click>=1.9.5",
     "typer>=0.21.1",
-  ]
+]
 
   [project.scripts]
     showcov = "showcov.cli:cli"

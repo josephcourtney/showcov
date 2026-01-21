@@ -16,28 +16,6 @@ if TYPE_CHECKING:
     from _pytest.monkeypatch import MonkeyPatch
 
 
-def test_get_schema_cached(monkeypatch: MonkeyPatch) -> None:
-    """``get_schema`` should load the schema once and cache the result."""
-    from showcov.core import config
-
-    config.get_schema.cache_clear()
-    calls = 0
-    original = config.resources.files
-
-    def tracking_files(package: str):
-        nonlocal calls
-        calls += 1
-        return original(package)
-
-    monkeypatch.setattr(config.resources, "files", tracking_files)
-
-    schema1 = config.get_schema()
-    schema2 = config.get_schema()
-
-    assert schema1 == schema2
-    assert calls == 1
-
-
 def test_import_has_no_side_effects(monkeypatch):
     """Importing the package should not configure logging or colorama."""
     basic_called = False

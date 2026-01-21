@@ -3,6 +3,7 @@
 # (exclude from directory tree listings)
 # ============================================
 exclude_tree = [
+  "tests/snapshots",
   ".ropeproject",
   "uv.lock",
 

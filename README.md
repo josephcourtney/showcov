@@ -86,9 +86,9 @@ Key options:
 
 ## JSON output
 
-`showcov report --format json` produces the schema-v2 JSON structure containing metadata, report
+`showcov report --format json` produces the schema JSON structure containing metadata, report
 sections, and deterministic ordering of files, ranges, and branch conditions. Use
-`jsonschema --instance <output> src/showcov/data/schema.v2.json` to validate the payload.
+`jsonschema --instance <output> src/showcov/data/schema.json` to validate the payload.
 
 ## Exit status
 

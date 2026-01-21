@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any, cast
 from showcov.core.files import normalize_path
 from showcov.core.types import Format
 from showcov.output.human import format_human
-from showcov.output.json import format_json_v2
+from showcov.output.json import format_json
 from showcov.output.rg import format_rg
 from showcov.output.table import format_table
 
@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 def render_report(report: Report, fmt: Format, meta: OutputMeta) -> str:
     """Render *report* using *fmt* and *meta*."""
     if fmt is Format.JSON:
-        return format_json_v2(report)
+        return format_json(report)
     if fmt is Format.RG:
         return format_rg(report, meta)
     if fmt is Format.HUMAN:
