@@ -1,41 +1,37 @@
-"""Unified command line interface for ``showcov``."""
+"""Unified command line interface for ``showcov``.
+
+Design goals
+------------
+- CLI contains only argument parsing + wiring.
+- All coverage parsing/building lives in engine/coverage modules.
+- Renderers consume a typed Report model; no back-compat coercions.
+"""
 
 from __future__ import annotations
 
 import logging
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ClassVar, cast
+from typing import TYPE_CHECKING, cast
 
 import click.utils as click_utils
 import rich_click as click
 from defusedxml import ElementTree
 
 from showcov import __version__, logger
-from showcov.core import (
-    BranchMode,
-    CoverageDataset,
-    PathFilter,
-    Report,
-    SummarySort,
-    Threshold,
-    build_branches,
-    build_diff,
-    build_lines,
-    determine_xml_file,
-    evaluate_thresholds,
-    parse_threshold,
-)
-from showcov.core.exceptions import CoverageXMLNotFoundError, InvalidCoverageXMLError
-from showcov.core.files import normalize_path, read_file_lines
-from showcov.core.types import Format
-from showcov.output.base import OutputMeta
-from showcov.output.report_render import render_report
+from showcov.coverage.discover import resolve_coverage_paths
+from showcov.engine.build import BuildOptions, build_report
+from showcov.engine.enrich import enrich_report
+from showcov.errors import CoverageXMLNotFoundError, InvalidCoverageXMLError
+from showcov.model.path_filter import PathFilter
+from showcov.model.thresholds import Threshold, parse_threshold
+from showcov.model.thresholds import evaluate as evaluate_thresholds
+from showcov.model.types import BranchMode, SummarySort
+from showcov.render.render import RenderOptions, render
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, Sequence
+    from collections.abc import Sequence
 
-    from showcov.core.dataset import FileCoverage
 
 CONTEXT_SETTINGS = {
     "help_option_names": ["-h", "--help"],
@@ -49,7 +45,6 @@ click.rich_click.SHOW_ARGUMENTS = True
 click.rich_click.GROUP_ARGUMENTS_OPTIONS = True
 click.rich_click.MAX_WIDTH = cast("int | None", CONTEXT_SETTINGS["max_content_width"])
 
-# Group options into logical sections in the help output
 _OPTION_GROUPS_BASE: list[click.rich_click.OptionGroupDict] = [
     {
         "name": "Input & selection",
@@ -106,23 +101,19 @@ _OPTION_GROUPS_BASE: list[click.rich_click.OptionGroupDict] = [
 ]
 
 click.rich_click.OPTION_GROUPS = {
-    # If the installed entry-point name is "showcov" (typical)
     "showcov": _OPTION_GROUPS_BASE,
-    # Fallback if Click's internal command name is "cli"
     "cli": _OPTION_GROUPS_BASE,
 }
 # ---------------------------------
 
 
-SECTIONS = ("lines", "branches", "summary", "diff")
-DEFAULT_SECTIONS = ("lines", "branches", "summary")  # effective default when --sections is omitted
-CONTEXT_PAIR_SIZE = 2
+_SECTION_CHOICES = {"lines", "branches", "summary", "diff"}
+_DEFAULT_SECTIONS = ("lines", "branches", "summary")
 
 EXIT_OK = 0
 EXIT_GENERIC = 1
 EXIT_DATAERR = 65
 EXIT_NOINPUT = 66
-EXIT_CONFIG = 78
 EXIT_THRESHOLD = 2
 
 
@@ -157,38 +148,20 @@ class _ContextType(click.ParamType):
 _CONTEXT = _ContextType()
 
 
-class _SectionsType(click.ParamType):
-    name = "sections"
-    _choices: ClassVar[set] = set(SECTIONS)
-
-    def convert(self, value, param, ctx):
-        if not value:
-            return DEFAULT_SECTIONS
-        parts = [p.strip().lower() for p in value.split(",") if p.strip()]
-        bad = [p for p in parts if p not in self._choices]
-        if bad:
-            self.fail(f"unknown section(s): {', '.join(bad)}", param, ctx)
-        # de-dupe while preserving order
-        seen: list[str] = []
-        for p in parts:
-            if p not in seen:
-                seen.append(p)
-        return tuple(seen)
-
-
-_SECTIONS_TYPE = _SectionsType()
-
-
-def _resolve_format_auto(value: str, *, is_tty: bool) -> Format:
-    # Be defensive: Click may pass unexpected values in tests/mocks.
-    try:
-        fmt = Format(value.lower())
-    except ValueError:
-        fmt = Format.AUTO
-
-    if fmt == Format.AUTO:
-        return Format.HUMAN if is_tty else Format.JSON
-    return fmt
+def _parse_sections(value: str | None) -> tuple[str, ...]:
+    if not value:
+        return _DEFAULT_SECTIONS
+    parts = [p.strip().lower() for p in value.split(",") if p.strip()]
+    bad = [p for p in parts if p not in _SECTION_CHOICES]
+    if bad:
+        msg = f"unknown section(s): {', '.join(bad)}"
+        raise click.BadParameter(msg, param_hint="--sections")
+    # de-dupe while preserving order
+    seen: list[str] = []
+    for p in parts:
+        if p not in seen:
+            seen.append(p)
+    return tuple(seen)
 
 
 def _thresholds_cb(
@@ -215,217 +188,22 @@ def _resolve_filters(
     return PathFilter(include_patterns, exclude_patterns, base=base)
 
 
-def _resolve_coverage_paths(cov: Sequence[Path]) -> tuple[Path, ...]:
-    if cov:
-        return tuple(path.resolve() for path in cov)
-    resolved = determine_xml_file()
-    return (resolved.resolve(),)
-
-
-def _build_lines_section(
-    sections: Sequence,
-    *,
-    meta: OutputMeta,
-    base_path: Path,
-    file_stats: bool,
-    aggregate_stats: bool,
-    attachments: dict[str, Any],
-) -> Mapping[str, object]:
-    files_payload: list[dict[str, object]] = []
-    total_uncovered: int | None = 0 if aggregate_stats else None
-    for section in sections:
-        section_dict = section.to_dict(
-            with_code=meta.with_code,
-            context_before=meta.context_before,
-            context_after=meta.context_after,
-            base=base_path,
-            show_file=meta.show_paths,
-            show_line_numbers=meta.show_line_numbers,
-        )
-        if file_stats:
-            uncovered = sum(end - start + 1 for start, end in section.ranges)
-            section_dict["counts"] = {
-                "uncovered": uncovered,
-                "total": len(read_file_lines(section.file)),
-            }
-        if total_uncovered is not None:
-            total_uncovered += sum(end - start + 1 for start, end in section.ranges)
-
-        files_payload.append(section_dict)
-    payload: dict[str, object] = {"files": files_payload}
-    if aggregate_stats and total_uncovered is not None:
-        payload["summary"] = {"uncovered": total_uncovered}
-    attachments["lines"] = {"sections": list(sections)}
-    return payload
-
-
-def _build_branches_section(
-    gaps: Sequence,
-    *,
-    meta: OutputMeta,
-    base_path: Path,
-    attachments: dict[str, Any],
-) -> Mapping[str, object]:
-    rendered: list[dict[str, object]] = []
-    for gap in gaps:
-        conditions: list[dict[str, object]] = []
-        entry: dict[str, object] = {"line": gap.line, "conditions": conditions}
-        if meta.show_paths:
-            entry["file"] = normalize_path(gap.file, base=base_path).as_posix()
-        conditions.extend(
-            {
-                "number": cond.number,
-                "type": cond.type,
-                "coverage": cond.coverage,
-            }
-            for cond in gap.conditions
-        )
-        rendered.append(entry)
-    attachments["branches"] = {"gaps": list(gaps)}
-    return {"gaps": rendered}
-
-
-def _build_summary_section(
-    dataset: CoverageDataset,
-    *,
-    filters: PathFilter | None,
-    sort: SummarySort,
-    attachments: dict[str, Any],
-) -> tuple[Mapping[str, object], tuple[int, int, int, int]]:
-    rows: list[dict[str, object]] = []
-    stmt_total = stmt_hit = br_total = br_hit = 0
-    files: list[FileCoverage] = []
-    for file_cov in dataset.iter_files():
-        if filters is not None and not filters.allow(file_cov.path):
-            continue
-        files.append(file_cov)
-    # Apply ordering after filtering
-    if sort is SummarySort.FILE:
-        files.sort(key=lambda fc: dataset.display_path(fc.path))
-    elif sort is SummarySort.STATEMENT_COVERAGE:
-        files.sort(
-            key=lambda fc: (
-                -((sum(1 for cov in fc.lines.values() if cov.hits > 0) / len(fc.lines)) * 100)
-                if fc.lines
-                else float("inf"),
-                dataset.display_path(fc.path),
-            )
-        )
-    elif sort is SummarySort.BRANCH_COVERAGE:
-
-        def branch_key(fc: FileCoverage) -> tuple[float, str]:
-            total = sum(cov.branches_total for cov in fc.lines.values())
-            hit = sum(cov.branches_covered for cov in fc.lines.values())
-            pct = (hit / total * 100) if total else float("inf")
-            return (-pct, dataset.display_path(fc.path))
-
-        files.sort(key=branch_key)
-    else:  # SummarySort.MISSES
-        files.sort(
-            key=lambda fc: (
-                -(
-                    sum(1 for cov in fc.lines.values() if cov.hits == 0)
-                    + sum(cov.branches_total - cov.branches_covered for cov in fc.lines.values())
-                ),
-                dataset.display_path(fc.path),
-            )
-        )
-
-    for file_cov in files:
-        stmt_tot = len(file_cov.lines)
-        stmt_cov = sum(1 for cov in file_cov.lines.values() if cov.hits > 0)
-        br_tot = sum(cov.branches_total for cov in file_cov.lines.values())
-        br_cov = sum(cov.branches_covered for cov in file_cov.lines.values())
-        rows.append({
-            "file": dataset.display_path(file_cov.path),
-            "statements": {
-                "total": stmt_tot,
-                "covered": stmt_cov,
-                "missed": stmt_tot - stmt_cov,
-            },
-            "branches": {
-                "total": br_tot,
-                "covered": br_cov,
-                "missed": br_tot - br_cov,
-            },
-        })
-        stmt_total += stmt_tot
-        stmt_hit += stmt_cov
-        br_total += br_tot
-        br_hit += br_cov
-    payload = {
-        "files": rows,
-        "totals": {
-            "statements": {
-                "total": stmt_total,
-                "covered": stmt_hit,
-                "missed": stmt_total - stmt_hit,
-            },
-            "branches": {
-                "total": br_total,
-                "covered": br_hit,
-                "missed": br_total - br_hit,
-            },
-        },
-    }
-    attachments["summary"] = {
-        "rows": rows,
-        "totals": (stmt_total, stmt_hit, br_total, br_hit),
-    }
-    return payload, (stmt_total, stmt_hit, br_total, br_hit)
-
-
-def _build_diff_section(
-    base_dataset: CoverageDataset,
-    current_dataset: CoverageDataset,
-    *,
-    filters: PathFilter | None,
-    meta: OutputMeta,
-    base_path: Path,
-    attachments: dict[str, Any],
-) -> Mapping[str, object]:
-    diff = build_diff(base_dataset, current_dataset)
-    new_sections = diff["new"]
-    resolved_sections = diff["resolved"]
-    if filters is not None:
-        new_sections = filters.filter(new_sections)
-        resolved_sections = filters.filter(resolved_sections)
-    attachments["diff"] = {"new": new_sections, "resolved": resolved_sections}
-    return {
-        "new": [
-            section.to_dict(
-                with_code=meta.with_code,
-                context_before=meta.context_before,
-                context_after=meta.context_after,
-                base=base_path,
-                show_file=meta.show_paths,
-                show_line_numbers=meta.show_line_numbers,
-            )
-            for section in new_sections
-        ],
-        "resolved": [
-            section.to_dict(
-                with_code=meta.with_code,
-                context_before=meta.context_before,
-                context_after=meta.context_after,
-                base=base_path,
-                show_file=meta.show_paths,
-                show_line_numbers=meta.show_line_numbers,
-            )
-            for section in resolved_sections
-        ],
-    }
-
-
 def _write_output(text: str, destination: Path | None) -> None:
-    if destination is None:
-        click.echo(text)
-        return
-    if destination == Path("-"):
+    if destination is None or destination == Path("-"):
         click.echo(text)
         return
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(text, encoding="utf-8")
+
+
+def _resolve_format(value: str, *, is_tty_like: bool) -> str:
+    v = (value or "").strip().lower()
+    if v in {"human", "json", "rg"}:
+        return v
+    if v in {"auto", ""}:
+        return "human" if is_tty_like else "json"
+    # Defensive fallback:
+    return "json"
 
 
 @click.command(
@@ -435,7 +213,7 @@ def _write_output(text: str, destination: Path | None) -> None:
         "Generate unified coverage reports from one or more coverage XML files.\n\n"
         "Common examples:\n"
         "  showcov --cov coverage.xml\n"
-        "  showcov --cov coverage.xml --threshold lines=90\n"
+        "  showcov --cov coverage.xml --threshold statements=90\n"
         "  showcov --cov py.xml --cov js.xml --sections summary,branches\n"
         "  showcov --cov coverage.xml --diff-base baseline.xml --sections diff,summary\n\n"
         "EXTRA_PATHS are optional extra source paths used when resolving files. "
@@ -455,10 +233,8 @@ def _write_output(text: str, destination: Path | None) -> None:
         "  1     unexpected failure\n"
         "  65    malformed coverage XML data\n"
         "  66    required coverage XML input missing (--cov)\n"
-        "  78    configuration error (e.g. invalid --config references)\n"
     ),
 )
-@click.argument("maybe_command", required=False)
 @click.argument("extra_paths", nargs=-1)
 @click.option(
     "--cov",
@@ -482,12 +258,7 @@ def _write_output(text: str, destination: Path | None) -> None:
 @click.option(
     "--sections",
     "sections_option",
-    type=_SECTIONS_TYPE,
-    help=(
-        "Comma-separated list of sections to include. "
-        "Available: lines, branches, summary, diff. "
-        "Defaults to 'lines,branches,summary'."
-    ),
+    help="Comma-separated list of sections: lines, branches, summary, diff.",
 )
 @click.option(
     "--diff-base",
@@ -511,7 +282,7 @@ def _write_output(text: str, destination: Path | None) -> None:
     "format_option",
     default="auto",
     show_default=True,
-    help="Output format: human, json, or auto (TTY → human, non-TTY → json).",
+    help="Output format: human, rg, json, or auto (TTY → human, non-TTY → json).",
 )
 @click.option(
     "--output",
@@ -523,7 +294,7 @@ def _write_output(text: str, destination: Path | None) -> None:
     "with_code",
     default=False,
     show_default=True,
-    help="Show code snippets around uncovered ranges.",
+    help="Include code snippets around uncovered ranges (requires file reads).",
 )
 @click.option(
     "--context",
@@ -548,10 +319,7 @@ def _write_output(text: str, destination: Path | None) -> None:
     type=click.Choice([choice.value for choice in SummarySort], case_sensitive=False),
     default=SummarySort.FILE.value,
     show_default=True,
-    help=(
-        "Ordering for the summary section: by file name, statement coverage, "
-        "branch coverage, or total misses."
-    ),
+    help="Ordering for the summary section.",
 )
 @click.option(
     "--stats",
@@ -561,7 +329,7 @@ def _write_output(text: str, destination: Path | None) -> None:
 @click.option(
     "--file-stats",
     is_flag=True,
-    help="Include per-file uncovered line counts.",
+    help="Include per-file uncovered line counts (requires file reads).",
 )
 @click.option(
     "--threshold",
@@ -570,7 +338,7 @@ def _write_output(text: str, destination: Path | None) -> None:
     callback=_thresholds_cb,
     help=(
         "Coverage thresholds; can be passed multiple times. "
-        "Each value is SPEC like lines=90,branches=80. "
+        "Each value is SPEC like statements=90,branches=80,misses=10. "
         "Exit status 2 if any threshold is not met."
     ),
 )
@@ -603,14 +371,13 @@ def _write_output(text: str, destination: Path | None) -> None:
 )
 @click.version_option(__version__)
 @click.pass_context
-def cli(  # noqa: C901, PLR0912, PLR0914, PLR0915
+def main(  # noqa: C901, PLR0912, PLR0914, PLR0915
     ctx: click.Context,
-    maybe_command: str | None,
     extra_paths: tuple[str, ...],
     cov_paths: tuple[Path, ...],
     include_patterns: tuple[str, ...],
     exclude_patterns: tuple[str, ...],
-    sections_option: tuple[str, ...] | None,
+    sections_option: str | None,
     diff_base: Path | None,
     branches_mode: str,
     format_option: str,
@@ -630,12 +397,7 @@ def cli(  # noqa: C901, PLR0912, PLR0914, PLR0915
     verbose: bool = False,
     debug: bool = False,
 ) -> None:
-    """Unified coverage reporting for multiple XML files."""
-    if maybe_command == "report":
-        positional_paths = extra_paths
-    else:
-        positional_paths = (maybe_command, *extra_paths) if maybe_command else extra_paths
-
+    """Unified coverage reporting for one or more XML files."""
     if color and no_color:
         msg = "--color"
         raise click.BadOptionUsage(msg, "--color and --no-color cannot be combined")
@@ -643,32 +405,95 @@ def cli(  # noqa: C901, PLR0912, PLR0914, PLR0915
         msg = "--quiet"
         raise click.BadOptionUsage(msg, "--quiet and --verbose cannot be combined")
 
-    before, after = context_option or (0, 0)
-    sections_requested = sections_option or DEFAULT_SECTIONS
-    thresholds = threshold_options
+    _configure_logging(quiet=quiet, verbose=verbose, debug=debug)
 
-    # If user requested context but did not explicitly enable code, turn it on.
-    if context_option is not None and not with_code:
-        with_code = True
+    # Parse sections early so we can validate diff requirements.
+    sections_requested = _parse_sections(sections_option)
 
     if "diff" in sections_requested and diff_base is None:
         msg = "--diff-base"
         raise click.BadOptionUsage(msg, "--diff-base is required when requesting the diff section")
 
-    _configure_logging(quiet=quiet, verbose=verbose, debug=debug)
+    # Threshold evaluation requires specific sections to be present in the report.
+    # If the user overrides --sections, ensure we still build what thresholds need.
+    if threshold_options:
+        need_stmt = any(t.statement is not None for t in threshold_options)
+        need_br = any(t.branch is not None for t in threshold_options)
+        need_miss = any(t.misses is not None for t in threshold_options)
 
+        # Start from user-requested sections, then add requirements.
+        sec_set = set(sections_requested)
+        if need_stmt or need_br:
+            sec_set.add("summary")
+        if need_miss:
+            sec_set.add("lines")
+
+        # Preserve original order for existing items; append any newly-required sections.
+        ordered: list[str] = list(sections_requested)
+        for name in ("lines", "branches", "summary", "diff"):
+            if name in sec_set and name not in ordered:
+                ordered.append(name)
+        sections_requested = tuple(ordered)
+
+    before, after = context_option or (0, 0)
+
+    # If user requested context but did not explicitly enable code, turn it on.
+    if context_option is not None and not with_code:
+        with_code = True
+
+    # Resolve coverage XML input paths.
     try:
-        coverage_paths = _resolve_coverage_paths(cov_paths)
+        coverage_paths = resolve_coverage_paths(cov_paths)
     except CoverageXMLNotFoundError as exc:
         click.echo(f"ERROR: {exc}", err=True)
         ctx.exit(EXIT_NOINPUT)
 
     base_path = coverage_paths[0].parent
-    includes = list(include_patterns) + [item for item in positional_paths if item]
+
+    # Build filters (include patterns incorporate extra_paths).
+    includes = list(include_patterns) + [item for item in extra_paths if item]
     filters = _resolve_filters(includes, exclude_patterns, base=base_path)
 
+    # Output/TTY/color decisions (CLI-only).
+    if output and output != Path("-") and format_option.strip().lower() == "auto":
+        msg = "--format"
+        raise click.BadOptionUsage(msg, "--format=auto cannot be used with --output")
+
+    ansi_allowed = not click_utils.should_strip_ansi(sys.stdout)
+    stdout_is_tty = bool(getattr(sys.stdout, "isatty", lambda: False)()) or ansi_allowed
+
+    allow_tty_output = output in {None, Path("-")}
+    is_tty_like = stdout_is_tty if allow_tty_output else False
+
+    use_color = (
+        True if color else False if no_color else (ctx.color if ctx.color is not None else ansi_allowed)
+    )
+    fmt = _resolve_format(format_option, is_tty_like=is_tty_like)
+
+    # Build report.
+    build_opts = BuildOptions(
+        coverage_paths=coverage_paths,
+        base_path=base_path,
+        filters=filters,
+        sections=set(sections_requested),
+        diff_base=diff_base,
+        branches_mode=BranchMode(branches_mode),
+        summary_sort=SummarySort(sort),
+        want_aggregate_stats=bool(stats),
+        want_file_stats=bool(file_stats),
+        # If code is requested, we enrich with snippets.
+        want_snippets=bool(with_code),
+        context_before=max(0, before),
+        context_after=max(0, after),
+        meta_show_paths=bool(show_paths),
+        meta_show_line_numbers=bool(line_numbers),
+    )
+
     try:
-        dataset = CoverageDataset.from_xml_files(coverage_paths, base_path=base_path)
+        report = build_report(build_opts)
+        # Enrich only if we need filesystem-derived data (snippets and/or per-file totals).
+        if build_opts.want_snippets or build_opts.want_file_stats:
+            report = enrich_report(report, build_opts)
     except OSError as exc:
         if debug:
             raise
@@ -680,128 +505,33 @@ def cli(  # noqa: C901, PLR0912, PLR0914, PLR0915
         click.echo(f"ERROR: failed to parse coverage XML: {exc}", err=True)
         ctx.exit(EXIT_DATAERR)
 
-    if output and output != Path("-") and format_option.lower() == "auto":
-        msg = "--format"
-        raise click.BadOptionUsage(msg, "--format=auto cannot be used with --output")
-
-    # "ansi_allowed" answers "should we strip ANSI?" not "is this a TTY?".
-    ansi_allowed = not click_utils.should_strip_ansi(sys.stdout)
-    # Treat "ANSI allowed" as "TTY-like" for presentation decisions (e.g. rg heading mode).
-    # Under click.testing.CliRunner(color=True), sys.stdout.isatty() may still be False, but
-    # Click will not strip ANSI, so we should behave like a TTY.
-    stdout_is_tty = bool(getattr(sys.stdout, "isatty", lambda: False)()) or ansi_allowed
-    color_support = ctx.color if ctx.color is not None else ansi_allowed
-
-    use_color = True if color else False if no_color else color_support
-    meta = OutputMeta(
-        coverage_xml=coverage_paths[0],
-        with_code=with_code,
-        color=use_color,
-        show_paths=show_paths,
-        show_line_numbers=line_numbers,
-        context_before=max(0, before),
-        context_after=max(0, after),
-        is_tty=stdout_is_tty,
+    # Render.
+    render_opts = RenderOptions(
+        color=bool(use_color),
+        show_paths=bool(show_paths),
+        show_line_numbers=bool(line_numbers),
+        is_tty=bool(is_tty_like),
     )
+    try:
+        text = render(report, fmt=fmt, options=render_opts)
+    except Exception as exc:
+        if debug:
+            raise
+        click.echo(f"ERROR: {exc}", err=True)
+        ctx.exit(EXIT_GENERIC)
 
-    attachments: dict[str, Any] = {}
-    report_sections: dict[str, object] = {}
+    _write_output(text, output)
 
-    totals: tuple[int, int, int, int] = (0, 0, 0, 0)
-    if "lines" in sections_requested or thresholds:
-        line_sections = build_lines(dataset, filters=filters)
-        if "lines" in sections_requested:
-            report_sections["lines"] = _build_lines_section(
-                line_sections,
-                meta=meta,
-                base_path=base_path,
-                file_stats=file_stats,
-                aggregate_stats=stats,
-                attachments=attachments,
-            )
-        if "lines" not in attachments:
-            attachments["lines"] = {"sections": line_sections}
-    else:
-        line_sections = ()
-    if "branches" in sections_requested:
-        gaps = build_branches(dataset, filters=filters, mode=BranchMode(branches_mode))
-        report_sections["branches"] = _build_branches_section(
-            gaps,
-            meta=meta,
-            base_path=base_path,
-            attachments=attachments,
-        )
-    if "summary" in sections_requested or thresholds:
-        summary_payload, totals = _build_summary_section(
-            dataset,
-            filters=filters,
-            sort=SummarySort(sort),
-            attachments=attachments,
-        )
-        if "summary" in sections_requested:
-            report_sections["summary"] = summary_payload
-    if "diff" in sections_requested and diff_base is not None:
-        try:
-            base_dataset = CoverageDataset.from_xml_files((diff_base,), base_path=base_path)
-        except OSError as exc:
-            if debug:
-                raise
-            click.echo(f"ERROR: {exc}", err=True)
-            ctx.exit(EXIT_NOINPUT)
-        except (ElementTree.ParseError, InvalidCoverageXMLError) as exc:
-            if debug:
-                raise
-            click.echo(f"ERROR: failed to parse diff base XML: {exc}", err=True)
-            ctx.exit(EXIT_DATAERR)
-        report_sections["diff"] = _build_diff_section(
-            base_dataset,
-            dataset,
-            filters=filters,
-            meta=meta,
-            base_path=base_path,
-            attachments=attachments,
-        )
-
-    report_meta: Mapping[str, object] = {
-        "environment": {"coverage_xml": coverage_paths[0].as_posix()},
-        "options": {
-            "context_lines": meta.context_lines,
-            "with_code": meta.with_code,
-            "show_paths": meta.show_paths,
-            "show_line_numbers": meta.show_line_numbers,
-            "aggregate_stats": stats,
-            "file_stats": file_stats,
-        },
-    }
-
-    report = Report(meta=report_meta, sections=report_sections, attachments=attachments)
-
-    allow_tty_output = output in {None, Path("-")}
-    format_supports_tty = (ctx.color is True or ansi_allowed) if allow_tty_output else False
-    fmt = _resolve_format_auto(format_option, is_tty=format_supports_tty)
-    rendered = render_report(report, fmt, meta)
-    _write_output(rendered, output)
-
-    if thresholds:
-        lines_sections = line_sections
-        lines_attachment = attachments.get("lines")
-        if isinstance(lines_attachment, dict):
-            sections_candidate = lines_attachment.get("sections")
-            if isinstance(sections_candidate, list):
-                lines_sections = sections_candidate
-        result = evaluate_thresholds(
-            thresholds,
-            totals=totals,
-            sections=lines_sections,
-        )
+    # Threshold evaluation (CI).
+    if threshold_options:
+        result = evaluate_thresholds(report, threshold_options)
         if not result.passed:
             for failure in result.failures:
-                message = (
-                    "Threshold failed: "
-                    f"{failure.metric} {failure.comparison} {failure.required} "
-                    f"(actual {failure.actual})"
+                click.echo(
+                    f"Threshold failed: {failure.metric} {failure.comparison} {failure.required} "
+                    f"(actual {failure.actual})",
+                    err=True,
                 )
-                click.echo(message, err=True)
             ctx.exit(EXIT_THRESHOLD)
 
     ctx.exit(EXIT_OK)

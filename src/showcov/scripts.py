@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Literal
 import click
 from click.shell_completion import BashComplete, FishComplete, ShellComplete, ZshComplete
 
-from .cli import cli
+from .cli import main
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -32,7 +32,7 @@ def _collect_option_flags(command: click.Command) -> tuple[str, ...]:
     return tuple(sorted({flag for flag in flags if flag}))
 
 
-_OPTION_COMMENT = "# showcov options: " + " ".join(_collect_option_flags(cli))
+_OPTION_COMMENT = "# showcov options: " + " ".join(_collect_option_flags(main))
 
 _EXIT_STATUS = """\
 0  success
@@ -45,7 +45,7 @@ _EXIT_STATUS = """\
 
 
 def _build_plain_command() -> click.Command:
-    """Return a plain Click command mirroring :data:`cli`.
+    """Return a plain Click command mirroring :data:`main`.
 
     This avoids the rich-click `RichCommand` help machinery, which expects a
     Rich-specific formatter object with extra attributes (like ``config``).
@@ -53,11 +53,11 @@ def _build_plain_command() -> click.Command:
     """
     return click.Command(
         name="showcov",
-        callback=cli.callback,
-        params=cli.params,
-        help=cli.help,
-        epilog=cli.epilog,
-        context_settings=cli.context_settings,
+        callback=main.callback,
+        params=main.params,
+        help=main.help,
+        epilog=main.epilog,
+        context_settings=main.context_settings,
     )
 
 
@@ -88,7 +88,7 @@ def write_man_page(destination: Path) -> None:
 def build_completion_script(shell: ShellName) -> str:
     """Return a shell completion script for *shell*."""
     complete_cls = _COMPLETE_CLASSES[shell]
-    complete = complete_cls(cli, {}, "showcov", _COMPLETE_VAR)
+    complete = complete_cls(main, {}, "showcov", _COMPLETE_VAR)
     script = complete.source()
     return f"{_OPTION_COMMENT}\n{script}"
 

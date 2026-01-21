@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING
 
 import pytest
 from defusedxml import ElementTree
-
 from showcov.core.dataset import (
     CoverageDataset,
     build_branches,
@@ -13,8 +12,9 @@ from showcov.core.dataset import (
     build_lines,
     build_summary,
 )
-from showcov.core.exceptions import InvalidCoverageXMLError
 from showcov.core.types import BranchMode
+
+from showcov.errors import InvalidCoverageXMLError
 
 if TYPE_CHECKING:
     from pathlib import Path

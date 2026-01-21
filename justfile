@@ -247,12 +247,6 @@ sec-deps:
 
 # Testing: Run full test suite
 [group('testing')]
-test-pretty:
-  @just _log_start test
-  {{PYTEST}} --rich {{PY_TESTPATH}} || true
-  @just _log_end test
-
-[group('testing')]
 test:
   @just _log_start test
   {{PYTEST}} {{PY_TESTPATH}} || true
@@ -498,7 +492,7 @@ fix:
   @just _run_soft typecheck 'just typecheck'
   # @just _run_soft lint-imports 'just lint-imports'
   # @just _run_soft build-docs "just build-docs"
-  @just test-pretty
+  @just test
   @just cov
   @just _log_end fix
 

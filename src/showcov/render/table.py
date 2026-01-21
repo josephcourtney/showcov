@@ -1,5 +1,3 @@
-"""Helpers for rendering grouped tables."""
-
 from __future__ import annotations
 
 import sys
@@ -14,7 +12,7 @@ from rich.table import Table
 
 
 def _header_text(parts: Sequence[str]) -> str:
-    r"""Convert a grouped header tuple like ('Statements','Covered') to 'Statements\\nCovered'."""
+    r"""Convert a grouped header tuple like ('Statements','Covered') to 'Statements\nCovered'."""
     items = [str(p) for p in parts if str(p).strip()]
     return "\n".join(items) if items else ""
 
@@ -22,14 +20,7 @@ def _header_text(parts: Sequence[str]) -> str:
 def _render_rich_table(
     headers: Sequence[Sequence[str]], rows: Sequence[Sequence[Any]], *, color: bool
 ) -> str:
-    r"""Render a Rich table captured to a string.
-
-    Notes
-    -----
-    Rich doesn't support true column-spanning grouped headers in a single
-    header row; we encode grouping as multi-line column headers:
-      ('Statements','Total') -> "Statements\\nTotal"
-    """
+    r"""Render a Rich table captured to a string."""
     table = Table(show_header=True, header_style="bold")
     for h in headers:
         table.add_column(_header_text(h), justify="right")
@@ -56,11 +47,10 @@ def _render_rich_table(
 def format_table(
     headers: Sequence[Sequence[str]], rows: Sequence[Sequence[Any]], *, color: bool = True
 ) -> str:
-    """Render a Rich table captured to text.
-
-    Kept as `format_table(...)` to preserve the existing call sites in
-    `report_render.py`.
-    """
+    """Render a Rich table captured to text."""
     if not headers or not rows:
         return ""
     return _render_rich_table(headers, rows, color=color)
+
+
+__all__ = ["format_table"]

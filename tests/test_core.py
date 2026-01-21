@@ -9,8 +9,6 @@ import pytest
 from _pytest.monkeypatch import MonkeyPatch
 from click.testing import CliRunner
 from defusedxml import ElementTree
-
-from showcov.cli import cli
 from showcov.core import (
     CoverageXMLNotFoundError,
     _get_xml_from_config,
@@ -26,6 +24,8 @@ from showcov.output import format_human
 from showcov.output.base import (
     OutputMeta,
 )
+
+from showcov.cli import cli
 
 # Capture logs during tests
 logging.basicConfig(level=logging.INFO)

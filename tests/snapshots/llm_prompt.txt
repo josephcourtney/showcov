@@ -13,7 +13,7 @@ Please review the following coverage data and suggest tests:
       "with_code": true
     }
   },
-  "schema": "https://example.com/showcov.schema.json",
+  "schema": "https://example.com/showcov.schema.v1.json",
   "schema_version": 1,
   "sections": {
     "lines": {

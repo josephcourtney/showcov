@@ -1,0 +1,58 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+from showcov.render.human import render_human
+from showcov.render.json import format_json
+from showcov.render.rg import render_rg
+
+if TYPE_CHECKING:
+    from showcov.model.report import Report
+
+
+@dataclass(frozen=True, slots=True)
+class RenderOptions:
+    """Options that affect *presentation* only (not report content).
+
+    Notes
+    -----
+    - Content decisions (which sections exist, whether snippets exist, etc.)
+      come from the Report itself (report.sections / report.meta.options).
+    """
+
+    color: bool = True
+    show_paths: bool = True
+    show_line_numbers: bool = True
+    is_tty: bool = False
+
+
+def render(report: Report, *, fmt: str, options: RenderOptions) -> str:
+    """Render a typed Report to text.
+
+    Parameters
+    ----------
+    report:
+        Built report model.
+    fmt:
+        One of: "human", "rg", "json".
+    options:
+        Presentation options (color/tty/path display).
+    """
+    f = (fmt or "").strip().lower()
+
+    if f == "json":
+        # JSON output is schema-validated and should be free of any terminal styling.
+        return format_json(report)
+
+    if f == "human":
+        return render_human(report, options)
+
+    if f == "rg":
+        return render_rg(report, options)
+
+    msg = f"Unsupported format: {fmt!r}. Expected one of: human, rg, json."
+    raise ValueError(msg)
+
+
+__all__ = ["RenderOptions", "render"]
