@@ -33,6 +33,15 @@ if TYPE_CHECKING:
 
     from showcov.model.path_filter import PathFilter
 
+Record = tuple[
+    str,  # file
+    int,  # line
+    int,  # hits
+    tuple[int, int] | None,  # branch_counts
+    tuple[int, ...],  # missing_branches
+    tuple[BranchCondition, ...],  # conditions
+]
+
 
 @dataclass(frozen=True, slots=True)
 class BuildOptions:
@@ -56,6 +65,8 @@ class BuildOptions:
 class _BranchAccumulator(TypedDict):
     bc: tuple[int, int] | None
     mb: set[int]
+    # key: (type,labelled-number) -> merged condition
+    conds: dict[tuple[str, int], BranchCondition]
 
 
 def _display_path(path: str, *, base: Path) -> str:
@@ -87,31 +98,32 @@ def _group_consecutive(nums: Iterable[int]) -> list[tuple[int, int]]:
 
 def _collect_records(
     coverage_paths: Sequence[Path],
-) -> list[tuple[str, int, int, tuple[int, int] | None, tuple[int, ...]]]:
+) -> list[Record]:
     """Collect normalized line records across all XML inputs.
 
-    Returns tuples: (file, line, hits, branch_counts, missing_branches)
+    Returns tuples: (file, line, hits, branch_counts, missing_branches, conditions)
     """
-    out: list[tuple[str, int, int, tuple[int, int] | None, tuple[int, ...]]] = []
+    out: list[Record] = []
     for p in coverage_paths:
         root = read_root(p)
         out.extend(
-            (rec.file, rec.line, rec.hits, rec.branch_counts, rec.missing_branches)
+            (rec.file, rec.line, rec.hits, rec.branch_counts, rec.missing_branches, rec.conditions)
             for rec in iter_line_records(root)
         )
     return out
 
 
-def _apply_filters(files: Iterable[str], *, filters: PathFilter | None, base: Path) -> list[str]:
+def _apply_filters(files: Iterable[str], *, filters: PathFilter | None) -> list[str]:
     if not filters:
         return list(files)
-    # match against display label and raw
-    kept: list[str] = [f for f in files if filters.allow(_display_path(f, base=base)) or filters.allow(f)]
-    return kept
+    # Keep in one place: let PathFilter do its rel/raw normalization
+    pairs = [(f, None) for f in files]
+    kept = filters.filter_files(pairs)
+    return [path for path, _ in kept]
 
 
 def _build_lines_section(
-    records: list[tuple[str, int, int, tuple[int, int] | None, tuple[int, ...]]],
+    records: list[Record],
     *,
     base: Path,
     filters: PathFilter | None,
@@ -122,11 +134,11 @@ def _build_lines_section(
     uncovered_total = 0
 
     files_all = sorted({r[0] for r in records})
-    files = _apply_filters(files_all, filters=filters, base=base)
+    files = _apply_filters(files_all, filters=filters)
 
     # collect uncovered lines per file
     for file in files:
-        lines = [line for f, line, hits, _bc, _mb in records if f == file and hits == 0]
+        lines = [line for f, line, hits, _bc, _mb, _conds in records if f == file and hits == 0]
         if not lines:
             by_file[file] = []
             continue
@@ -148,43 +160,62 @@ def _build_lines_section(
 
 
 def _build_branches_section(
-    records: list[tuple[str, int, int, tuple[int, int] | None, tuple[int, ...]]],
+    records: list[Record],
     *,
     base: Path,
     filters: PathFilter | None,
     mode: BranchMode,
 ) -> BranchesSection:
     files_all = sorted({r[0] for r in records})
-    files = set(_apply_filters(files_all, filters=filters, base=base))
+    files = set(_apply_filters(files_all, filters=filters))
     accum = _aggregate_branch_records(records, files=files)
 
     gaps: list[BranchGap] = []
     for (f, line), data in sorted(accum.items()):
-        missing = data["mb"]
-        pct = _branch_coverage_pct(data["bc"])
-        if not _should_include_branch(mode, pct, missing):
+        all_conds = tuple(data["conds"].values())
+        shown = _select_branch_conditions(all_conds, mode=mode)
+        if not shown:
             continue
-        conds = _branch_conditions(missing, pct)
-        if not conds:
-            continue
-        gaps.append(BranchGap(file=_display_path(f, base=base), line=line, conditions=conds))
+        # Stable ordering: non-line first, then line aggregate last
+        shown_sorted = tuple(
+            sorted(
+                shown,
+                key=lambda c: (
+                    1 if (c.type or "").lower() == "line" else 0,
+                    (c.type or "").lower(),
+                    c.number,
+                ),
+            )
+        )
+        gaps.append(
+            BranchGap(
+                file=_display_path(f, base=base),
+                line=line,
+                conditions=shown_sorted,
+            )
+        )
 
     return BranchesSection(gaps=tuple(gaps))
 
 
 def _aggregate_branch_records(
-    records: list[tuple[str, int, int, tuple[int, int] | None, tuple[int, ...]]],
+    records: list[Record],
     *,
     files: set[str],
 ) -> dict[tuple[str, int], _BranchAccumulator]:
     by_key: dict[tuple[str, int], _BranchAccumulator] = {}
-    for f, line, _hits, bc, mb in records:
+    for f, line, _hits, bc, mb, conds in records:
         if f not in files:
             continue
         key = (f, line)
-        d = by_key.setdefault(key, {"bc": None, "mb": set()})
+        d = by_key.setdefault(key, {"bc": None, "mb": set(), "conds": {}})
+
+        # keep the branch_counts with the largest denominator (best fidelity)
         if bc is not None:
-            d["bc"] = bc
+            prev = d["bc"]
+            if prev is None or bc[1] > prev[1]:
+                d["bc"] = bc
+
         if mb:
             bucket = d["mb"]
             if not isinstance(bucket, set):
@@ -194,33 +225,52 @@ def _aggregate_branch_records(
                 )
                 raise TypeError(msg)
             bucket.update(mb)
+
+        # merge rich conditions (including synthetic missing + line aggregate)
+        cond_map = d["conds"]
+        # ensure missing branches always show up as explicit "branch"/None, even if conds is empty
+        for b in mb:
+            k = ("branch", int(b))
+            cond_map.setdefault(k, BranchCondition(number=int(b), type="branch", coverage=None))
+
+        for c in conds:
+            k = ((c.type or "branch").lower(), int(c.number))
+            existing = cond_map.get(k)
+            cond_map[k] = _merge_branch_condition(existing, c) if existing else c
     return by_key
 
 
-def _branch_coverage_pct(bc: tuple[int, int] | None) -> int | None:
-    if bc is None:
-        return None
-    covered, total = bc
-    if total == 0:
-        return 0
-    return round(float(FULL_COVERAGE) * covered / total)
+def _merge_branch_condition(existing: BranchCondition, new: BranchCondition) -> BranchCondition:
+    """Merge two conditions for the same (type,number).
+
+    Strategy: preserve missing (None) if either side is missing; otherwise take the minimum
+    percentage so merged reports show the worst coverage across inputs.
+    """
+    cov = None if existing.coverage is None or new.coverage is None else min(existing.coverage, new.coverage)
+    typ = existing.type or new.type
+    return BranchCondition(number=existing.number, type=typ, coverage=cov)
 
 
-def _should_include_branch(mode: BranchMode, pct: int | None, missing: set[int]) -> bool:
-    if mode == BranchMode.MISSING_ONLY:
-        return bool(missing) or pct == 0
+def _select_branch_conditions(
+    conds: tuple[BranchCondition, ...],
+    *,
+    mode: BranchMode,
+) -> tuple[BranchCondition, ...]:
+    if not conds:
+        return ()
+
+    def is_missing(c: BranchCondition) -> bool:
+        return c.coverage is None or c.coverage == 0
+
+    def is_partial(c: BranchCondition) -> bool:
+        return c.coverage is None or c.coverage < FULL_COVERAGE
+
+    if mode == BranchMode.ALL:
+        return conds
     if mode == BranchMode.PARTIAL:
-        return bool(missing) or pct is None or pct < FULL_COVERAGE
-    return True
-
-
-def _branch_conditions(missing: set[int], pct: int | None) -> tuple[BranchCondition, ...]:
-    conds: list[BranchCondition] = [
-        BranchCondition(number=int(b), type="branch", coverage=None) for b in sorted(missing)
-    ]
-    if pct is not None:
-        conds.append(BranchCondition(number=-1, type="line", coverage=pct))
-    return tuple(conds)
+        return tuple(c for c in conds if is_partial(c))
+    # missing-only
+    return tuple(c for c in conds if is_missing(c))
 
 
 def _summary_counts_stmt(records_for_file: list[tuple[int, int]]) -> tuple[int, int, int]:
@@ -246,18 +296,16 @@ def _summary_counts_br(
 
 
 def _build_summary_section(
-    records: list[tuple[str, int, int, tuple[int, int] | None, tuple[int, ...]]],
+    records: list[Record],
     *,
     base: Path,
     filters: PathFilter | None,
     sort: SummarySort,
 ) -> SummarySection:
     files_all = sorted({r[0] for r in records})
-    files = _apply_filters(files_all, filters=filters, base=base)
+    files = _apply_filters(files_all, filters=filters)
 
-    rows: list[SummaryRow] = [
-        _build_summary_row(f, records, base=base) for f in files
-    ]
+    rows: list[SummaryRow] = [_build_summary_row(f, records, base=base) for f in files]
     _sort_summary_rows(rows, sort)
     rows_tuple = tuple(rows)
 
@@ -267,10 +315,10 @@ def _build_summary_section(
 
 def _deduplicate_statement_records(
     file: str,
-    records: list[tuple[str, int, int, tuple[int, int] | None, tuple[int, ...]]],
+    records: list[Record],
 ) -> list[tuple[int, int]]:
     stmt_by_line: dict[int, int] = {}
-    for ff, line, hits, _bc, _mb in records:
+    for ff, line, hits, _bc, _mb, _conds in records:
         if ff != file:
             continue
         stmt_by_line[line] = max(stmt_by_line.get(line, -1), hits)
@@ -279,10 +327,10 @@ def _deduplicate_statement_records(
 
 def _deduplicate_branch_records(
     file: str,
-    records: list[tuple[str, int, int, tuple[int, int] | None, tuple[int, ...]]],
+    records: list[Record],
 ) -> list[tuple[int, tuple[int, int] | None, tuple[int, ...]]]:
     br_by_line: dict[int, tuple[int, int]] = {}
-    for ff, line, _hits, bc, _mb in records:
+    for ff, line, _hits, bc, _mb, _conds in records:
         if ff != file or bc is None:
             continue
         prev = br_by_line.get(line)
@@ -293,7 +341,7 @@ def _deduplicate_branch_records(
 
 def _build_summary_row(
     file: str,
-    records: list[tuple[str, int, int, tuple[int, int] | None, tuple[int, ...]]],
+    records: list[Record],
     *,
     base: Path,
 ) -> SummaryRow:
@@ -390,8 +438,6 @@ def build_report(opts: BuildOptions) -> Report:
         ),
     )
 
-    sections = ReportSections()
-
     # Lines (built only when needed: lines or diff)
     lines: LinesSection | None = (
         _build_lines_section(
@@ -426,8 +472,8 @@ def build_report(opts: BuildOptions) -> Report:
             msg = "diff section requested but diff_base is None"
             raise ValueError(msg)
         base_root = read_root(opts.diff_base)
-        base_records = [
-            (r.file, r.line, r.hits, r.branch_counts, r.missing_branches)
+        base_records: list[Record] = [
+            (r.file, r.line, r.hits, r.branch_counts, r.missing_branches, r.conditions)
             for r in iter_line_records(base_root)
         ]
         base_lines_sec = _build_lines_section(

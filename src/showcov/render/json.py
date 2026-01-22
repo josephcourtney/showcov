@@ -47,7 +47,11 @@ def _to_obj(x: object) -> object:
 
 
 def _prune_none(obj: object) -> object:
-    """Recursively drop dict keys with None values."""
+    """Recursively drop dict keys with None values.
+
+    Also normalizes tuples to lists so the JSON Schema validator sees
+    Python `list` for schema `type: "array"`.
+    """
     if isinstance(obj, dict):
         mapping = cast("dict[str, object]", obj)
         out: dict[str, object] = {}
@@ -56,6 +60,8 @@ def _prune_none(obj: object) -> object:
                 continue
             out[k] = _prune_none(v)
         return out
+    if isinstance(obj, tuple):
+        return [_prune_none(v) for v in obj]
     if isinstance(obj, list):
         return [_prune_none(v) for v in obj]
     return obj

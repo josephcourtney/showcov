@@ -40,7 +40,6 @@ _EXIT_STATUS = """\
 2  coverage threshold failure
 65 malformed coverage XML data
 66 required coverage XML input missing
-78 configuration error
 """
 
 

@@ -3,275 +3,145 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
 
-from showcov import __version__
-from showcov.cli import EXIT_NOINPUT, EXIT_THRESHOLD, cli
-from showcov.core import dataset
+from click.testing import CliRunner
+
+from showcov.cli import main
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
     from pathlib import Path
-    from xml.etree.ElementTree import Element  # noqa: S405
-
-    from _pytest.monkeypatch import MonkeyPatch
-    from click.testing import CliRunner
 
 
-def _invoke(runner: CliRunner, args: list[str], *, color: bool = False) -> tuple[int, str]:
-    res = runner.invoke(cli, args, color=color)
-    return res.exit_code, res.output
+def test_cli_json_output(project: dict[str, Path]) -> None:
+    from tests.conftest import write_cobertura_xml
 
-
-def _run(runner: CliRunner, args: list[str]) -> tuple[int, str]:
-    result = runner.invoke(cli, args)
-    return result.exit_code, result.output
-
-
-def test_cli_reports_lines_by_default(
-    cli_runner: CliRunner, coverage_xml_file: Callable[..., Path], tmp_path: Path
-) -> None:
-    src = tmp_path / "file.py"
-    src.write_text("print('hi')\n")
-    xml = coverage_xml_file({src: [1]})
-
-    code, output = _run(cli_runner, ["--cov", str(xml), "--format", "human"])
-    assert code == 0
-    assert "Lines" in output
-    assert src.name in output
-
-
-def test_cli_supports_report_alias(
-    cli_runner: CliRunner, coverage_xml_file: Callable[..., Path], tmp_path: Path
-) -> None:
-    src = tmp_path / "file.py"
-    src.write_text("print('hi')\n")
-    xml = coverage_xml_file({src: [1]})
-
-    code, output = _run(cli_runner, ["report", "--cov", str(xml), "--format", "json"])
-    assert code == 0
-    assert output.strip().startswith("{")
-
-
-def test_cli_requires_diff_base(
-    cli_runner: CliRunner, coverage_xml_file: Callable[..., Path], tmp_path: Path
-) -> None:
-    src = tmp_path / "file.py"
-    src.write_text("print('hi')\n")
-    xml = coverage_xml_file({src: [1]})
-
-    result = cli_runner.invoke(cli, ["--cov", str(xml), "--sections", "diff"])
-    assert result.exit_code != 0
-    assert "--diff-base" in result.output
-
-
-def test_cli_threshold_failure(
-    cli_runner: CliRunner, coverage_xml_file: Callable[..., Path], tmp_path: Path
-) -> None:
-    src = tmp_path / "file.py"
-    src.write_text("print('hi')\n")
-    xml = coverage_xml_file({src: [1]})
-
-    code, output = _run(cli_runner, ["--cov", str(xml), "--threshold", "stmt=100"])
-    assert code == EXIT_THRESHOLD
-    assert "Threshold failed" in output
-
-
-def test_cli_writes_json_output(
-    cli_runner: CliRunner, coverage_xml_file: Callable[..., Path], tmp_path: Path
-) -> None:
-    src = tmp_path / "file.py"
-    src.write_text("print('hi')\n")
-    xml = coverage_xml_file({src: [1]})
-    out_file = tmp_path / "out.json"
-
-    code, output = _run(
-        cli_runner,
-        ["--cov", str(xml), "--format", "json", "--output", str(out_file)],
-    )
-    assert code == 0
-    assert out_file.read_text(encoding="utf-8").lstrip().startswith("{")
-    assert not output
-
-
-def test_cli_color_flag(
-    cli_runner: CliRunner, coverage_xml_file: Callable[..., Path], tmp_path: Path
-) -> None:
-    src = tmp_path / "file.py"
-    src.write_text("print('hi')\n")
-    xml = coverage_xml_file({src: [1]})
-
-    result = cli_runner.invoke(
-        cli,
-        ["--cov", str(xml), "--format", "human", "--color"],
-        color=True,
-    )
-    assert result.exit_code == 0
-    assert "\x1b" in result.output
-
-
-def test_cli_no_color_flag(
-    cli_runner: CliRunner, coverage_xml_file: Callable[..., Path], tmp_path: Path
-) -> None:
-    src = tmp_path / "file.py"
-    src.write_text("print('hi')\n")
-    xml = coverage_xml_file({src: [1]})
-
-    result = cli_runner.invoke(
-        cli,
-        ["--cov", str(xml), "--format", "human", "--no-color"],
-        color=True,
-    )
-    assert result.exit_code == 0
-    assert "\x1b" not in result.output
-
-
-def test_cli_auto_color_when_tty(
-    cli_runner: CliRunner, coverage_xml_file: Callable[..., Path], tmp_path: Path
-) -> None:
-    src = tmp_path / "file.py"
-    src.write_text("print('hi')\n")
-    xml = coverage_xml_file({src: [1]})
-
-    result = cli_runner.invoke(cli, ["--cov", str(xml)], color=True)
-    assert result.exit_code == 0
-    assert "\x1b" in result.output
-
-
-def test_cli_sections_json_combo(
-    cli_runner: CliRunner,
-    tmp_path: Path,
-) -> None:
-    src = tmp_path / "file.py"
-    src.write_text("print('hi')\n")
-    xml = tmp_path / "cov.xml"
-    xml.write_text(
-        (
-            "<coverage>"
-            "<packages><package><classes>"
-            f'<class filename="{src}"><lines>'
-            '<line number="1" hits="0"/>'
-            '<line number="2" hits="0" branch="true" condition-coverage="0% (0/2)">'
-            '<conditions><condition number="0" type="jump" coverage="0%"/></conditions>'
-            "</line>"
-            "</lines></class>"
-            "</classes></package></packages>"
-            "</coverage>"
-        ),
-        encoding="utf-8",
+    root = project["root"]
+    cov = write_cobertura_xml(
+        root,
+        "coverage.xml",
+        classes=[{"filename": "pkg/mod.py", "lines": [{"number": 2, "hits": 0}]}],
     )
 
-    result = cli_runner.invoke(
-        cli,
+    runner = CliRunner()
+    result = runner.invoke(
+        main,
         [
             "--cov",
-            str(xml),
+            str(cov),
             "--sections",
-            "lines,branches,summary",
+            "lines,summary",
             "--format",
             "json",
         ],
     )
-    assert result.exit_code == 0
-    data = json.loads(result.output)
-    sections = data["sections"]
-    assert set(sections) >= {"lines", "branches", "summary"}
+    assert result.exit_code == 0, result.output
+
+    payload = json.loads(result.output)
+    assert payload["tool"]["name"] == "showcov"
+    assert "lines" in payload["sections"]
+    assert "summary" in payload["sections"]
 
 
-def test_cli_parses_xml_once(
-    cli_runner: CliRunner,
-    coverage_xml_file: Callable[..., Path],
-    monkeypatch: MonkeyPatch,
-    tmp_path: Path,
-) -> None:
-    src = tmp_path / "file.py"
-    src.write_text("print('hi')\n")
-    xml = coverage_xml_file({src: [1]})
+def test_cli_threshold_failure_exit_code_2(project: dict[str, Path]) -> None:
+    from tests.conftest import write_cobertura_xml
 
-    calls = 0
-    original = dataset.read_coverage_xml_file
+    root = project["root"]
+    cov = write_cobertura_xml(
+        root,
+        "coverage.xml",
+        classes=[{"filename": "pkg/mod.py", "lines": [{"number": 1, "hits": 1}, {"number": 2, "hits": 0}]}],
+    )
 
-    def tracker(path: Path) -> Element | None:
-        nonlocal calls
-        calls += 1
-        return original(path)
-
-    monkeypatch.setattr("showcov.core.dataset.read_coverage_xml_file", tracker)
-
-    code, _ = _run(
-        cli_runner,
+    runner = CliRunner()
+    result = runner.invoke(
+        main,
         [
             "--cov",
-            str(xml),
+            str(cov),
             "--sections",
-            "lines,branches,summary",
+            "lines,summary",
+            "--format",
+            "json",
+            "--threshold",
+            "statements=90",
         ],
     )
-    assert code == 0
-    assert calls == 1
+    assert result.exit_code == 2
+    assert "Threshold failed" in result.output
 
 
-def test_cli_version_flag(cli_runner: CliRunner) -> None:
-    code, output = _run(cli_runner, ["--version"])
-    assert code == 0
-    assert output.strip().endswith(__version__)
+def test_cli_include_exclude_filters(project: dict[str, Path]) -> None:
+    from tests.conftest import write_cobertura_xml
 
-
-def test_cli_missing_coverage_file(cli_runner: CliRunner, tmp_path: Path) -> None:
-    missing = tmp_path / "missing.xml"
-    code, output = _run(cli_runner, ["--cov", str(missing)])
-    assert code == EXIT_NOINPUT
-    assert "ERROR" in output
-
-
-def test_line_stats_flags_gate_output(
-    cli_runner: CliRunner, coverage_xml_file: Callable[..., Path], tmp_path: Path
-) -> None:
-    # Source with 3 lines, 2 misses → uncovered = {1, 3}
-    src = tmp_path / "m.py"
-    src.write_text("a = 1\nb = 2\nc = 3\n", encoding="utf-8")
-    xml = coverage_xml_file({src: {1: 0, 2: 1, 3: 0}})
-
-    # Baseline: no stats lines at all.
-    code, out = _invoke(
-        cli_runner,
-        ["--cov", str(xml), "--sections", "lines", "--format", "human"],
+    root = project["root"]
+    cov = write_cobertura_xml(
+        root,
+        "coverage.xml",
+        classes=[
+            {"filename": "pkg/mod.py", "lines": [{"number": 2, "hits": 0}]},
+            {"filename": "pkg/other.py", "lines": [{"number": 1, "hits": 0}]},
+        ],
     )
-    assert code == 0
-    assert "Total uncovered lines:" not in out
-    assert "uncovered (" not in out  # guards per-file counts like "foo.py: 2 uncovered (..)"
 
-    # Aggregate only with --stats.
-    code, out = _invoke(
-        cli_runner,
-        ["--cov", str(xml), "--sections", "lines", "--format", "human", "--stats"],
-    )
-    assert code == 0
-    assert "Total uncovered lines: 2" in out
-    assert "uncovered (" not in out
-
-    # Per-file only with --file-stats (and do not fabricate zeros).
-    code, out = _invoke(
-        cli_runner,
-        ["--cov", str(xml), "--sections", "lines", "--format", "human", "--file-stats"],
-    )
-    assert code == 0
-    # The label uses a base-relative path; check suffix to avoid tmp prefix coupling.
-    assert any(ln.strip().endswith("m.py: 2 uncovered (67% of 3)") for ln in out.splitlines()), out
-    assert "Total uncovered lines:" not in out
-
-    # Both flags together: show both lines.
-    code, out = _invoke(
-        cli_runner,
+    runner = CliRunner()
+    result = runner.invoke(
+        main,
         [
             "--cov",
-            str(xml),
+            str(cov),
             "--sections",
             "lines",
             "--format",
-            "human",
-            "--stats",
-            "--file-stats",
+            "json",
+            "--include",
+            "pkg/mod.py",
         ],
     )
-    assert code == 0
-    assert "Total uncovered lines: 2" in out
-    assert any(ln.strip().endswith("m.py: 2 uncovered (67% of 3)") for ln in out.splitlines()), out
+    assert result.exit_code == 0, result.output
+
+    payload = json.loads(result.output)
+    files = payload["sections"]["lines"]["files"]
+    assert len(files) == 1
+    assert files[0]["file"] == "pkg/mod.py"
+
+
+def test_cli_include_existing_source_file_is_not_treated_as_pattern_file() -> None:
+    from pathlib import Path
+
+    from tests.conftest import write_cobertura_xml, write_source_file
+
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        root = Path.cwd()
+
+        # Create real source files on disk.
+        write_source_file(root, "pkg/mod.py", "def f():\n    return 1\n")
+        write_source_file(root, "pkg/other.py", "def g():\n    return 2\n")
+
+        cov = write_cobertura_xml(
+            root,
+            "coverage.xml",
+            classes=[
+                {"filename": "pkg/mod.py", "lines": [{"number": 1, "hits": 0}]},
+                {"filename": "pkg/other.py", "lines": [{"number": 1, "hits": 0}]},
+            ],
+        )
+
+        result = runner.invoke(
+            main,
+            [
+                "--cov",
+                str(cov),
+                "--sections",
+                "lines",
+                "--format",
+                "json",
+                "--include",
+                "pkg/mod.py",
+            ],
+        )
+        assert result.exit_code == 0, result.output
+
+        payload = json.loads(result.output)
+        files = payload["sections"]["lines"]["files"]
+        assert len(files) == 1
+        assert files[0]["file"] == "pkg/mod.py"

@@ -11,7 +11,7 @@ set export := true
 # ----------------------------------------------------------------------
 
 MODE          := env("MODE", "dev")  # dev | debug | ci
-PYTHON_PACKAGE := env("PYTHON_PACKAGE", "showcov")
+PYTHON_PACKAGE := env("PYTHON_PACKAGE", "hiwlic")
 PY_TESTPATH    := env("PY_TESTPATH", "tests")
 PY_SRC         := env("PY_SRC", "src")
 VERBOSE        := env("VERBOSE", "0")
@@ -246,6 +246,12 @@ sec-deps:
 # ======================================================================
 
 # Testing: Run full test suite
+[group('testing')]
+test-pretty:
+  @just _log_start test
+  {{PYTEST}} --rich {{PY_TESTPATH}} || true
+  @just _log_end test
+
 [group('testing')]
 test:
   @just _log_start test
@@ -490,7 +496,7 @@ fix:
   @just _run_soft lint "just lint"
   @just _run_soft format "just format"
   @just _run_soft typecheck 'just typecheck'
-  # @just _run_soft lint-imports 'just lint-imports'
+  @just _run_soft lint-imports 'just lint-imports'
   # @just _run_soft build-docs "just build-docs"
   @just test
   @just cov

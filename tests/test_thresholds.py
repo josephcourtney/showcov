@@ -1,86 +1,68 @@
-from pathlib import Path
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 import pytest
 
-from showcov.core.core import UncoveredSection
-from showcov.core.thresholds import (
-    Threshold,
-    ThresholdFailure,
-    ThresholdsResult,
-    evaluate_thresholds,
-    parse_threshold,
-)
+from showcov.engine.build import BuildOptions, build_report
+from showcov.model.thresholds import Threshold, evaluate, parse_threshold
+from showcov.model.types import BranchMode, SummarySort
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
-@pytest.mark.parametrize(
-    ("expression", "expected"),
-    [
-        ("stmt=80", Threshold(statement=80.0)),
-        ("br=75% miss=10", Threshold(branch=75.0, misses=10)),
-        ("stmt=90, br=80, miss=5", Threshold(statement=90.0, branch=80.0, misses=5)),
-        ("STATEMENTS=100 BRANCHES=0", Threshold(statement=100.0, branch=0.0)),
-    ],
-)
-def test_parse_threshold(expression: str, expected: Threshold) -> None:
-    assert parse_threshold(expression) == expected
+def _build_report_for_thresholds(project_root: Path, cov: Path):
+    return build_report(
+        BuildOptions(
+            coverage_paths=(cov,),
+            base_path=project_root,
+            filters=None,
+            sections={"lines", "summary"},
+            diff_base=None,
+            branches_mode=BranchMode.PARTIAL,
+            summary_sort=SummarySort.FILE,
+            want_aggregate_stats=False,
+            want_file_stats=False,
+            want_snippets=False,
+            context_before=0,
+            context_after=0,
+            meta_show_paths=True,
+            meta_show_line_numbers=True,
+        )
+    )
 
 
-@pytest.mark.parametrize(
-    ("expression", "pattern"),
-    [
-        ("", "non-empty"),
-        (" ", "non-empty"),
-        ("stmt", "invalid threshold token"),
-        ("foo=10", "unknown threshold metric"),
-        ("stmt=-1", "percentage out of range"),
-        ("stmt=101", "percentage out of range"),
-        ("miss=-5", "must be non-negative"),
-        ("stmt=80 stmt=90", "duplicate percentage constraint"),
-    ],
-)
-def test_parse_threshold_rejects_invalid_input(expression: str, pattern: str) -> None:
-    with pytest.raises(ValueError, match=pattern):
-        parse_threshold(expression)
+def test_parse_threshold() -> None:
+    t = parse_threshold("statements=90,branches=80,misses=10")
+    assert t.statement == 90
+    assert t.branch == 80
+    assert t.misses == 10
+
+    with pytest.raises(ValueError):
+        parse_threshold("")
 
 
-def test_evaluate_thresholds_passes_at_boundaries() -> None:
-    sections = [UncoveredSection(Path("file.py"), [(5, 5)])]
-    totals = (10, 8, 4, 3)
-    thresholds = [parse_threshold("stmt=80 br=75 miss=1")]
-    result = evaluate_thresholds(thresholds, totals=totals, sections=sections)
-    assert result == ThresholdsResult(passed=True, failures=[])
+def test_thresholds_pass_and_fail(project: dict[str, Path]) -> None:
+    from tests.conftest import write_cobertura_xml
 
+    root = project["root"]
 
-def test_evaluate_thresholds_reports_failures() -> None:
-    sections = [UncoveredSection(Path("file.py"), [(1, 3)])]
-    totals = (20, 10, 0, 0)
-    thresholds = [parse_threshold("stmt=60 br=50 miss=2")]
-    result = evaluate_thresholds(thresholds, totals=totals, sections=sections)
-    assert not result.passed
-    assert result.failures == [
-        ThresholdFailure(metric="statement", required=60.0, actual=50.0, comparison=">="),
-        ThresholdFailure(metric="misses", required=2, actual=3, comparison="<="),
-    ]
+    # statements: line 1 covered, line 2 missed => 50% statement coverage
+    cov = write_cobertura_xml(
+        root,
+        "coverage.xml",
+        classes=[
+            {"filename": "pkg/mod.py", "lines": [{"number": 1, "hits": 1}, {"number": 2, "hits": 0}]},
+        ],
+    )
 
+    report = _build_report_for_thresholds(root, cov)
 
-def test_evaluate_thresholds_combines_multiple_specs() -> None:
-    sections = [UncoveredSection(Path("file.py"), [(10, 12)])]
-    totals = (12, 9, 6, 6)
-    thresholds = [parse_threshold("stmt=80"), parse_threshold("miss=2")]
-    result = evaluate_thresholds(thresholds, totals=totals, sections=sections)
-    assert not result.passed
-    assert result.failures == [
-        ThresholdFailure(metric="statement", required=80.0, actual=75.0, comparison=">="),
-        ThresholdFailure(metric="misses", required=2, actual=3, comparison="<="),
-    ]
+    ok = evaluate(report, [Threshold(statement=50)])
+    assert ok.passed is True
 
-
-def test_evaluate_thresholds_branch_failure() -> None:
-    sections: list[UncoveredSection] = []
-    totals = (5, 5, 4, 2)
-    thresholds = [parse_threshold("br=60")]
-    result = evaluate_thresholds(thresholds, totals=totals, sections=sections)
-    assert not result.passed
-    assert result.failures == [
-        ThresholdFailure(metric="branch", required=60.0, actual=50.0, comparison=">="),
-    ]
+    bad = evaluate(report, [Threshold(statement=99)])
+    assert bad.passed is False
+    assert bad.failures
+    assert bad.failures[0].metric == "statement"

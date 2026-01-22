@@ -12,7 +12,6 @@ if TYPE_CHECKING:
     from showcov.model.report import LinesSection, Report
 
 _THRESHOLD_PATTERN = re.compile(r"^[a-zA-Z_-]+=")
-_FULL_PERCENT = 100.0
 
 
 @dataclass(frozen=True, slots=True)

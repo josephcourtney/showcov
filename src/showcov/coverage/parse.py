@@ -23,6 +23,7 @@ class LineRecord:
     branch_counts: tuple[int, int] | None = None
     # missing branch indices if present (coverage.py uses "missing-branches")
     missing_branches: tuple[int, ...] = ()
+    conditions: tuple[BranchCondition, ...] = ()
 
 
 def parse_condition_coverage(text: str) -> tuple[int, int] | None:
@@ -64,6 +65,7 @@ def parse_conditions(line_elem: ElementLike) -> tuple[BranchCondition, ...]:
     Many generators omit <conditions>; in that case we emit a synthetic condition.
     """
     out: list[BranchCondition] = []
+    seen_numbers: set[int] = set()
 
     # explicit <conditions>/<condition>
     for cond in line_elem.findall(".//condition"):
@@ -81,20 +83,17 @@ def parse_conditions(line_elem: ElementLike) -> tuple[BranchCondition, ...]:
             except ValueError:
                 cov = None
         out.append(BranchCondition(number=num, type=typ, coverage=cov))
+        seen_numbers.add(num)
 
-    if out:
-        return tuple(out)
-
-    # synthetic from condition-coverage / missing-branches
-    cc = parse_condition_coverage(line_elem.get("condition-coverage", "") or "")
     missing = _parse_missing_branches(line_elem.get("missing-branches"))
-    if cc is None and not missing:
-        return ()
+    # represent missing branch ids explicitly as unknown coverage
+    # (but avoid duping an explicit condition number if present)
+    for b in missing:
+        if b in seen_numbers:
+            continue
+        out.append(BranchCondition(number=b, type="branch", coverage=None))
 
-    # If missing branch ids exist, represent them explicitly as unknown coverage.
-    out.extend(BranchCondition(number=b, type="branch", coverage=None) for b in missing)
-
-    # Also emit an aggregate condition for the line if we have covered/total.
+    cc = parse_condition_coverage(line_elem.get("condition-coverage", "") or "")
     if cc is not None:
         covered, total = cc
         pct = 0 if total == 0 else round(100.0 * covered / total)
@@ -123,7 +122,15 @@ def iter_line_records(root: ElementLike) -> Iterator[LineRecord]:
 
             cc = parse_condition_coverage(line_elem.get("condition-coverage", "") or "")
             missing = _parse_missing_branches(line_elem.get("missing-branches"))
-            yield LineRecord(file=filename, line=n, hits=hits, branch_counts=cc, missing_branches=missing)
+            conds = parse_conditions(line_elem)
+            yield LineRecord(
+                file=filename,
+                line=n,
+                hits=hits,
+                branch_counts=cc,
+                missing_branches=missing,
+                conditions=conds,
+            )
 
 
 __all__ = [

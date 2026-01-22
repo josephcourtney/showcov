@@ -23,7 +23,7 @@
     "pathspec>=1.0.3",
     "rich-click>=1.9.5",
     "typer>=0.21.1",
-  ]
+]
 
   [project.scripts]
     showcov = "showcov.cli:cli"

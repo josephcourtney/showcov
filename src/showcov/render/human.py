@@ -19,7 +19,6 @@ if TYPE_CHECKING:
         SourceLine,
         SummarySection,
         UncoveredFile,
-        UncoveredRange,
     )
     from showcov.render.render import RenderOptions
 
@@ -49,16 +48,6 @@ def _render_rich_table(table: Table, *, color: bool) -> str:
     )
     console.print(table)
     return buf.getvalue().rstrip()
-
-
-def _range_table(ranges: Iterable[UncoveredRange]) -> str:
-    t = Table(show_header=True, header_style="bold")
-    t.add_column("Start", justify="right")
-    t.add_column("End", justify="right")
-    t.add_column("# Lines", justify="right")
-    for r in ranges:
-        t.add_row(str(r.start), str(r.end), str(r.line_count))
-    return _render_rich_table(t, color=True)  # color is applied by caller via Console; keep true here
 
 
 def _render_lines_ranges(

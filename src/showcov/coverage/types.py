@@ -8,11 +8,9 @@ class ElementLike(Protocol):
 
     tag: str | None
 
-    def findall(self, path: str) -> list[ElementLike]:
-        ...
+    def findall(self, path: str) -> list[ElementLike]: ...
 
-    def get(self, key: str, default: str | None = None) -> str | None:
-        ...
+    def get(self, key: str, default: str | None = None) -> str | None: ...
 
 
 __all__ = ["ElementLike"]

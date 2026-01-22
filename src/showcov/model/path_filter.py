@@ -3,10 +3,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from fnmatch import fnmatch
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeVar
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
+
+T = TypeVar("T")
 
 
 def _load_patterns(p: Path) -> list[str]:
@@ -93,9 +95,9 @@ class PathFilter:
 
         return True
 
-    def filter_files(self, files: Iterable[tuple[str, object]]) -> list[tuple[str, object]]:
+    def filter_files(self, files: Iterable[tuple[str, T]]) -> list[tuple[str, T]]:
         """Filter (path, payload) pairs whose path is allowed."""
-        out: list[tuple[str, object]] = []
+        out: list[tuple[str, T]] = []
         for path, payload in files:
             if self.allow(path):
                 out.append((path, payload))

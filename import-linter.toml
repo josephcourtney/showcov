@@ -1,0 +1,61 @@
+# import-linter.toml
+
+[tool.importlinter]
+  root_package = "showcov"
+
+  [[tool.importlinter.contracts]]
+    name = "Model layer does not depend on higher layers"
+    type = "forbidden"
+    source_modules = ["showcov.model"]
+    forbidden_modules = [
+      "showcov.cli",
+      "showcov.scripts",
+      "showcov.render",
+      "showcov.engine",
+      "showcov.coverage",
+    ]
+
+  [[tool.importlinter.contracts]]
+    name = "Coverage parsing does not depend on engine/render/cli"
+    type = "forbidden"
+    source_modules = ["showcov.coverage"]
+    forbidden_modules = [
+      "showcov.cli",
+      "showcov.scripts",
+      "showcov.render",
+      "showcov.engine",
+    ]
+
+  [[tool.importlinter.contracts]]
+    name = "Engine does not depend on CLI or render"
+    type = "forbidden"
+    source_modules = ["showcov.engine"]
+    forbidden_modules = [
+      "showcov.cli",
+      "showcov.scripts",
+      "showcov.render",
+    ]
+
+  [[tool.importlinter.contracts]]
+    name = "Render does not depend on engine/coverage/cli"
+    type = "forbidden"
+    source_modules = ["showcov.render"]
+    forbidden_modules = [
+      "showcov.cli",
+      "showcov.scripts",
+      "showcov.engine",
+      "showcov.coverage",
+    ]
+
+  [[tool.importlinter.contracts]]
+    name = "Scripts stay thin (no direct imports of internals)"
+    type = "forbidden"
+    source_modules = ["showcov.scripts"]
+    forbidden_modules = [
+      "showcov.engine",
+      "showcov.coverage",
+      "showcov.render",
+      "showcov.model",
+    ]
+    # scripts imports cli (which imports internals). That's fine; we only want to prevent *direct* coupling.
+    allow_indirect_imports = true
