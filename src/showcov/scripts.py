@@ -2,15 +2,12 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal
+import io
+from contextlib import redirect_stdout
+from typing import Literal
 
 import click
 from click.shell_completion import BashComplete, FishComplete, ShellComplete, ZshComplete
-
-from .cli import main
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 ShellName = Literal["bash", "zsh", "fish"]
 
@@ -22,18 +19,6 @@ _COMPLETE_CLASSES: dict[ShellName, type[ShellComplete]] = {
 
 _COMPLETE_VAR = "_SHOWCOV_COMPLETE"
 
-
-def _collect_option_flags(command: click.Command) -> tuple[str, ...]:
-    flags: list[str] = []
-    for param in command.params:
-        if isinstance(param, click.Option):
-            flags.extend(param.opts)
-            flags.extend(param.secondary_opts)
-    return tuple(sorted({flag for flag in flags if flag}))
-
-
-_OPTION_COMMENT = "# showcov options: " + " ".join(_collect_option_flags(main))
-
 _EXIT_STATUS = """\
 0  success
 1  generic error (unexpected failure)
@@ -43,32 +28,45 @@ _EXIT_STATUS = """\
 """
 
 
-def _build_plain_command() -> click.Command:
-    """Return a plain Click command mirroring :data:`main`.
+def _get_main_command() -> click.Command:
+    # Local import prevents circular import:
+    # - completion command imports scripts
+    # - scripts importing cli at import time would cycle
+    from showcov.cli import main  # noqa: PLC0415
 
-    This avoids the rich-click `RichCommand` help machinery, which expects a
-    Rich-specific formatter object with extra attributes (like ``config``).
-    For man-page generation we only need a stable, plain-text help string.
-    """
-    return click.Command(
-        name="showcov",
-        callback=main.callback,
-        params=main.params,
-        help=main.help,
-        epilog=main.epilog,
-        context_settings=main.context_settings,
-    )
+    return main
+
+
+def _collect_option_flags(command: click.Command) -> tuple[str, ...]:
+    flags: set[str] = set()
+
+    def visit(cmd: click.Command) -> None:
+        for param in getattr(cmd, "params", []):
+            if isinstance(param, click.Option):
+                flags.update(param.opts)
+                flags.update(param.secondary_opts)
+
+        if isinstance(cmd, click.Group):
+            for sub in cmd.commands.values():
+                visit(sub)
+
+    visit(command)
+    return tuple(sorted({f for f in flags if f}))
 
 
 def build_man_page() -> str:
-    """Return a plain-text manual page for :mod:`showcov`'s CLI."""
-    plain_cmd = _build_plain_command()
-    ctx = click.Context(plain_cmd, info_name="showcov")
-    help_text = plain_cmd.get_help(ctx).strip()
+    """Return a plain-text manual page for showcov's CLI."""
+    main = _get_main_command()
+    ctx = click.Context(main, info_name="showcov")
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        help_text = main.get_help(ctx).strip()
+    help_text = help_text or buf.getvalue().strip()
+
     sections = [
         "SHOWCOV(1)\n",
         "NAME\n----\nshowcov - unified coverage report generator\n\n",
-        "SYNOPSIS\n--------\nshowcov [OPTIONS] [PATHS]...\n\n",
+        "SYNOPSIS\n--------\nshowcov [COMMAND] [ARGS]...\n\n",
         "DESCRIPTION\n-----------\n",
         help_text,
         "\n\nEXIT STATUS\n-----------\n",
@@ -78,21 +76,12 @@ def build_man_page() -> str:
     return "".join(sections)
 
 
-def write_man_page(destination: Path) -> None:
-    """Write the generated manual page to *destination*."""
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    destination.write_text(build_man_page(), encoding="utf-8")
-
-
 def build_completion_script(shell: ShellName) -> str:
     """Return a shell completion script for *shell*."""
+    main = _get_main_command()
+    option_comment = "# showcov options: " + " ".join(_collect_option_flags(main))
+
     complete_cls = _COMPLETE_CLASSES[shell]
     complete = complete_cls(main, {}, "showcov", _COMPLETE_VAR)
     script = complete.source()
-    return f"{_OPTION_COMMENT}\n{script}"
-
-
-def write_completion_script(shell: ShellName, destination: Path) -> None:
-    """Write the completion script for *shell* to *destination*."""
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    destination.write_text(build_completion_script(shell), encoding="utf-8")
+    return f"{option_comment}\n{script}"
