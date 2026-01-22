@@ -13,7 +13,11 @@ if TYPE_CHECKING:
 
 
 def read_file_lines_uncached(path: Path) -> list[str]:
-    return path.read_text(encoding="utf-8", errors="replace").splitlines()
+    try:
+        return path.read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        # Coverage XML often references paths that don't exist in the current workspace.
+        return []
 
 
 def detect_line_tag(code: str) -> str | None:

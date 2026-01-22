@@ -111,5 +111,5 @@ def test_render_invalid_format_raises(project: dict[str, Path]) -> None:
     )
     report = _report_for_render(root, cov)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"Unsupported format"):
         render(report, fmt="nope", options=RenderOptions(color=False))

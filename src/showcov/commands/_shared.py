@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import sys
 import tomllib
 from dataclasses import replace
 from enum import StrEnum
 from pathlib import Path
+from tomllib import TOMLDecodeError
 from typing import TYPE_CHECKING
 
 import click.utils as click_utils
@@ -22,6 +24,7 @@ from showcov.render.render import RenderOptions, render
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+    from showcov.model.report import Report
     from showcov.model.types import BranchMode, SummarySort
 
 EXIT_OK = 0
@@ -80,7 +83,7 @@ def _pyproject_coverage_xml_output(project_root: Path) -> Path | None:
         data = tomllib.loads(pp.read_text(encoding="utf-8"))
     except OSError:
         return None
-    except Exception:
+    except (TOMLDecodeError, UnicodeError, ValueError):
         return None
 
     tool = data.get("tool", {})
@@ -165,8 +168,6 @@ def compute_io_policy(
     output: Path | None,
 ) -> tuple[str, bool, bool]:
     """Return (render_fmt, is_tty_like, color_allowed)."""
-    import sys
-
     allow_tty_output = output in {None, Path("-")}
     stdout = sys.stdout
 
@@ -186,7 +187,7 @@ def compute_io_policy(
 
 
 def apply_thresholds_or_exit(
-    report,
+    report: Report,
     *,
     fail_under_stmt: float | None,
     fail_under_branches: float | None,
@@ -235,7 +236,7 @@ def build_and_render(
     is_tty_like: bool,
     color: bool,
     drop_empty_branches: bool,
-):
+) -> tuple[Report, str]:
     opts = BuildOptions(
         coverage_paths=coverage_paths,
         base_path=base_path,
@@ -254,7 +255,7 @@ def build_and_render(
     )
 
     try:
-        report = build_report(opts)
+        report: Report = build_report(opts)
         if want_snippets or want_file_stats:
             report = enrich_report(report, opts)
     except CoverageXMLNotFoundError as exc:

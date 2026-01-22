@@ -39,7 +39,7 @@ def test_parse_threshold() -> None:
     assert t.branch == 80
     assert t.misses == 10
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"threshold expression must be non-empty"):
         parse_threshold("")
 
 

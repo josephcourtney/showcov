@@ -138,7 +138,10 @@ def _build_lines_section(
 
     # collect uncovered lines per file
     for file in files:
-        lines = [line for f, line, hits, _bc, _mb, _conds in records if f == file and hits == 0]
+        # Use merged max-hits across all inputs so multi-report merges only mark
+        # a statement line uncovered if every input missed it.
+        stmt_records = _deduplicate_statement_records(file, records)
+        lines = [line for line, hits in stmt_records if hits == 0]
         if not lines:
             by_file[file] = []
             continue

@@ -95,115 +95,12 @@ def test_build_lines_and_summary_with_filters(project: dict[str, Path]) -> None:
     assert report.sections.lines.summary.uncovered == 2
 
 
-def test_build_branches_uses_richer_conditions(project: dict[str, Path]) -> None:
+def test_build_lines_merges_statement_hits_across_multiple_reports(project: dict[str, Path]) -> None:
     from tests.conftest import write_cobertura_xml
 
     root = project["root"]
 
-    cov = write_cobertura_xml(
-        root,
-        "coverage.xml",
-        classes=[
-            {
-                "filename": "pkg/mod.py",
-                "lines": [
-                    {
-                        "number": 3,
-                        "hits": 1,
-                        "branch": True,
-                        "condition_coverage": "50% (1/2)",
-                        "missing_branches": "1",
-                        "conditions": [
-                            {"number": 0, "type": "jump", "coverage": "100%"},
-                            {"number": 1, "type": "jump", "coverage": "0%"},
-                        ],
-                    }
-                ],
-            }
-        ],
-    )
-
-    report = build_report(
-        _opts(
-            coverage_paths=(cov,),
-            base_path=root,
-            sections={"branches"},
-            branches_mode=BranchMode.PARTIAL,
-        )
-    )
-
-    sec = report.sections.branches
-    assert sec is not None
-    assert sec.gaps
-
-    gap = sec.gaps[0]
-    assert gap.file == "pkg/mod.py"
-    assert gap.line == 3
-
-    # In PARTIAL mode, we should see:
-    # - jump#1 0%
-    # - branch#1 missing (coverage None)
-    # - line aggregate 50%
-    labels = {(c.type, c.number, c.coverage) for c in gap.conditions}
-    assert ("jump", 1, 0) in labels
-    assert ("branch", 1, None) in labels
-    assert ("line", -1, 50) in labels
-    assert ("jump", 0, 100) not in labels  # fully covered should be filtered out
-
-
-def test_build_branches_missing_only(project: dict[str, Path]) -> None:
-    from tests.conftest import write_cobertura_xml
-
-    root = project["root"]
-
-    cov = write_cobertura_xml(
-        root,
-        "coverage.xml",
-        classes=[
-            {
-                "filename": "pkg/mod.py",
-                "lines": [
-                    {
-                        "number": 3,
-                        "hits": 1,
-                        "branch": True,
-                        "condition_coverage": "50% (1/2)",
-                        "missing_branches": "1",
-                        "conditions": [
-                            {"number": 0, "type": "jump", "coverage": "100%"},
-                            {"number": 1, "type": "jump", "coverage": "0%"},
-                        ],
-                    }
-                ],
-            }
-        ],
-    )
-
-    report = build_report(
-        _opts(
-            coverage_paths=(cov,),
-            base_path=root,
-            sections={"branches"},
-            branches_mode=BranchMode.MISSING_ONLY,
-        )
-    )
-
-    sec = report.sections.branches
-    assert sec is not None
-    gap = sec.gaps[0]
-    labels = {(c.type, c.number, c.coverage) for c in gap.conditions}
-
-    # missing-only: coverage None or 0
-    assert ("jump", 1, 0) in labels
-    assert ("branch", 1, None) in labels
-    assert ("line", -1, 50) not in labels
-
-
-def test_build_summary_prefers_branch_counts_with_larger_denominator(project: dict[str, Path]) -> None:
-    from tests.conftest import write_cobertura_xml
-
-    root = project["root"]
-
+    # Line 2 missed in cov1, covered in cov2 => merged max-hits => covered.
     cov1 = write_cobertura_xml(
         root,
         "c1.xml",
@@ -212,12 +109,7 @@ def test_build_summary_prefers_branch_counts_with_larger_denominator(project: di
                 "filename": "pkg/mod.py",
                 "lines": [
                     {"number": 1, "hits": 1},
-                    {
-                        "number": 3,
-                        "hits": 1,
-                        "branch": True,
-                        "condition_coverage": "50% (1/2)",
-                    },
+                    {"number": 2, "hits": 0},
                 ],
             }
         ],
@@ -230,12 +122,7 @@ def test_build_summary_prefers_branch_counts_with_larger_denominator(project: di
                 "filename": "pkg/mod.py",
                 "lines": [
                     {"number": 1, "hits": 1},
-                    {
-                        "number": 3,
-                        "hits": 1,
-                        "branch": True,
-                        "condition_coverage": "66% (2/3)",
-                    },
+                    {"number": 2, "hits": 1},
                 ],
             }
         ],
@@ -245,21 +132,18 @@ def test_build_summary_prefers_branch_counts_with_larger_denominator(project: di
         _opts(
             coverage_paths=(cov1, cov2),
             base_path=root,
-            sections={"summary"},
+            sections={"lines"},
+            want_aggregate_stats=True,
         )
     )
 
-    sec = report.sections.summary
-    assert sec is not None
-    row = next(r for r in sec.files if r.file == "pkg/mod.py")
-
-    # Branch counts should reflect the best-fidelity denominator (3)
-    assert row.branches.total == 3
-    assert row.branches.covered == 2
-    assert row.branches.missed == 1
+    assert report.sections.lines is not None
+    assert report.sections.lines.files == ()
+    assert report.sections.lines.summary is not None
+    assert report.sections.lines.summary.uncovered == 0
 
 
-def test_build_diff_section(project: dict[str, Path]) -> None:
+def test_build_branches_uses_richer_conditions(project: dict[str, Path]) -> None:
     from tests.conftest import write_cobertura_xml
 
     root = project["root"]

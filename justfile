@@ -138,7 +138,7 @@ setup:
 [group('code quality')]
 lint:
   @just _log_start lint
-  {{RUFF}} check --fix {{PY_SRC}} {{PY_TESTPATH}} || true
+  {{RUFF}} check --fix {{PY_SRC}} {{PY_TESTPATH}} 
   @just _log_end lint
 
 # Code Quality: Check for linting violations with `ruff check` without modifying files
@@ -159,7 +159,7 @@ lint-imports:
 [group('code quality')]
 format:
   @just _log_start format
-  {{RUFF}} format {{PY_SRC}} {{PY_TESTPATH}} || true
+  {{RUFF}} format {{PY_SRC}} {{PY_TESTPATH}} 
   @just _log_end format
 
 # Code Quality: Check for formatting violations with `ruff format` without modifying files
@@ -190,7 +190,7 @@ typecheck:
 [group('code quality')]
 dead-code:
   @just _log_start dead-code
-  {{VULTURE}} {{PY_SRC}} {{PY_TESTPATH}} || true
+  {{VULTURE}} {{PY_SRC}} {{PY_TESTPATH}} 
   @just _log_end dead-code
 
 # Code Quality: complexity report
@@ -249,13 +249,13 @@ sec-deps:
 [group('testing')]
 test-pretty:
   @just _log_start test
-  {{PYTEST}} --rich {{PY_TESTPATH}} || true
+  {{PYTEST}} --rich {{PY_TESTPATH}} 
   @just _log_end test
 
 [group('testing')]
 test:
   @just _log_start test
-  {{PYTEST}} {{PY_TESTPATH}} || true
+  {{PYTEST}} {{PY_TESTPATH}} 
   @just _log_end test
 
 # Testing: Run full test suite and fail if any test fails
@@ -330,7 +330,7 @@ cov:
 [group('test quality')]
 cov-lines:
   @just _log_start cov-lines
-  bash -euo pipefail -c 'if [ -x {{SHOWCOV}} ]; then {{SHOWCOV}} --code --context 2,2 || true; else echo "[cov-lines] skipping: showcov ({{SHOWCOV}}) not found"; fi'
+  bash -euo pipefail -c 'if [ -x {{SHOWCOV}} ]; then {{SHOWCOV}} --code --context 2,2 ; else echo "[cov-lines] skipping: showcov ({{SHOWCOV}}) not found"; fi'
   @just _log_end cov-lines
 
 # Test Quality: Run mutation testing on the test suite

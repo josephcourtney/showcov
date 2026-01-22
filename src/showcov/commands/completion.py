@@ -8,7 +8,7 @@ from showcov.commands._shared import EXIT_OK, write_output
 from showcov.scripts import build_completion_script
 
 if TYPE_CHECKING:
-    import pathlib
+    from pathlib import Path
 
 ShellName = Literal["bash", "zsh", "fish"]
 
@@ -21,7 +21,7 @@ def register(app: typer.Typer) -> None:
             typer.Argument(..., help="Shell name: bash, zsh, or fish."),
         ],
         output: Annotated[
-            pathlib.Path | None,
+            Path | None,
             typer.Option("--output", help="Write script to PATH (use '-' for stdout)."),
         ] = None,
     ) -> None:

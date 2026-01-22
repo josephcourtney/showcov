@@ -110,7 +110,7 @@ def write_cobertura_xml(
 
 @pytest.fixture
 def project(tmp_path: Path) -> dict[str, Path]:
-    """A tiny “project” on disk with a couple of source files."""
+    """Create a tiny “project” on disk with a couple of source files."""
     write_source_file(
         tmp_path,
         "pkg/mod.py",
