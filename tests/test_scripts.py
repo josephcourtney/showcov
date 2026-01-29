@@ -14,3 +14,4 @@ def test_build_completion_script_includes_report_flags() -> None:
     assert "--format" in script
     assert "--snippets" in script
     assert "--fail-under-stmt" in script
+    assert "--sections" in script

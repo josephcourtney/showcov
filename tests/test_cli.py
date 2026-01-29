@@ -24,7 +24,7 @@ def test_cli_report_default_auto_format_non_tty(project) -> None:
     assert "2" in result.output
 
 
-def test_cli_report_human_format(project) -> None:
+def test_cli_report_sections_summary_only(project) -> None:
     from tests.conftest import write_cobertura_xml
 
     root = project["root"]
@@ -35,10 +35,12 @@ def test_cli_report_human_format(project) -> None:
     )
 
     runner = CliRunner()
-    result = runner.invoke(main, ["report", str(cov), "--format", "human", "--branches", "off"])
+    result = runner.invoke(
+        main, ["report", str(cov), "--format", "human", "--branches", "off", "--sections", "summary"]
+    )
     assert result.exit_code == 0, result.output
-    assert "Uncovered Lines" in result.output
-    assert "pkg/mod.py" in result.output
+    assert "Summary" in result.output
+    assert "Uncovered Lines" not in result.output
 
 
 def test_cli_threshold_failure_exit_code_2(project) -> None:

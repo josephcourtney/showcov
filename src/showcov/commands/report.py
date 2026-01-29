@@ -21,6 +21,28 @@ from ._shared import (
 
 BranchesModeName = Literal["off", "missing", "partial", "all"]
 
+_ALLOWED_SECTIONS: set[str] = {"lines", "branches", "summary"}
+
+
+def _parse_sections(raw: list[str], *, default: set[str]) -> set[str]:
+    """Parse --sections tokens (repeatable and/or comma-separated) into a set."""
+    if not raw:
+        return set(default)
+
+    out: set[str] = set()
+    for token in raw:
+        for part in (token or "").replace(",", " ").split():
+            name = part.strip().lower()
+            if not name:
+                continue
+            if name not in _ALLOWED_SECTIONS:
+                allowed = ", ".join(sorted(_ALLOWED_SECTIONS))
+                msg = f"unknown section {name!r}. Expected one of: {allowed}"
+                raise typer.BadParameter(msg)
+            out.add(name)
+
+    return out or set(default)
+
 
 def _resolve_branches_mode(mode: BranchesModeName) -> BranchMode | None:
     m = (mode or "partial").strip().lower()
@@ -44,6 +66,14 @@ def register(app: typer.Typer) -> None:
             OutputFormat,
             typer.Option("--format", help="Output format: auto, human, grep."),
         ] = OutputFormat.AUTO,
+        sections: Annotated[
+            list[str] | None,
+            typer.Option(
+                "--section",
+                "--sections",
+                help="Sections to include (repeatable or comma-separated): lines, branches, summary.",
+            ),
+        ] = None,
         branches: Annotated[
             BranchesModeName,
             typer.Option(
@@ -99,6 +129,8 @@ def register(app: typer.Typer) -> None:
             typer.Option("--paths/--no-paths", help="Show file paths in output."),
         ] = True,
     ) -> None:
+        if sections is None:
+            sections = []
         try:
             cov_paths = resolve_coverage_paths(coverage_xml, cwd=Path.cwd())
         except CoverageXMLNotFoundError as exc:
@@ -111,16 +143,31 @@ def register(app: typer.Typer) -> None:
         use_color = bool(color or color_allowed) and not no_color
 
         want_snippets = bool(code or context > 0)
-        sections = {"lines", "summary"} | ({"branches"} if branches_mode is not None else set())
+        default_sections = {"lines", "summary"} | ({"branches"} if branches_mode is not None else set())
+        sections_set = _parse_sections(sections, default=default_sections)
+
+        # Validate section/mode consistency.
+        if "branches" in sections_set and branches_mode is None:
+            msg = "sections include 'branches' but --branches=off disables branch reporting"
+            raise typer.BadParameter(msg)
+
+        # Thresholds require specific sections to exist in the built report.
+        if (fail_under_stmt is not None or fail_under_branch is not None) and "summary" not in sections_set:
+            msg = "threshold evaluation for --fail-under-* requires 'summary' in --sections"
+            raise typer.BadParameter(msg)
+        if max_misses is not None and "lines" not in sections_set:
+            msg = "threshold evaluation for --max-misses requires 'lines' in --sections"
+            raise typer.BadParameter(msg)
+
         report, text = build_and_render(
             coverage_paths=tuple(cov_paths),
             base_path=cov_paths[0].parent,
             filters=None,
-            sections=sections,
+            sections=sections_set,
             diff_base=None,
             branches_mode=branches_mode or BranchMode.PARTIAL,
             summary_sort=SummarySort.FILE,
-            want_stats=True,
+            want_stats=bool("lines" in sections_set),
             want_file_stats=False,
             want_snippets=want_snippets,
             context_before=int(context),
