@@ -51,7 +51,7 @@ def _format_code_line_rg(
         prefix = ":".join(parts[:-1]) + parts[-1]  # "path:line:" or "line:"
         return f"{prefix}{sl.code}"
 
-    # No line number: in tty heading mode, just emit ":code"; in grep mode, "path::code" is ugly.
+    # No line number: in tty heading mode, just emit ":code"; in rg mode, "path::code" is ugly.
     if parts:
         prefix = ":".join(parts) + (sep or ":")
         return f"{prefix}{sl.code}"
@@ -148,23 +148,44 @@ def _render_summary_section_rg(sec: SummarySection) -> str:
         return _NO_SUMMARY
 
     out: list[str] = []
+    have_deltas = any(r.delta_missed_statements is not None for r in sec.files)
     for r in sec.files:
         st = r.statements
         bt = r.branches
-        stmt_pct = (st.covered / st.total * 100.0) if st.total else 100.0
-        br_pct = (bt.covered / bt.total * 100.0) if bt.total else 100.0
-        out.append(
-            f"{r.file}: statements {st.covered}/{st.total} ({stmt_pct:.1f}%) "
-            f"branches {bt.covered}/{bt.total} ({br_pct:.1f}%)"
+        brpct = "—" if r.branch_pct is None else f"{r.branch_pct:.1f}%"
+        tag = []
+        if r.untested:
+            tag.append("untested")
+        if r.tiny:
+            tag.append("tiny")
+        tag_s = f" [{' '.join(tag)}]" if tag else ""
+
+        base = (
+            f"{r.file}{tag_s}: "
+            f"stmt {st.covered}/{st.total} ({r.statement_pct:.1f}%) miss={st.missed} "
+            f"br {bt.covered}/{bt.total} ({brpct}) miss={bt.missed} "
+            f"uncovered_lines={r.uncovered_lines} ranges={r.uncovered_ranges}"
         )
+        if have_deltas:
+            base += (
+                f" Δmiss_stmt={r.delta_missed_statements:+d}" if r.delta_missed_statements is not None else ""
+            )
+            base += f" Δmiss_br={r.delta_missed_branches:+d}" if r.delta_missed_branches is not None else ""
+            base += (
+                f" Δuncovered_lines={r.delta_uncovered_lines:+d}"
+                if r.delta_uncovered_lines is not None
+                else ""
+            )
+        out.append(base)
 
     stt = sec.totals.statements
     btt = sec.totals.branches
     stmt_pct = (stt.covered / stt.total * 100.0) if stt.total else 100.0
     br_pct = (btt.covered / btt.total * 100.0) if btt.total else 100.0
     out.append(
-        f"Overall: statements {stt.covered}/{stt.total} ({stmt_pct:.1f}%) "
-        f"branches {btt.covered}/{btt.total} ({br_pct:.1f}%)"
+        f"Overall(weighted): stmt {stt.covered}/{stt.total} ({stmt_pct:.1f}%) "
+        f"br {btt.covered}/{btt.total} ({br_pct:.1f}%) "
+        f"files_with_branches={sec.files_with_branches}/{sec.total_files}"
     )
     return "\n".join(out).rstrip()
 
@@ -189,7 +210,7 @@ def _render_diff_section_rg(sec: DiffSection, *, options: RenderOptions) -> str:
 
 
 def render_rg(report: Report, options: RenderOptions) -> str:
-    """Ripgrep-like output. No filesystem I/O; uses snippets if present."""
+    """Riprg-like output. No filesystem I/O; uses snippets if present."""
     parts: list[str] = []
 
     if report.sections.lines is not None:

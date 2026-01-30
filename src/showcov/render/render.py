@@ -25,6 +25,12 @@ class RenderOptions:
     show_paths: bool = True
     show_line_numbers: bool = True
     is_tty: bool = False
+    # Summary presentation controls
+    show_covered: bool = False
+    summary_group: bool = True
+    summary_group_depth: int = 2
+    summary_top: bool = True
+    summary_top_n: int = 10
 
 
 def render(report: Report, *, fmt: str, options: RenderOptions) -> str:

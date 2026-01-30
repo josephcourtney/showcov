@@ -5,18 +5,19 @@ from typing import Annotated, Literal
 
 import typer
 
+from showcov.coverage.discover import resolve_coverage_paths
 from showcov.errors import CoverageXMLNotFoundError
+from showcov.io import (
+    OutputFormat,
+    compute_io_policy,
+    write_output,
+)
 from showcov.model.types import BranchMode, SummarySort
-
-from ._shared import (
+from showcov.run import (
     EXIT_NOINPUT,
     EXIT_OK,
-    OutputFormat,
     apply_thresholds_or_exit,
     build_and_render,
-    compute_io_policy,
-    resolve_coverage_paths,
-    write_output,
 )
 
 BranchesModeName = Literal["off", "missing", "partial", "all"]
@@ -58,13 +59,19 @@ def _resolve_branches_mode(mode: BranchesModeName) -> BranchMode | None:
 def register(app: typer.Typer) -> None:
     @app.command("report")
     def report_cmd(
+        *,
         coverage_xml: Annotated[
-            list[Path],
-            typer.Argument(..., help="One or more Cobertura-style coverage XML files."),
-        ],
+            list[Path] | None,
+            typer.Argument(
+                help=(
+                    "Zero or more Cobertura-style coverage XML files. "
+                    "If omitted, try to discover from pyproject.toml and common filenames."
+                ),
+            ),
+        ] = None,
         report_format: Annotated[
             OutputFormat,
-            typer.Option("--format", help="Output format: auto, human, grep."),
+            typer.Option("--format", help="Output format: auto, human, rg, json."),
         ] = OutputFormat.AUTO,
         sections: Annotated[
             list[str] | None,
@@ -74,13 +81,34 @@ def register(app: typer.Typer) -> None:
                 help="Sections to include (repeatable or comma-separated): lines, branches, summary.",
             ),
         ] = None,
+        lines: Annotated[
+            bool,
+            typer.Option(
+                "--lines",
+                help="Enable line reporting.",
+            ),
+        ] = False,
         branches: Annotated[
             BranchesModeName,
             typer.Option(
                 "--branches",
                 help="Branch reporting: off, missing, partial, all.",
             ),
-        ] = "partial",
+        ] = "off",
+        sort: Annotated[
+            SummarySort,
+            typer.Option(
+                "--sort",
+                help="Summary sort: file, stmt_cov, br_cov, miss_stmt, miss_br, uncovered_lines.",
+            ),
+        ] = SummarySort.MISSED_STATEMENTS,
+        baseline: Annotated[
+            Path | None,
+            typer.Option(
+                "--baseline",
+                help=("Baseline coverage XML to compute summary deltas (current - baseline)."),
+            ),
+        ] = None,
         fail_under_stmt: Annotated[
             float | None,
             typer.Option("--fail-under-stmt", min=0.0, max=100.0, help="Minimum statement coverage percent."),
@@ -97,7 +125,6 @@ def register(app: typer.Typer) -> None:
             Path | None,
             typer.Option("--output", help="Write output to PATH (use '-' for stdout)."),
         ] = None,
-        *,
         color: Annotated[
             bool,
             typer.Option("--color", help="Force ANSI color output."),
@@ -127,7 +154,38 @@ def register(app: typer.Typer) -> None:
         show_paths: Annotated[
             bool,
             typer.Option("--paths/--no-paths", help="Show file paths in output."),
+        ] = False,
+        show_covered: Annotated[
+            bool,
+            typer.Option(
+                "--show-covered/--no-show-covered",
+                help="Include fully covered files in the summary table.",
+            ),
+        ] = False,
+        summary_group: Annotated[
+            bool,
+            typer.Option(
+                "--summary-group/--no-summary-group",
+                help="Show directory rollups above the file summary table.",
+            ),
         ] = True,
+        summary_group_depth: Annotated[
+            int,
+            typer.Option(
+                "--summary-group-depth", min=1, help="Directory depth for rollups (e.g., 2 => src/pkg)."
+            ),
+        ] = 2,
+        summary_top: Annotated[
+            bool,
+            typer.Option(
+                "--summary-top/--no-summary-top",
+                help="Show 'Top offenders' blocks above the summary table.",
+            ),
+        ] = True,
+        summary_top_n: Annotated[
+            int,
+            typer.Option("--summary-top-n", min=1, help="Number of rows in each 'Top offenders' block."),
+        ] = 10,
     ) -> None:
         if sections is None:
             sections = []
@@ -142,9 +200,21 @@ def register(app: typer.Typer) -> None:
         render_fmt, is_tty_like, color_allowed = compute_io_policy(fmt=report_format, output=output)
         use_color = bool(color or color_allowed) and not no_color
 
+        # In non-TTY auto mode, output resolves to rg/rg style; default should include line data.
+        default_lines = bool(lines or render_fmt == "rg")
+
         want_snippets = bool(code or context > 0)
-        default_sections = {"lines", "summary"} | ({"branches"} if branches_mode is not None else set())
+        default_sections = (
+            {"summary"}
+            | ({"lines"} if default_lines else set())
+            | ({"branches"} if branches_mode is not None else set())
+        )
         sections_set = _parse_sections(sections, default=default_sections)
+
+        # If baseline is provided, it is used for summary deltas; diff section still requires "diff" in sections.
+        if baseline is not None and not baseline.exists():
+            msg = f"--baseline coverage XML not found: {baseline}"
+            raise typer.BadParameter(msg)
 
         # Validate section/mode consistency.
         if "branches" in sections_set and branches_mode is None:
@@ -164,9 +234,9 @@ def register(app: typer.Typer) -> None:
             base_path=cov_paths[0].parent,
             filters=None,
             sections=sections_set,
-            diff_base=None,
+            diff_base=(baseline.resolve() if baseline is not None else None),
             branches_mode=branches_mode or BranchMode.PARTIAL,
-            summary_sort=SummarySort.FILE,
+            summary_sort=sort,
             want_stats=bool("lines" in sections_set),
             want_file_stats=False,
             want_snippets=want_snippets,
@@ -177,6 +247,11 @@ def register(app: typer.Typer) -> None:
             render_fmt=render_fmt,
             is_tty_like=is_tty_like,
             color=use_color,
+            show_covered=bool(show_covered),
+            summary_group=bool(summary_group),
+            summary_group_depth=int(summary_group_depth),
+            summary_top=bool(summary_top),
+            summary_top_n=int(summary_top_n),
             drop_empty_branches=False,
         )
         write_output(text, output)

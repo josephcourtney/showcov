@@ -471,7 +471,7 @@ clean:
 [group('cleaning')]
 stash-untracked:
   @just _log_start stash-untracked
-  bash -euo pipefail -c 'if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then msg="scour:untracked:$(date -u +%Y%m%dT%H%M%SZ)"; if git ls-files --others --exclude-standard --directory --no-empty-directory | grep -q .; then git ls-files --others --exclude-standard -z | xargs -0 git stash push -m "$msg" -- >/dev/null; echo "Stashed untracked (non-ignored) files as: $msg"; else echo "No untracked (non-ignored) paths to stash."; fi; else echo "[stash-untracked] not a git repository; skipping"; fi'
+  bash -euo pipefail -c 'if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then msg="scour:untracked:$(date -u +%Y%m%dT%H%M%SZ)"; if git ls-files --others --exclude-standard --directory --no-empty-directory | rg -q .; then git ls-files --others --exclude-standard -z | xargs -0 git stash push -m "$msg" -- >/dev/null; echo "Stashed untracked (non-ignored) files as: $msg"; else echo "No untracked (non-ignored) paths to stash."; fi; else echo "[stash-untracked] not a git repository; skipping"; fi'
   @just _log_end stash-untracked
 
 # Cleaning: Remove git-ignored files/dirs while keeping .venv

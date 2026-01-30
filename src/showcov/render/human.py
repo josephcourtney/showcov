@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from collections import defaultdict
+from collections.abc import Callable
 from io import StringIO
+from pathlib import PurePosixPath
 from typing import TYPE_CHECKING
 
 from rich.console import Console
@@ -9,7 +12,7 @@ from rich.table import Table
 from showcov.render.table import format_table
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Callable, Iterable, Sequence
 
     from showcov.model.report import (
         BranchesSection,
@@ -17,6 +20,7 @@ if TYPE_CHECKING:
         LinesSection,
         Report,
         SourceLine,
+        SummaryRow,
         SummarySection,
         UncoveredFile,
     )
@@ -170,44 +174,218 @@ def _render_branches_section(sec: BranchesSection, *, options: RenderOptions) ->
     return format_table(headers, rows, color=options.color) or _NO_BRANCHES
 
 
-def _render_summary_section(sec: SummarySection, *, options: RenderOptions) -> str:
+def _is_fully_covered_summary_row(r: SummaryRow) -> bool:
+    stmt_ok = (r.statements.total == 0) or (r.statements.missed == 0)
+    br_ok = (r.branches.total == 0) or (r.branches.missed == 0)
+    return bool(stmt_ok and br_ok and r.uncovered_lines == 0)
+
+
+def _summary_visible_files(sec: SummarySection, *, options: RenderOptions) -> list[SummaryRow]:
+    files = list(sec.files)
+    if not options.show_covered:
+        files = [r for r in files if not _is_fully_covered_summary_row(r)]
+    return files
+
+
+def _render_top_offenders(
+    files: Sequence[SummaryRow],
+    *,
+    options: RenderOptions,
+) -> str:
+    def _top_by(key_fn: Callable[[SummaryRow], tuple[int, int, str]], n: int = 10) -> list[SummaryRow]:
+        return sorted(files, key=key_fn)[:n]
+
+    top_stmt = _top_by(lambda r: (-r.statements.missed, -r.uncovered_lines, r.file))
+    top_br = _top_by(lambda r: (-r.branches.missed, -r.uncovered_lines, r.file))
+
+    def _render_top(title: str, rows_in: Sequence[SummaryRow]) -> str:
+        t = Table(show_header=True, header_style="bold")
+        t.add_column(title)
+        t.add_column("Miss stmt", justify="right")
+        t.add_column("Stmt%", justify="right")
+        t.add_column("Miss br", justify="right")
+        t.add_column("Br%", justify="right")
+        t.add_column("Uncov lines", justify="right")
+        for r in rows_in:
+            brpct = "—" if r.branch_pct is None else f"{r.branch_pct:.1f}%"
+            t.add_row(
+                r.file,
+                str(r.statements.missed),
+                f"{r.statement_pct:.1f}%",
+                str(r.branches.missed),
+                brpct,
+                str(r.uncovered_lines),
+            )
+        return _render_rich_table(t, color=options.color)
+
+    parts: list[str] = [
+        _subheading("Top offenders (statements)", options),
+        _render_top("File", top_stmt),
+        _subheading("Top offenders (branches)", options),
+        _render_top("File", top_br),
+    ]
+    return "\n".join([p for p in parts if p]).rstrip()
+
+
+def _render_directory_rollups(
+    files: Sequence[SummaryRow],
+    *,
+    options: RenderOptions,
+) -> str:
+    if not options.summary_group:
+        return ""
+    depth = max(1, int(options.summary_group_depth))
+    grouped: dict[str, list[SummaryRow]] = defaultdict(list)
+
+    def group_key(path: str) -> str:
+        p = PurePosixPath(path)
+        parts = p.parts
+        if not parts:
+            return path
+        return "/".join(parts[: min(depth, len(parts))])
+
+    for r in files:
+        grouped[group_key(r.file)].append(r)
+
+    roll_rows: list[list[str]] = []
+    for g in sorted(grouped):
+        rs = grouped[g]
+        st_total = sum(x.statements.total for x in rs)
+        st_cov = sum(x.statements.covered for x in rs)
+        st_miss = sum(x.statements.missed for x in rs)
+        br_total = sum(x.branches.total for x in rs)
+        br_cov = sum(x.branches.covered for x in rs)
+        br_miss = sum(x.branches.missed for x in rs)
+        uncov = sum(x.uncovered_lines for x in rs)
+        ranges = sum(x.uncovered_ranges for x in rs)
+
+        stmt_pct = 100.0 if st_total == 0 else (st_cov / st_total) * 100.0
+        br_pct = None if br_total == 0 else (br_cov / br_total) * 100.0
+        br_pct_s = "—" if br_pct is None else f"{br_pct:.1f}%"
+
+        roll_rows.append([
+            g,
+            f"{stmt_pct:.1f}%",
+            str(st_miss),
+            br_pct_s,
+            str(br_miss),
+            str(uncov),
+            str(ranges),
+        ])
+
+    roll_headers = [
+        ("Dir",),
+        ("Stmt%",),
+        ("Miss stmt",),
+        ("Br%",),
+        ("Miss br",),
+        ("Uncov lines",),
+        ("Ranges",),
+    ]
+    roll_table = format_table(roll_headers, roll_rows, color=options.color) if roll_rows else ""
+    if not roll_table:
+        return ""
+    return "\n".join([_subheading("Directory rollups", options), roll_table]).rstrip()
+
+
+def _render_files_table(
+    files: Sequence[SummaryRow],
+    *,
+    options: RenderOptions,
+) -> str:
     headers = [
         ("File",),
+        ("Stmt%",),
         ("Statements", "Total"),
         ("Statements", "Covered"),
         ("Statements", "Missed"),
+        ("Br%",),
         ("Branches", "Total"),
         ("Branches", "Covered"),
         ("Branches", "Missed"),
+        ("Uncov", "Lines"),
+        ("Uncov", "Ranges"),
     ]
+    have_deltas = any(r.delta_missed_statements is not None for r in files)
+    if have_deltas:
+        headers.extend([
+            ("Δ miss", "stmt"),
+            ("Δ miss", "br"),
+            ("Δ uncov", "lines"),
+        ])
 
-    rows: list[list[str]] = [
-        [
-            r.file,
+    def fmt_delta(x: int | None) -> str:
+        if x is None:
+            return ""
+        return f"{x:+d}"
+
+    rows: list[list[str]] = []
+    for r in files:
+        brpct = "—" if r.branch_pct is None else f"{r.branch_pct:.1f}%"
+        row = [
+            r.file + ("  [untested]" if r.untested else "") + ("  [tiny]" if r.tiny else ""),
+            f"{r.statement_pct:.1f}%",
             str(r.statements.total),
             str(r.statements.covered),
             str(r.statements.missed),
+            brpct,
             str(r.branches.total),
             str(r.branches.covered),
             str(r.branches.missed),
+            str(r.uncovered_lines),
+            str(r.uncovered_ranges),
         ]
-        for r in sec.files
-    ]
+        if have_deltas:
+            row.extend([
+                fmt_delta(r.delta_missed_statements),
+                fmt_delta(r.delta_missed_branches),
+                fmt_delta(r.delta_uncovered_lines),
+            ])
+        rows.append(row)
 
     table = format_table(headers, rows, color=options.color) if rows else ""
     if not table:
-        return _NO_SUMMARY
+        return ""
+    return "\n".join([_subheading("Files", options), table]).rstrip()
 
+
+def _render_summary_footer(sec: SummarySection, *, have_deltas: bool) -> str:
     st = sec.totals.statements
     bt = sec.totals.branches
     stmt_pct = (st.covered / st.total * 100.0) if st.total else 100.0
     br_pct = (bt.covered / bt.total * 100.0) if bt.total else 100.0
+    parts = [
+        f"Overall (weighted): statements {st.covered}/{st.total} covered ({stmt_pct:.1f}%)",
+        f"Overall (weighted): branches {bt.covered}/{bt.total} covered ({br_pct:.1f}%)",
+        f"Files with branches: {sec.files_with_branches}/{sec.total_files}",
+        ("Note: baseline deltas are (current - baseline)." if have_deltas else ""),
+    ]
+    return "\n".join([p for p in parts if p]).rstrip()
 
-    footer = "\n".join([
-        f"Statements: {st.covered}/{st.total} covered ({stmt_pct:.1f}%)",
-        f"Branches: {bt.covered}/{bt.total} covered ({br_pct:.1f}%)",
-    ])
-    return f"{table}\n{footer}".rstrip()
+
+def _render_summary_section(sec: SummarySection, *, options: RenderOptions) -> str:
+    files = _summary_visible_files(sec, options=options)
+    if not files:
+        return _NO_SUMMARY
+
+    have_deltas = any(r.delta_missed_statements is not None for r in files)
+
+    blocks: list[str] = []
+    blocks.append(_render_top_offenders(files, options=options))
+
+    rollups = _render_directory_rollups(files, options=options)
+    if rollups:
+        blocks.append(rollups)
+
+    file_table = _render_files_table(files, options=options)
+    if file_table:
+        blocks.append(file_table)
+
+    footer = _render_summary_footer(sec, have_deltas=have_deltas)
+    if footer:
+        blocks.append(footer)
+
+    return "\n".join([b for b in blocks if b]).rstrip()
 
 
 def _render_diff_section(sec: DiffSection, *, options: RenderOptions) -> str:

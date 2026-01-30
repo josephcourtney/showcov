@@ -19,7 +19,7 @@
         },
         "version": {
           "type": "string",
-          "pattern": "^\\d+\\.\\d+\\.\\d+$"
+          "pattern": "^\\d+\\.\\d+\\.\\d+(?:[a-zA-Z0-9\\.\\+\\-]+)?$"
         }
       },
       "required": [

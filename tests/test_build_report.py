@@ -195,3 +195,83 @@ def test_internal_branch_accumulator_prefers_larger_denominator() -> None:
     ]
     accum = build_mod._aggregate_branch_records(records, files={"pkg/mod.py"})
     assert accum["pkg/mod.py", 10]["bc"] == (2, 3)
+
+
+def test_summary_counts_branches_when_only_missing_branches_present(project: dict[str, Path]) -> None:
+    from tests.conftest import write_cobertura_xml
+
+    root = project["root"]
+
+    # No condition-coverage, but missing-branches indicates 2 missing branches.
+    cov = write_cobertura_xml(
+        root,
+        "coverage.xml",
+        classes=[
+            {
+                "filename": "pkg/mod.py",
+                "lines": [
+                    {"number": 1, "hits": 1},
+                    {"number": 3, "hits": 1, "branch": True, "missing_branches": "0,1"},
+                ],
+            }
+        ],
+    )
+
+    report = build_report(
+        _opts(
+            coverage_paths=(cov,),
+            base_path=root,
+            sections={"summary"},
+        )
+    )
+
+    assert report.sections.summary is not None
+    row = next(r for r in report.sections.summary.files if r.file == "pkg/mod.py")
+    assert row.branches.total == 2
+    assert row.branches.covered == 0
+    assert row.branches.missed == 2
+
+
+def test_summary_merges_branch_counts_max_covered_when_denominator_equal(project: dict[str, Path]) -> None:
+    from tests.conftest import write_cobertura_xml
+
+    root = project["root"]
+
+    cov1 = write_cobertura_xml(
+        root,
+        "c1.xml",
+        classes=[
+            {
+                "filename": "pkg/mod.py",
+                "lines": [
+                    {"number": 3, "hits": 1, "branch": True, "condition_coverage": "50% (1/2)"},
+                ],
+            }
+        ],
+    )
+    cov2 = write_cobertura_xml(
+        root,
+        "c2.xml",
+        classes=[
+            {
+                "filename": "pkg/mod.py",
+                "lines": [
+                    {"number": 3, "hits": 1, "branch": True, "condition_coverage": "100% (2/2)"},
+                ],
+            }
+        ],
+    )
+
+    report = build_report(
+        _opts(
+            coverage_paths=(cov1, cov2),
+            base_path=root,
+            sections={"summary"},
+        )
+    )
+
+    assert report.sections.summary is not None
+    row = next(r for r in report.sections.summary.files if r.file == "pkg/mod.py")
+    assert row.branches.total == 2
+    assert row.branches.covered == 2
+    assert row.branches.missed == 0

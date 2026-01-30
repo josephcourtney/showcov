@@ -89,7 +89,7 @@ respect-gitignore = true
     "FIX",   # flake8-fixme
     "ERA",   # eradicate
     "PD",    # pandas-vet
-    "PGH",   # pygrep-hooks
+    "PGH",   # pyrg-hooks
     "PL",    # Pylint
     "TRY",   # tryceratops
     "FLY",   # flynt

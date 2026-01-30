@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.2.3] - 2026-01-29
+
+### Added
+
+- add `--format json` to `showcov report` and `showcov diff` for schema-validated machine output
+
+### Changed
+
+- make `showcov report` coverage XML arguments optional and enable discovery when omitted
+
+### Fixed
+
+- fix branch summary counts when coverage XML provides `missing-branches` without `condition-coverage`
+- fix branch summary merging across multiple reports to avoid order-dependent covered-branch undercount
+
 ## [0.2.2] - 2026-01-29
 
 ### Added
@@ -52,12 +67,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - refactor human output formatter into smaller helpers for improved readability
-- refactor ripgrep-style line renderer into smaller helpers for improved readability
+- refactor riprg-style line renderer into smaller helpers for improved readability
 
 ### Fixed
 
 - fix CLI threshold option typing so typecheck passes when evaluating thresholds
-- fix typing in ripgrep renderer mapping helper to satisfy static type checker
+- fix typing in riprg renderer mapping helper to satisfy static type checker
 - add a default for `OutputMeta.is_tty` so existing tests and callers do not need to pass it explicitly
 
 ## [0.1.0] - 2025-11-08

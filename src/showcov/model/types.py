@@ -21,9 +21,15 @@ class SummarySort(StrEnum):
     """Ordering options for coverage summary tables."""
 
     FILE = "file"
-    STATEMENT_COVERAGE = "stmt_cov"
-    BRANCH_COVERAGE = "br_cov"
-    MISSES = "miss"
+    # Percentages
+    STATEMENT_COVERAGE = "stmt_cov"  # ascending (worst first)
+    BRANCH_COVERAGE = "br_cov"  # ascending (worst first)
+    # Misses / hotness
+    MISSED_STATEMENTS = "miss_stmt"  # descending (worst first)
+    MISSED_BRANCHES = "miss_br"  # descending (worst first)
+    UNCOVERED_LINES = "uncovered_lines"  # descending (worst first)
+    # Legacy alias: keep for compatibility
+    MISSES = "miss"  # maps to MISSED_STATEMENTS
 
 
 FULL_COVERAGE: int = 100

@@ -1,22 +1,21 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Annotated
+from pathlib import Path  # noqa: TC003
+from typing import Annotated
 
 import typer
 
-from showcov.model.types import BranchMode, SummarySort
-
-from ._shared import (
-    EXIT_NOINPUT,
-    EXIT_OK,
+from showcov.io import (
     OutputFormat,
-    build_and_render,
     compute_io_policy,
     write_output,
 )
-
-if TYPE_CHECKING:
-    from pathlib import Path
+from showcov.model.types import BranchMode, SummarySort
+from showcov.run import (
+    EXIT_NOINPUT,
+    EXIT_OK,
+    build_and_render,
+)
 
 
 def register(app: typer.Typer) -> None:
@@ -26,7 +25,7 @@ def register(app: typer.Typer) -> None:
         current: Annotated[Path, typer.Argument(..., help="Current coverage XML.")],
         output_format: Annotated[
             OutputFormat,
-            typer.Option("--format", help="Output format: auto, human, grep."),
+            typer.Option("--format", help="Output format: auto, human, rg, json."),
         ] = OutputFormat.AUTO,
         output: Annotated[
             Path | None,

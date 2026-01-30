@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Annotated
+from pathlib import Path  # noqa: TC003
+from typing import Annotated
 
 import typer
 
-from showcov.commands._shared import EXIT_OK, write_output
+from showcov.io import write_output
+from showcov.run import EXIT_OK
 from showcov.scripts import build_man_page
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 
 def register(app: typer.Typer) -> None:

@@ -11,7 +11,7 @@ from showcov.errors import CoverageXMLNotFoundError, InvalidCoverageXMLError
 
 def test_resolve_coverage_paths_explicit_missing(tmp_path: Path) -> None:
     with pytest.raises(CoverageXMLNotFoundError):
-        resolve_coverage_paths([tmp_path / "nope.xml"])
+        resolve_coverage_paths([tmp_path / "nope.xml"], cwd=tmp_path)
 
 
 def test_resolve_coverage_paths_default_coverage_xml(tmp_path: Path) -> None:
@@ -24,7 +24,7 @@ def test_resolve_coverage_paths_default_coverage_xml(tmp_path: Path) -> None:
         import os
 
         os.chdir(tmp_path)
-        got = resolve_coverage_paths(None)
+        got = resolve_coverage_paths(None, cwd=tmp_path)
         assert got == (p.resolve(),)
     finally:
         import os

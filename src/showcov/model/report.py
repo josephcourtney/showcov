@@ -201,6 +201,18 @@ class SummaryRow:
     file: str
     statements: SummaryCounts
     branches: SummaryCounts
+    # Derived / actionable fields
+    statement_pct: float = 100.0
+    branch_pct: float | None = None  # None when branches.total == 0
+    uncovered_lines: int = 0
+    uncovered_ranges: int = 0
+    # Baseline deltas (current - baseline); only present when baseline provided
+    delta_missed_statements: int | None = None
+    delta_missed_branches: int | None = None
+    delta_uncovered_lines: int | None = None
+    # Lightweight tags
+    untested: bool = False  # statements.total > 0 and statements.covered == 0
+    tiny: bool = False  # statements.total is very small (heuristic)
 
 
 @dataclass(frozen=True, slots=True)
@@ -213,6 +225,9 @@ class SummaryTotals:
 class SummarySection:
     files: tuple[SummaryRow, ...]
     totals: SummaryTotals
+    # Extra summary metadata (presentation/trust)
+    files_with_branches: int = 0
+    total_files: int = 0
 
 
 # -----------------------------------------------------------------------------

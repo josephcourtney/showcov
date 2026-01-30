@@ -7,10 +7,7 @@ import typer
 from typer.main import get_command
 
 from showcov import __version__
-from showcov.commands import completion as completion_cmd
-from showcov.commands import diff as diff_cmd
-from showcov.commands import man as man_cmd
-from showcov.commands import report as report_cmd
+from showcov.cli import completion, diff, man, report
 
 if TYPE_CHECKING:
     from types import ModuleType
@@ -43,13 +40,13 @@ def _patch_typer_annotation_globals(module: ModuleType) -> None:
 
 
 # Patch modules before building the Click command so annotation evaluation is safe.
-for _mod in (completion_cmd, man_cmd, diff_cmd, report_cmd):
+for _mod in (completion, man, diff, report):
     _patch_typer_annotation_globals(_mod)
 
-report_cmd.register(app)
-diff_cmd.register(app)
-completion_cmd.register(app)
-man_cmd.register(app)
+report.register(app)
+diff.register(app)
+completion.register(app)
+man.register(app)
 
 main = get_command(app)
 cli = main
