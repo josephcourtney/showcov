@@ -1,269 +1,280 @@
 from __future__ import annotations
 
+import sys
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import TYPE_CHECKING, Annotated
 
+import click.utils as click_utils
 import typer
 
-from showcov.coverage.discover import resolve_coverage_paths
-from showcov.errors import CoverageXMLNotFoundError
-from showcov.io import (
-    OutputFormat,
-    compute_io_policy,
-    write_output,
-)
-from showcov.model.types import BranchMode, SummarySort
-from showcov.run import (
+from showcov.cli._shared import resolve_use_color
+from showcov.cli.exit_codes import (
+    EXIT_DATAERR,
+    EXIT_GENERIC,
     EXIT_NOINPUT,
     EXIT_OK,
-    apply_thresholds_or_exit,
-    build_and_render,
+    EXIT_THRESHOLD,
 )
+from showcov.core.model.path_filter import PathFilter
+from showcov.core.model.thresholds import Threshold
+from showcov.core.model.types import BranchMode, SummarySort
+from showcov.core.pipeline import (
+    DataError,
+    NoInputError,
+    SystemIOError,
+    ThresholdError,
+    UnexpectedError,
+    build_and_render_text,
+    evaluate_thresholds_or_raise,
+)
+from showcov.inputs.discover import resolve_coverage_paths
+from showcov.io import write_output
 
-BranchesModeName = Literal["off", "missing", "partial", "all"]
+if TYPE_CHECKING:
+    from showcov.core.model.report import Report
 
-_ALLOWED_SECTIONS: set[str] = {"lines", "branches", "summary"}
-
-
-def _parse_sections(raw: list[str], *, default: set[str]) -> set[str]:
-    """Parse --sections tokens (repeatable and/or comma-separated) into a set."""
-    if not raw:
-        return set(default)
-
-    out: set[str] = set()
-    for token in raw:
-        for part in (token or "").replace(",", " ").split():
-            name = part.strip().lower()
-            if not name:
-                continue
-            if name not in _ALLOWED_SECTIONS:
-                allowed = ", ".join(sorted(_ALLOWED_SECTIONS))
-                msg = f"unknown section {name!r}. Expected one of: {allowed}"
-                raise typer.BadParameter(msg)
-            out.add(name)
-
-    return out or set(default)
+_BOOL_TRUE = True
+_BOOL_FALSE = False
 
 
-def _resolve_branches_mode(mode: BranchesModeName) -> BranchMode | None:
-    m = (mode or "partial").strip().lower()
-    if m == "off":
-        return None
-    if m == "missing":
-        return BranchMode.MISSING_ONLY
-    if m == "all":
-        return BranchMode.ALL
-    return BranchMode.PARTIAL
+def _is_tty_stdout() -> bool:
+    try:
+        return bool(getattr(sys.stdout, "isatty", lambda: False)())
+    except OSError:
+        return False
+
+
+def _build_report_and_text(
+    *,
+    coverage_paths: tuple[Path, ...],
+    filters: PathFilter | None,
+    sections: set[str],
+    want_snippets: bool,
+    context: int,
+    sort: SummarySort,
+    group_depth: int,
+    is_tty_like: bool,
+    use_color: bool,
+) -> tuple[Report, str]:
+    base_path = Path.cwd()
+    try:
+        return build_and_render_text(
+            coverage_paths=tuple(coverage_paths),
+            base_path=base_path,
+            filters=filters,
+            sections=sections,
+            branches_mode=BranchMode.PARTIAL,
+            summary_sort=sort,
+            want_stats=("lines" in sections),
+            want_file_stats=False,
+            want_snippets=want_snippets,
+            context_before=context,
+            context_after=context,
+            show_paths=True,
+            show_line_numbers=True,
+            render_fmt="human",
+            is_tty_like=is_tty_like,
+            color=use_color,
+            show_covered=False,
+            summary_group=True,
+            summary_group_depth=group_depth,
+            drop_empty_branches=True,
+        )
+    except NoInputError as exc:
+        typer.echo(f"ERROR: {exc}", err=True)
+        raise typer.Exit(code=EXIT_NOINPUT) from exc
+    except SystemIOError as exc:
+        typer.echo(f"ERROR: {exc}", err=True)
+        raise typer.Exit(code=EXIT_NOINPUT) from exc
+    except DataError as exc:
+        typer.echo(f"ERROR: {exc}", err=True)
+        raise typer.Exit(code=EXIT_DATAERR) from exc
+    except UnexpectedError as exc:
+        typer.echo(f"ERROR: {exc}", err=True)
+        raise typer.Exit(code=EXIT_GENERIC) from exc
+
+
+def report_cmd(
+    include: Annotated[
+        list[str] | None,
+        typer.Option(
+            "-i",
+            "--include",
+            help="Include glob patterns (repeatable).",
+        ),
+    ] = None,
+    exclude: Annotated[
+        list[str] | None,
+        typer.Option(
+            "-x",
+            "--exclude",
+            help="Exclude glob patterns (repeatable).",
+        ),
+    ] = None,
+    coverage: Annotated[
+        list[Path] | None,
+        typer.Argument(help="Coverage XML file(s). If omitted, discovery is used."),
+    ] = None,
+    # Section toggles (simpler than --sections)
+    lines: Annotated[
+        bool,
+        typer.Option("--lines/--no-lines", help="Show uncovered statement lines."),
+    ] = _BOOL_TRUE,
+    branches: Annotated[
+        bool,
+        typer.Option("--branches/--no-branches", help="Show partially covered branch lines."),
+    ] = _BOOL_TRUE,
+    summary: Annotated[
+        bool,
+        typer.Option("--summary/--no-summary", help="Show summary and directory rollups."),
+    ] = _BOOL_TRUE,
+    # Code/snippets (replaces --snippets)
+    code: Annotated[
+        bool,
+        typer.Option("--code/--no-code", help="Include source snippets for uncovered lines."),
+    ] = _BOOL_FALSE,
+    context: Annotated[
+        int,
+        typer.Option(
+            "-C",
+            "--context",
+            help="Context lines around uncovered lines (implies --code when > 0).",
+            min=0,
+        ),
+    ] = 0,
+    # Summary knobs
+    sort: Annotated[
+        SummarySort,
+        typer.Option(
+            "--sort",
+            help="Sort order for summary.",
+            case_sensitive=False,
+        ),
+    ] = SummarySort.MISSED_STATEMENTS,
+    group_depth: Annotated[
+        int,
+        typer.Option(
+            "--group-depth",
+            help="Directory rollup depth for summary (e.g., 2 groups by top two path parts).",
+            min=1,
+        ),
+    ] = 2,
+    # Thresholds (keep the same semantics)
+    fail_under_stmt: Annotated[
+        float | None,
+        typer.Option("--fail-under-stmt", help="Fail if statement coverage % is below this value"),
+    ] = None,
+    fail_under_branches: Annotated[
+        float | None,
+        typer.Option("--fail-under-branches", help="Fail if branch coverage % is below this value"),
+    ] = None,
+    max_misses: Annotated[
+        int | None,
+        typer.Option("--max-misses", help="Fail if total uncovered statement lines exceeds this value"),
+    ] = None,
+    output: Annotated[
+        Path | None,
+        typer.Option("--output", help="Write output to PATH (use '-' for stdout)."),
+    ] = None,
+    color: Annotated[
+        bool,
+        typer.Option("--color", help="Force color output"),
+    ] = _BOOL_FALSE,
+    no_color: Annotated[
+        bool,
+        typer.Option("--no-color", help="Disable color output"),
+    ] = _BOOL_FALSE,
+) -> None:
+    include = include or []
+    exclude = exclude or []
+
+    coverage_paths = resolve_coverage_paths(coverage, cwd=Path.cwd())
+
+    sections: set[str] = set()
+    if lines:
+        sections.add("lines")
+    if branches:
+        sections.add("branches")
+    if summary:
+        sections.add("summary")
+
+    # If user disables everything, default to summary (least surprising).
+    if not sections:
+        sections = {"summary"}
+
+    filters = (
+        PathFilter(include=tuple(include), exclude=tuple(exclude), base=Path.cwd())
+        if (include or exclude)
+        else None
+    )
+
+    want_snippets = bool(code or context > 0)
+
+    is_tty_like = _is_tty_stdout() and (output is None or output == Path("-"))
+    ansi_allowed = not click_utils.should_strip_ansi(sys.stdout)
+    color_allowed = bool(is_tty_like and ansi_allowed)
+    use_color = resolve_use_color(color=color, no_color=no_color, color_allowed=color_allowed)
+
+    # We intentionally simplify: single console text output, no JSON, no rg/human split, no color flags.
+    # For now we still render through the existing renderer (human), but we don't expose its complexity.
+
+    report, text = _build_report_and_text(
+        coverage_paths=tuple(coverage_paths),
+        filters=filters,
+        sections=sections,
+        want_snippets=want_snippets,
+        context=int(context),
+        sort=sort,
+        group_depth=int(group_depth),
+        is_tty_like=is_tty_like,
+        use_color=use_color,
+    )
+
+    _enforce_thresholds(
+        report,
+        fail_under_stmt=fail_under_stmt,
+        fail_under_branches=fail_under_branches,
+        max_misses=max_misses,
+    )
+    write_output(text, output)
+    raise typer.Exit(code=EXIT_OK)
+
+
+def _enforce_thresholds(
+    report: Report,
+    *,
+    fail_under_stmt: float | None,
+    fail_under_branches: float | None,
+    max_misses: int | None,
+) -> None:
+    thresholds: list[Threshold] = []
+    if fail_under_stmt is not None:
+        thresholds.append(Threshold(statement=float(fail_under_stmt)))
+    if fail_under_branches is not None:
+        thresholds.append(Threshold(branch=float(fail_under_branches)))
+    if max_misses is not None:
+        thresholds.append(Threshold(misses=int(max_misses)))
+
+    if not thresholds:
+        return
+
+    try:
+        evaluate_thresholds_or_raise(report, thresholds=thresholds)
+    except ThresholdError as exc:
+        for failure in exc.result.failures:
+            typer.echo(
+                (
+                    "Threshold failed: "
+                    f"{failure.metric} {failure.comparison} {failure.required}"
+                    f" (actual {failure.actual})"
+                ),
+                err=True,
+            )
+        raise typer.Exit(code=EXIT_THRESHOLD) from exc
 
 
 def register(app: typer.Typer) -> None:
-    @app.command("report")
-    def report_cmd(
-        *,
-        coverage_xml: Annotated[
-            list[Path] | None,
-            typer.Argument(
-                help=(
-                    "Zero or more Cobertura-style coverage XML files. "
-                    "If omitted, try to discover from pyproject.toml and common filenames."
-                ),
-            ),
-        ] = None,
-        report_format: Annotated[
-            OutputFormat,
-            typer.Option("--format", help="Output format: auto, human, rg, json."),
-        ] = OutputFormat.AUTO,
-        sections: Annotated[
-            list[str] | None,
-            typer.Option(
-                "--section",
-                "--sections",
-                help="Sections to include (repeatable or comma-separated): lines, branches, summary.",
-            ),
-        ] = None,
-        lines: Annotated[
-            bool,
-            typer.Option(
-                "--lines",
-                help="Enable line reporting.",
-            ),
-        ] = False,
-        branches: Annotated[
-            BranchesModeName,
-            typer.Option(
-                "--branches",
-                help="Branch reporting: off, missing, partial, all.",
-            ),
-        ] = "off",
-        sort: Annotated[
-            SummarySort,
-            typer.Option(
-                "--sort",
-                help="Summary sort: file, stmt_cov, br_cov, miss_stmt, miss_br, uncovered_lines.",
-            ),
-        ] = SummarySort.MISSED_STATEMENTS,
-        baseline: Annotated[
-            Path | None,
-            typer.Option(
-                "--baseline",
-                help=("Baseline coverage XML to compute summary deltas (current - baseline)."),
-            ),
-        ] = None,
-        fail_under_stmt: Annotated[
-            float | None,
-            typer.Option("--fail-under-stmt", min=0.0, max=100.0, help="Minimum statement coverage percent."),
-        ] = None,
-        fail_under_branch: Annotated[
-            float | None,
-            typer.Option("--fail-under-branch", min=0.0, max=100.0, help="Minimum branch coverage percent."),
-        ] = None,
-        max_misses: Annotated[
-            int | None,
-            typer.Option("--max-misses", min=0, help="Maximum allowed uncovered statement lines."),
-        ] = None,
-        output: Annotated[
-            Path | None,
-            typer.Option("--output", help="Write output to PATH (use '-' for stdout)."),
-        ] = None,
-        color: Annotated[
-            bool,
-            typer.Option("--color", help="Force ANSI color output."),
-        ] = False,
-        no_color: Annotated[
-            bool,
-            typer.Option("--no-color", help="Disable ANSI color output."),
-        ] = False,
-        code: Annotated[
-            bool,
-            typer.Option(
-                "--code/--no-code",
-                "--snippets/--no-snippets",
-                help="Include source snippets around uncovered ranges.",
-            ),
-        ] = False,
-        context: Annotated[
-            int,
-            typer.Option(
-                "--context", min=0, help="Context lines before/after uncovered ranges (implies --code)."
-            ),
-        ] = 0,
-        line_numbers: Annotated[
-            bool,
-            typer.Option("--line-numbers", help="Show line numbers in source snippets."),
-        ] = False,
-        show_paths: Annotated[
-            bool,
-            typer.Option("--paths/--no-paths", help="Show file paths in output."),
-        ] = False,
-        show_covered: Annotated[
-            bool,
-            typer.Option(
-                "--show-covered/--no-show-covered",
-                help="Include fully covered files in the summary table.",
-            ),
-        ] = False,
-        summary_group: Annotated[
-            bool,
-            typer.Option(
-                "--summary-group/--no-summary-group",
-                help="Show directory rollups above the file summary table.",
-            ),
-        ] = True,
-        summary_group_depth: Annotated[
-            int,
-            typer.Option(
-                "--summary-group-depth", min=1, help="Directory depth for rollups (e.g., 2 => src/pkg)."
-            ),
-        ] = 2,
-        summary_top: Annotated[
-            bool,
-            typer.Option(
-                "--summary-top/--no-summary-top",
-                help="Show 'Top offenders' blocks above the summary table.",
-            ),
-        ] = True,
-        summary_top_n: Annotated[
-            int,
-            typer.Option("--summary-top-n", min=1, help="Number of rows in each 'Top offenders' block."),
-        ] = 10,
-    ) -> None:
-        if sections is None:
-            sections = []
-        try:
-            cov_paths = resolve_coverage_paths(coverage_xml, cwd=Path.cwd())
-        except CoverageXMLNotFoundError as exc:
-            typer.echo(f"ERROR: {exc}", err=True)
-            raise typer.Exit(code=EXIT_NOINPUT) from exc
-
-        branches_mode = _resolve_branches_mode(branches)
-
-        render_fmt, is_tty_like, color_allowed = compute_io_policy(fmt=report_format, output=output)
-        use_color = bool(color or color_allowed) and not no_color
-
-        # In non-TTY auto mode, output resolves to rg/rg style; default should include line data.
-        default_lines = bool(lines or render_fmt == "rg")
-
-        want_snippets = bool(code or context > 0)
-        default_sections = (
-            {"summary"}
-            | ({"lines"} if default_lines else set())
-            | ({"branches"} if branches_mode is not None else set())
-        )
-        sections_set = _parse_sections(sections, default=default_sections)
-
-        # If baseline is provided, it is used for summary deltas; diff section still requires "diff" in sections.
-        if baseline is not None and not baseline.exists():
-            msg = f"--baseline coverage XML not found: {baseline}"
-            raise typer.BadParameter(msg)
-
-        # Validate section/mode consistency.
-        if "branches" in sections_set and branches_mode is None:
-            msg = "sections include 'branches' but --branches=off disables branch reporting"
-            raise typer.BadParameter(msg)
-
-        # Thresholds require specific sections to exist in the built report.
-        if (fail_under_stmt is not None or fail_under_branch is not None) and "summary" not in sections_set:
-            msg = "threshold evaluation for --fail-under-* requires 'summary' in --sections"
-            raise typer.BadParameter(msg)
-        if max_misses is not None and "lines" not in sections_set:
-            msg = "threshold evaluation for --max-misses requires 'lines' in --sections"
-            raise typer.BadParameter(msg)
-
-        report, text = build_and_render(
-            coverage_paths=tuple(cov_paths),
-            base_path=cov_paths[0].parent,
-            filters=None,
-            sections=sections_set,
-            diff_base=(baseline.resolve() if baseline is not None else None),
-            branches_mode=branches_mode or BranchMode.PARTIAL,
-            summary_sort=sort,
-            want_stats=bool("lines" in sections_set),
-            want_file_stats=False,
-            want_snippets=want_snippets,
-            context_before=int(context),
-            context_after=int(context),
-            show_paths=bool(show_paths),
-            show_line_numbers=bool(line_numbers),
-            render_fmt=render_fmt,
-            is_tty_like=is_tty_like,
-            color=use_color,
-            show_covered=bool(show_covered),
-            summary_group=bool(summary_group),
-            summary_group_depth=int(summary_group_depth),
-            summary_top=bool(summary_top),
-            summary_top_n=int(summary_top_n),
-            drop_empty_branches=False,
-        )
-        write_output(text, output)
-
-        apply_thresholds_or_exit(
-            report,
-            fail_under_stmt=fail_under_stmt,
-            fail_under_branches=fail_under_branch,
-            max_misses=max_misses,
-        )
-
-        raise typer.Exit(code=EXIT_OK)
+    app.command("report")(report_cmd)
 
 
 __all__ = ["register"]

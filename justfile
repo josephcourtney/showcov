@@ -323,14 +323,14 @@ test-timed:
 [group('test quality')]
 cov:
   @just _log_start cov
-  @bash -euo pipefail -c 'if [ -x {{SHOWCOV}} ]; then {{SHOWCOV}} --sections summary; else echo "[cov-lines] skipping: showcov ({{SHOWCOV}}) not found"; fi'
+  @bash -euo pipefail -c 'if [ -x {{SHOWCOV}} ]; then {{SHOWCOV}} --summary --no-lines --no-branches; else echo "[cov-lines] skipping: showcov ({{SHOWCOV}}) not found"; fi'
   @just _log_end cov
 
 # Test Quality: List lines not covered by last test execution
 [group('test quality')]
 cov-lines:
   @just _log_start cov-lines
-  bash -euo pipefail -c 'if [ -x {{SHOWCOV}} ]; then {{SHOWCOV}} --code --context 2,2 ; else echo "[cov-lines] skipping: showcov ({{SHOWCOV}}) not found"; fi'
+  bash -euo pipefail -c 'if [ -x {{SHOWCOV}} ]; then {{SHOWCOV}} --lines --code --context 2 ; else echo "[cov-lines] skipping: showcov ({{SHOWCOV}}) not found"; fi'
   @just _log_end cov-lines
 
 # Test Quality: Run mutation testing on the test suite
@@ -510,34 +510,6 @@ fix:
 # MODE=ci    : full enforcement (equivalent to prior `check`).
 # ----------------------------------------------------------------------
 
-# Dev: fast-ish gating (no expensive metrics/security gates by default)
-[group('dev')]
-check-dev:
-  @just _log_start check-dev
-  @just _run setup "just setup"
-  @just _run lint "just lint-no-fix"
-  @just _run format "just format-no-fix"
-  @just _run typecheck 'just typecheck'
-  @just _run lint-imports 'just lint-imports'
-  @just _run test "just test"
-  @just cov
-  @just _log_end check-dev
-
-# Debug: prioritize iteration speed + diagnostics; do not block on heavy gates.
-#
-# Use `just test-marker <expr>` / `just test-fast` / `just test-smoke` for tighter loops.
-[group('debug')]
-check-debug:
-  @just _log_start check-debug
-  @just _run setup "just setup"
-  @just _run lint "just lint-no-fix"
-  @just _run format "just format-no-fix"
-  @just _run typecheck 'just typecheck'
-  @just _run test "just test --durations=25" # Run tests in "timed" mode to surface slow tests quickly.
-  @just cov
-
-  @just _log_end check-debug
-
 # CI: full enforcement (previous `check` behavior)
 [group('ci')]
 check-ci:
@@ -553,18 +525,17 @@ check-ci:
   @just _run sec-deps 'just sec-deps'
   @just _log_end check-ci
 
-# Canonical entrypoint: dispatch based on MODE
+# Dev: fast-ish gating (no expensive metrics/security gates by default)
 check:
   @just _log_start check
-  bash -euo pipefail -c '\
-    case "{{MODE}}" in \
-      dev)   just check-dev ;; \
-      debug) just check-debug ;; \
-      ci)    just check-ci ;; \
-      *)     echo "[check] ERROR: invalid MODE={{MODE}} (expected: dev|debug|ci)"; exit 2 ;; \
-    esac \
-  '
+  @just _run_soft lint-no-fix "just lint-no-fix"
+  @just _run_soft format-no-fix "just format-no-fix"
+  @just _run_soft typecheck 'just typecheck'
+  @just _run_soft lint-imports 'just lint-imports'
+  @just test
+  @just cov
   @just _log_end check
+
 
 # Optional: a convenience alias for full local enforcement without changing MODE
 check-full:

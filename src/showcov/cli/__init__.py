@@ -1,3 +1,3 @@
-from showcov.cli.root import main
+from showcov.cli.root import cli, main
 
-__all__ = ["main"]
+__all__ = ["cli", "main"]

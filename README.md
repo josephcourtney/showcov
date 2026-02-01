@@ -1,25 +1,24 @@
 # showcov
 
-showcov is a command-line utility that loads one or more coverage XML reports and emits a unified
-summary of uncovered code. A single `report` command drives every format and section.
+showcov is a command-line utility that loads one or more coverage XML reports, merges them into a
+single dataset, and emits a deterministic summary of uncovered code. All workflows now flow through the
+single `report` command, which toggles the available sections and enrichment flags (no additional
+subcommands or formats).
 
 ## Features
 
 - **Unified coverage report from one or more XML files**
   - Merges multiple coverage reports into a single dataset.
-  - Automatically locates the coverage XML via common project configs, or accepts explicit paths.
+  - Automatically locates the coverage XML via common project configs or accepts explicit paths.
   - Normalizes file paths relative to the project root for stable output.
 
 - **Report sections**
-  - **Uncovered lines:** groups contiguous misses and merges groups separated only by blank lines.
-  - **Uncovered branches:** lists per-line branch conditions with their individual coverage or “missing” status; supports different inclusion modes (e.g., only missing, partial, all).
-  - **Summary:** per-file and overall totals for statements and branches (total / covered / missed) with derived percentages.
-    - Select sections to render with `showcov report --sections ...` (e.g., `--sections summary`).
-  - **Diff:** compares two reports, highlighting newly uncovered and resolved lines.
+  - **Uncovered lines:** groups contiguous misses and merges gaps separated only by blank lines. Toggle with `--lines/--no-lines`.
+  - **Uncovered branches:** lists per-line branch conditions and their coverage status. Enable or disable branch output with `--branches/--no-branches`.
+  - **Summary:** per-file and overall totals for statements and branches plus derived percentages. Disable with `--no-summary` if only raw misses are desired.
 
-- **Output formats**
-  - **Human-readable:** compact tables; optional color; suitable for terminals and logs.
-  - **Machine-readable JSON:** validated against a versioned public schema; includes tool metadata, environment info, options, and all report sections.
+- **Human-readable output**
+  - A single Rich-inspired renderer with compact tables and optional inline snippets; no other formats are exposed.
 
 - **Filtering & ordering**
   - Include/exclude files using glob/“.gitignore”-style patterns and concrete paths or directories.
@@ -27,7 +26,7 @@ summary of uncovered code. A single `report` command drives every format and sec
   - Multiple ordering strategies for summaries (by file name, statement coverage, branch coverage, or total misses).
 
 - **Code context & annotations**
-  - Optional inline source excerpts around uncovered ranges with a tunable context window.
+  - Optional inline source excerpts around uncovered ranges enabled with `--code` and tuned via `--context`.
   - Optional line numbers alongside excerpts.
   - Lightweight tagging of lines for common cases (e.g., “no-cover” pragmas, abstract methods).
 
@@ -38,14 +37,13 @@ summary of uncovered code. A single `report` command drives every format and sec
 
 - **TTY and color behavior**
   - Auto-detects whether ANSI color should be emitted; can be forced on/off.
-  - Avoids ANSI codes in non-human formats.
 
 - **Logging & exit codes**
   - Adjustable verbosity (quiet/normal/verbose/debug).
   - Clear, distinct exit statuses for success, threshold failure, malformed input, missing input, and configuration errors.
 
 - **Programmatic surface**
-  - Importable building blocks to parse coverage XML, build datasets, compute sections, and render human/JSON outputs.
+  - Importable building blocks to parse coverage XML, build datasets, compute sections, and render human output.
   - A Rich-based coverage table renderer available for embedding in other tools.
 
 - **Determinism & robustness**

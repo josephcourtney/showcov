@@ -4,22 +4,23 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from showcov.engine.build import BuildOptions, build_report
-from showcov.model.thresholds import Threshold, evaluate, parse_threshold
-from showcov.model.types import BranchMode, SummarySort
+from showcov.core.build import BuildOptions, build_report
+from showcov.core.model.thresholds import Threshold, evaluate, parse_threshold
+from showcov.core.model.types import BranchMode, SummarySort
+from showcov.inputs.records import collect_cobertura_records
 
 if TYPE_CHECKING:
     from pathlib import Path
 
 
 def _build_report_for_thresholds(project_root: Path, cov: Path):
+    records = collect_cobertura_records((cov,))
     return build_report(
         BuildOptions(
             coverage_paths=(cov,),
             base_path=project_root,
             filters=None,
             sections={"lines", "summary"},
-            diff_base=None,
             branches_mode=BranchMode.PARTIAL,
             summary_sort=SummarySort.FILE,
             want_aggregate_stats=False,
@@ -27,6 +28,7 @@ def _build_report_for_thresholds(project_root: Path, cov: Path):
             want_snippets=False,
             context_before=0,
             context_after=0,
+            records=records,
             meta_show_paths=True,
             meta_show_line_numbers=True,
         )

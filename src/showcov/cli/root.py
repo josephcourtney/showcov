@@ -1,54 +1,42 @@
 from __future__ import annotations
 
-import pathlib
-from typing import TYPE_CHECKING
+from typing import Annotated
 
 import typer
 from typer.main import get_command
 
 from showcov import __version__
-from showcov.cli import completion, diff, man, report
-
-if TYPE_CHECKING:
-    from types import ModuleType
-
-app = typer.Typer(help="Unified coverage reporting for Cobertura-style coverage XML.")
+from showcov.cli import completion, man, report
 
 
-@app.callback()
-def _root(
-    *,
-    version: bool = typer.Option(False, "--version", help="Show the version and exit."),  # noqa: FBT003
-) -> None:
-    if version:
-        typer.echo(__version__)
-        raise typer.Exit(code=0)
+def create_app() -> typer.Typer:
+    app = typer.Typer(help="Unified coverage reporting for Cobertura-style coverage XML.")
+
+    @app.callback()
+    def _root(
+        *,
+        version: Annotated[
+            bool,
+            typer.Option("--version", help="Show version and exit"),
+        ] = False,
+    ) -> None:
+        if version:
+            typer.echo(f"showcov {__version__}")
+            raise typer.Exit
+
+    report.register(app)
+    completion.register(app)
+    man.register(app)
+
+    return app
 
 
-def _patch_typer_annotation_globals(module: ModuleType) -> None:
-    """Ensure names referenced by string annotations exist at runtime.
-
-    Typer (via Click) inspects command callback signatures with `eval_str=True` on
-    Python 3.14+, which evaluates string annotations created by
-    `from __future__ import annotations`. If a command module only imports names like
-    `Path`/`pathlib` under TYPE_CHECKING, signature evaluation can raise NameError.
-    """
-    if not hasattr(module, "Path"):
-        module.Path = pathlib.Path
-    if not hasattr(module, "pathlib"):
-        module.pathlib = pathlib
+def main() -> None:
+    app = create_app()
+    get_command(app)()
 
 
-# Patch modules before building the Click command so annotation evaluation is safe.
-for _mod in (completion, man, diff, report):
-    _patch_typer_annotation_globals(_mod)
+# Click-compatible object for tooling that imports it
+cli = get_command(create_app())
 
-report.register(app)
-diff.register(app)
-completion.register(app)
-man.register(app)
-
-main = get_command(app)
-cli = main
-
-__all__ = ["app", "cli", "main"]
+__all__ = ["cli", "create_app", "main"]

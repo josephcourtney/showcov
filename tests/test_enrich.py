@@ -3,9 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from showcov.engine.build import BuildOptions, build_report
-from showcov.engine.enrich import enrich_report
-from showcov.model.types import BranchMode, SummarySort
+from showcov.core.build import BuildOptions, build_report
+from showcov.core.enrich import enrich_report
+from showcov.core.model.types import BranchMode, SummarySort
+from showcov.inputs.records import collect_cobertura_records
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -30,12 +31,12 @@ def test_enrich_attaches_snippets_and_file_counts(project: dict[str, Path]) -> N
         ],
     )
 
+    records = collect_cobertura_records((cov,))
     opts = BuildOptions(
         coverage_paths=(cov,),
         base_path=root,
         filters=None,
         sections={"lines"},
-        diff_base=None,
         branches_mode=BranchMode.PARTIAL,
         summary_sort=SummarySort.FILE,
         want_aggregate_stats=False,
@@ -43,6 +44,7 @@ def test_enrich_attaches_snippets_and_file_counts(project: dict[str, Path]) -> N
         want_snippets=True,
         context_before=1,
         context_after=1,
+        records=records,
         meta_show_paths=True,
         meta_show_line_numbers=True,
     )
@@ -76,12 +78,12 @@ def test_enrich_does_not_crash_when_source_file_missing(tmp_path: Path) -> None:
         classes=[{"filename": "pkg/missing.py", "lines": [{"number": 2, "hits": 0}]}],
     )
 
+    records = collect_cobertura_records((cov,))
     opts = BuildOptions(
         coverage_paths=(cov,),
         base_path=tmp_path,
         filters=None,
         sections={"lines"},
-        diff_base=None,
         branches_mode=BranchMode.PARTIAL,
         summary_sort=SummarySort.FILE,
         want_aggregate_stats=False,
@@ -89,6 +91,7 @@ def test_enrich_does_not_crash_when_source_file_missing(tmp_path: Path) -> None:
         want_snippets=True,
         context_before=1,
         context_after=1,
+        records=records,
         meta_show_paths=True,
         meta_show_line_numbers=True,
     )

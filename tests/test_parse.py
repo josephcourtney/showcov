@@ -2,8 +2,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from showcov.coverage.parse import iter_line_records, parse_condition_coverage, parse_conditions
-from showcov.coverage.xml_reader import read_root
+from showcov.inputs.cobertura import (
+    iter_line_records,
+    parse_condition_coverage,
+    parse_conditions,
+    read_root,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path

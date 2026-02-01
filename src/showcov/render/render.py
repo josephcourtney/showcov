@@ -4,11 +4,9 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from showcov.render.human import render_human
-from showcov.render.json import format_json
-from showcov.render.rg import render_rg
 
 if TYPE_CHECKING:
-    from showcov.model.report import Report
+    from showcov.core.model.report import Report
 
 
 @dataclass(frozen=True, slots=True)
@@ -29,8 +27,6 @@ class RenderOptions:
     show_covered: bool = False
     summary_group: bool = True
     summary_group_depth: int = 2
-    summary_top: bool = True
-    summary_top_n: int = 10
 
 
 def render(report: Report, *, fmt: str, options: RenderOptions) -> str:
@@ -41,23 +37,15 @@ def render(report: Report, *, fmt: str, options: RenderOptions) -> str:
     report:
         Built report model.
     fmt:
-        One of: "human", "rg", "json".
+        One of: "human".
     options:
         Presentation options (color/tty/path display).
     """
     f = (fmt or "").strip().lower()
 
-    if f == "json":
-        # JSON output is schema-validated and should be free of any terminal styling.
-        return format_json(report)
-
     if f == "human":
         return render_human(report, options)
-
-    if f == "rg":
-        return render_rg(report, options)
-
-    msg = f"Unsupported format: {fmt!r}. Expected one of: human, rg, json."
+    msg = f"Unsupported format: {fmt!r}. Expected one of: human."
     raise ValueError(msg)
 
 

@@ -28,8 +28,6 @@ class SummarySort(StrEnum):
     MISSED_STATEMENTS = "miss_stmt"  # descending (worst first)
     MISSED_BRANCHES = "miss_br"  # descending (worst first)
     UNCOVERED_LINES = "uncovered_lines"  # descending (worst first)
-    # Legacy alias: keep for compatibility
-    MISSES = "miss"  # maps to MISSED_STATEMENTS
 
 
 FULL_COVERAGE: int = 100

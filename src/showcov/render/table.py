@@ -32,6 +32,10 @@ def _render_rich_table(
     for r in rows:
         table.add_row(*[str(v) for v in r])
 
+    return _render_table(table, color=color)
+
+
+def _render_table(table: Table, *, color: bool) -> str:
     buf = StringIO()
     console = Console(
         file=buf,
@@ -51,6 +55,10 @@ def format_table(
     if not headers or not rows:
         return ""
     return _render_rich_table(headers, rows, color=color)
+
+
+def render_table(table: Table, *, color: bool) -> str:
+    return _render_table(table, color=color)
 
 
 __all__ = ["format_table"]

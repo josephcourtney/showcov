@@ -3,13 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-from showcov.model.types import FULL_COVERAGE
+from showcov.core.model.types import FULL_COVERAGE
 
 # -----------------------------------------------------------------------------
 # Core surface model (what renderers + JSON output consume)
 # -----------------------------------------------------------------------------
 
-SectionName = Literal["lines", "branches", "summary", "diff"]
+SectionName = Literal["lines", "branches", "summary"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -206,10 +206,6 @@ class SummaryRow:
     branch_pct: float | None = None  # None when branches.total == 0
     uncovered_lines: int = 0
     uncovered_ranges: int = 0
-    # Baseline deltas (current - baseline); only present when baseline provided
-    delta_missed_statements: int | None = None
-    delta_missed_branches: int | None = None
-    delta_uncovered_lines: int | None = None
     # Lightweight tags
     untested: bool = False  # statements.total > 0 and statements.covered == 0
     tiny: bool = False  # statements.total is very small (heuristic)
@@ -231,17 +227,6 @@ class SummarySection:
 
 
 # -----------------------------------------------------------------------------
-# Diff section
-# -----------------------------------------------------------------------------
-
-
-@dataclass(frozen=True, slots=True)
-class DiffSection:
-    new: tuple[UncoveredFile, ...]
-    resolved: tuple[UncoveredFile, ...]
-
-
-# -----------------------------------------------------------------------------
 # Report
 # -----------------------------------------------------------------------------
 
@@ -256,7 +241,6 @@ class ReportSections:
     lines: LinesSection | None = None
     branches: BranchesSection | None = None
     summary: SummarySection | None = None
-    diff: DiffSection | None = None
 
     def present(self) -> tuple[SectionName, ...]:
         out: list[SectionName] = []
@@ -266,8 +250,6 @@ class ReportSections:
             out.append("branches")
         if self.summary is not None:
             out.append("summary")
-        if self.diff is not None:
-            out.append("diff")
         return tuple(out)
 
 

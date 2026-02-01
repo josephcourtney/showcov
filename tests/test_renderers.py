@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import json
 from typing import TYPE_CHECKING
 
 import pytest
 
-from showcov.engine.build import BuildOptions, build_report
-from showcov.model.types import BranchMode, SummarySort
+from showcov.core.build import BuildOptions, build_report
+from showcov.core.model.types import BranchMode, SummarySort
+from showcov.inputs.records import collect_cobertura_records
 from showcov.render.render import RenderOptions, render
 
 if TYPE_CHECKING:
@@ -14,12 +14,12 @@ if TYPE_CHECKING:
 
 
 def _report_for_render(project_root: Path, cov: Path):
+    records = collect_cobertura_records((cov,))
     opts = BuildOptions(
         coverage_paths=(cov,),
         base_path=project_root,
         filters=None,
         sections={"lines", "branches", "summary"},
-        diff_base=None,
         branches_mode=BranchMode.PARTIAL,
         summary_sort=SummarySort.FILE,
         want_aggregate_stats=True,
@@ -27,32 +27,11 @@ def _report_for_render(project_root: Path, cov: Path):
         want_snippets=False,
         context_before=0,
         context_after=0,
+        records=records,
         meta_show_paths=True,
         meta_show_line_numbers=True,
     )
     return build_report(opts)
-
-
-def test_render_json_schema_valid(project: dict[str, Path]) -> None:
-    from tests.conftest import write_cobertura_xml
-
-    root = project["root"]
-    cov = write_cobertura_xml(
-        root,
-        "coverage.xml",
-        classes=[
-            {"filename": "pkg/mod.py", "lines": [{"number": 2, "hits": 0}]},
-        ],
-    )
-
-    report = _report_for_render(root, cov)
-    out = render(report, fmt="json", options=RenderOptions(color=False))
-    payload = json.loads(out)
-
-    assert payload["tool"]["name"] == "showcov"
-    assert payload["schema_version"] == 1
-    assert "sections" in payload
-    assert "lines" in payload["sections"]
 
 
 def test_render_human_smoke(project: dict[str, Path]) -> None:
@@ -76,28 +55,6 @@ def test_render_human_smoke(project: dict[str, Path]) -> None:
     assert "Uncovered Lines" in out
     assert "pkg/mod.py" in out
     assert "2" in out  # range line number present somewhere
-
-
-def test_render_rg_smoke(project: dict[str, Path]) -> None:
-    from tests.conftest import write_cobertura_xml
-
-    root = project["root"]
-    cov = write_cobertura_xml(
-        root,
-        "coverage.xml",
-        classes=[
-            {"filename": "pkg/mod.py", "lines": [{"number": 2, "hits": 0}]},
-        ],
-    )
-
-    report = _report_for_render(root, cov)
-    out = render(
-        report,
-        fmt="rg",
-        options=RenderOptions(color=False, show_paths=True, show_line_numbers=True, is_tty=False),
-    )
-    assert "pkg/mod.py" in out
-    assert "2" in out
 
 
 def test_render_invalid_format_raises(project: dict[str, Path]) -> None:

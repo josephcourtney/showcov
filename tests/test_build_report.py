@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from showcov.engine.build import BuildOptions, build_report
-from showcov.model.path_filter import PathFilter
-from showcov.model.types import BranchMode, SummarySort
+from showcov.core.build import BuildOptions, build_report
+from showcov.core.model.path_filter import PathFilter
+from showcov.core.model.types import BranchMode, SummarySort
+from showcov.inputs.records import collect_cobertura_records
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -16,18 +17,17 @@ def _opts(
     base_path: Path,
     filters: PathFilter | None = None,
     sections: set[str],
-    diff_base: Path | None = None,
     branches_mode: BranchMode = BranchMode.PARTIAL,
     want_aggregate_stats: bool = False,
     want_file_stats: bool = False,
     want_snippets: bool = False,
 ) -> BuildOptions:
+    records = collect_cobertura_records(coverage_paths)
     return BuildOptions(
         coverage_paths=coverage_paths,
         base_path=base_path,
         filters=filters,
         sections=sections,
-        diff_base=diff_base,
         branches_mode=branches_mode,
         summary_sort=SummarySort.FILE,
         want_aggregate_stats=want_aggregate_stats,
@@ -35,6 +35,7 @@ def _opts(
         want_snippets=want_snippets,
         context_before=0,
         context_after=0,
+        records=records,
         meta_show_paths=True,
         meta_show_line_numbers=True,
     )
@@ -152,48 +153,61 @@ def test_build_branches_uses_richer_conditions(project: dict[str, Path]) -> None
         root,
         "base.xml",
         classes=[
-            {"filename": "pkg/mod.py", "lines": [{"number": 2, "hits": 0}]},
+            {
+                "filename": "pkg/mod.py",
+                "lines": [
+                    {"number": 2, "hits": 1},
+                ],
+            }
         ],
     )
     cur = write_cobertura_xml(
         root,
         "cur.xml",
         classes=[
-            {"filename": "pkg/mod.py", "lines": [{"number": 4, "hits": 0}]},
+            {
+                "filename": "pkg/mod.py",
+                "lines": [
+                    {
+                        "number": 2,
+                        "hits": 0,
+                        "branch": True,
+                        "conditions": [
+                            {"number": 0, "type": "jump", "coverage": "100%"},
+                            {"number": 1, "type": "jump", "coverage": "0%"},
+                        ],
+                    },
+                ],
+            }
         ],
     )
 
     report = build_report(
         _opts(
-            coverage_paths=(cur,),
+            coverage_paths=(base, cur),
             base_path=root,
-            sections={"diff"},
-            diff_base=base,
+            sections={"branches"},
         )
     )
 
-    diff = report.sections.diff
-    assert diff is not None
-
-    assert diff.new
-    assert diff.resolved
-
-    new_ranges = diff.new[0].uncovered
-    res_ranges = diff.resolved[0].uncovered
-
-    assert (new_ranges[0].start, new_ranges[0].end) == (4, 4)
-    assert (res_ranges[0].start, res_ranges[0].end) == (2, 2)
+    assert report.sections.branches is not None
+    assert len(report.sections.branches.gaps) == 1
+    gap = report.sections.branches.gaps[0]
+    assert gap.line == 2
+    cond_by_number = {c.number: c.coverage for c in gap.conditions}
+    assert cond_by_number[0] == 100
+    assert cond_by_number[1] == 0
 
 
 def test_internal_branch_accumulator_prefers_larger_denominator() -> None:
-    from showcov.engine import build as build_mod
-    from showcov.model.report import BranchCondition
+    from showcov.core.build import branches as branches_mod
+    from showcov.core.model.report import BranchCondition
 
     records = [
         ("pkg/mod.py", 10, 1, (1, 2), (), (BranchCondition(number=-1, type="line", coverage=50),)),
         ("pkg/mod.py", 10, 1, (2, 3), (), (BranchCondition(number=-1, type="line", coverage=67),)),
     ]
-    accum = build_mod._aggregate_branch_records(records, files={"pkg/mod.py"})
+    accum = branches_mod._aggregate_branch_records(records, files={"pkg/mod.py"})
     assert accum["pkg/mod.py", 10]["bc"] == (2, 3)
 
 

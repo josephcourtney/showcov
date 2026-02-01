@@ -4,9 +4,9 @@ from pathlib import Path
 
 import pytest
 
-from showcov.coverage.discover import resolve_coverage_paths
-from showcov.coverage.xml_reader import read_root
 from showcov.errors import CoverageXMLNotFoundError, InvalidCoverageXMLError
+from showcov.inputs.cobertura import read_root
+from showcov.inputs.discover import resolve_coverage_paths
 
 
 def test_resolve_coverage_paths_explicit_missing(tmp_path: Path) -> None:

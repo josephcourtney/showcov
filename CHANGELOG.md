@@ -4,6 +4,28 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.2.5] - 2026-01-31
+
+### Added
+- add a stable `core.pipeline` + `api` surface so programmatic users can build/render reports without the CLI helper
+- introduce `inputs.cobertura` and `cli.exit_codes` to centralize coverage parsing and shared exit-code constants
+
+### Changed
+- reorganize `showcov.coverage/engine/model` into `showcov.inputs` and `showcov.core` while updating all CLI/testing imports
+- remove the legacy `showcov.run` helper and make `showcov.report` drive the new pipeline, CLI, and tests
+
+## [0.2.4] - 2026-01-31
+
+### Changed
+
+- simplify `showcov report` to a single human renderer with boolean section toggles and replace the removed `--format`, `--sections`, and `--snippets` options with the current toggles.
+- align CLI documentation, completion helpers, and automation scripts with the streamlined interface.
+- move the manual-page and completion-generation helpers into the CLI modules (dropping `showcov.scripts`).
+
+### Removed
+
+- drop the JSON and ripgrep-style renderers along with the standalone `diff` capability to keep the CLI surface focused on the human report.
+
 ## [0.2.3] - 2026-01-29
 
 ### Added

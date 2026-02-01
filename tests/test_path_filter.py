@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from showcov.model.path_filter import PathFilter
+from showcov.core.model.path_filter import PathFilter
 
 if TYPE_CHECKING:
     from pathlib import Path

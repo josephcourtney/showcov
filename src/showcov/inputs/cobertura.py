@@ -4,14 +4,16 @@ import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from showcov.model.report import BranchCondition
+from defusedxml import ElementTree
+
+from showcov.core.model.report import BranchCondition
+from showcov.errors import InvalidCoverageXMLError
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Iterable
+    from pathlib import Path
 
-    from showcov.coverage.types import ElementLike
-
-_COND_RE = re.compile(r"(?P<pct>\d+)\s*%\s*\(\s*(?P<covered>\d+)\s*/\s*(?P<total>\d+)\s*\)")
+    from showcov.inputs.types import ElementLike
 
 
 @dataclass(frozen=True, slots=True)
@@ -19,15 +21,25 @@ class LineRecord:
     file: str
     line: int
     hits: int
-    # branch accounting from condition-coverage if present: (covered, total)
     branch_counts: tuple[int, int] | None = None
-    # missing branch indices if present (coverage.py uses "missing-branches")
     missing_branches: tuple[int, ...] = ()
     conditions: tuple[BranchCondition, ...] = ()
 
 
+def read_root(path: Path) -> ElementLike:
+    """Parse coverage XML and return the root element."""
+    root = ElementTree.parse(path).getroot()
+    tag = (root.tag or "").split("}")[-1]
+    if tag.lower() != "coverage":
+        msg = f"unexpected root tag {root.tag!r} in {path}"
+        raise InvalidCoverageXMLError(msg)
+    return root
+
+
+_COND_RE = re.compile(r"(?P<pct>\d+)\s*%\s*\(\s*(?P<covered>\d+)\s*/\s*(?P<total>\d+)\s*\)")
+
+
 def parse_condition_coverage(text: str) -> tuple[int, int] | None:
-    """Parse Cobertura condition-coverage: '50% (1/2)' -> (covered,total)."""
     if not text:
         return None
     m = _COND_RE.search(text.strip())
@@ -41,33 +53,21 @@ def parse_condition_coverage(text: str) -> tuple[int, int] | None:
 def _parse_missing_branches(text: str | None) -> tuple[int, ...]:
     if not text:
         return ()
-    items: list[int] = []
+    out: list[int] = []
     for part in text.replace(" ", "").split(","):
         if not part:
             continue
         try:
-            items.append(int(part))
+            out.append(int(part))
         except ValueError:
             continue
-    return tuple(items)
+    return tuple(out)
 
 
 def parse_conditions(line_elem: ElementLike) -> tuple[BranchCondition, ...]:
-    """Parse <line> branch sub-elements (if present) into BranchCondition records.
-
-    Cobertura may include:
-      <line ... branch="true" condition-coverage="50% (1/2)">
-        <conditions>
-          <condition number="0" type="jump" coverage="0%"/>
-        </conditions>
-      </line>
-
-    Many generators omit <conditions>; in that case we emit a synthetic condition.
-    """
     out: list[BranchCondition] = []
     seen_numbers: set[int] = set()
 
-    # explicit <conditions>/<condition>
     for cond in line_elem.findall(".//condition"):
         try:
             num = int(cond.get("number", "-1") or "-1")
@@ -86,8 +86,6 @@ def parse_conditions(line_elem: ElementLike) -> tuple[BranchCondition, ...]:
         seen_numbers.add(num)
 
     missing = _parse_missing_branches(line_elem.get("missing-branches"))
-    # represent missing branch ids explicitly as unknown coverage
-    # (but avoid duping an explicit condition number if present)
     for b in missing:
         if b in seen_numbers:
             continue
@@ -102,9 +100,7 @@ def parse_conditions(line_elem: ElementLike) -> tuple[BranchCondition, ...]:
     return tuple(out)
 
 
-def iter_line_records(root: ElementLike) -> Iterator[LineRecord]:
-    """Yield normalized line records from a Cobertura-style XML tree."""
-    # Cobertura: coverage/packages/package/classes/class@filename and class/lines/line
+def iter_line_records(root: ElementLike) -> Iterable[LineRecord]:
     for cls in root.findall(".//class"):
         filename = cls.get("filename")
         if not filename:
@@ -138,4 +134,5 @@ __all__ = [
     "iter_line_records",
     "parse_condition_coverage",
     "parse_conditions",
+    "read_root",
 ]

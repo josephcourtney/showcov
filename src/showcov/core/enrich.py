@@ -4,12 +4,12 @@ from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from showcov.model.report import FileCounts, Report, SourceLine, UncoveredFile, UncoveredRange
+from showcov.core.model.report import FileCounts, Report, SourceLine, UncoveredFile, UncoveredRange
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from showcov.engine.build import BuildOptions
+    from showcov.core.build import BuildOptions
 
 
 def read_file_lines_uncached(path: Path) -> list[str]:
@@ -118,7 +118,7 @@ def _enrich_file(
 def enrich_report(report: Report, opts: BuildOptions) -> Report:
     """Attach filesystem-derived data (snippets, file totals) to an already-built Report."""
     sec = report.sections
-    if sec.lines is None and sec.diff is None:
+    if sec.lines is None:
         return report
 
     include_line_numbers = bool(opts.meta_show_line_numbers)
@@ -142,15 +142,7 @@ def enrich_report(report: Report, opts: BuildOptions) -> Report:
     if new_lines is not None:
         new_lines = replace(new_lines, files=enrich_files(new_lines.files))
 
-    new_diff = sec.diff
-    if new_diff is not None:
-        new_diff = replace(
-            new_diff,
-            new=enrich_files(new_diff.new),
-            resolved=enrich_files(new_diff.resolved),
-        )
-
-    return replace(report, sections=replace(sec, lines=new_lines, diff=new_diff))
+    return replace(report, sections=replace(sec, lines=new_lines))
 
 
 __all__ = ["enrich_report"]

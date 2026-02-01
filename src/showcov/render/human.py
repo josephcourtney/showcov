@@ -2,21 +2,18 @@ from __future__ import annotations
 
 from collections import defaultdict
 from collections.abc import Callable
-from io import StringIO
 from pathlib import PurePosixPath
 from typing import TYPE_CHECKING
 
-from rich.console import Console
 from rich.table import Table
 
-from showcov.render.table import format_table
+from showcov.render.table import format_table, render_table
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Sequence
 
-    from showcov.model.report import (
+    from showcov.core.model.report import (
         BranchesSection,
-        DiffSection,
         LinesSection,
         Report,
         SourceLine,
@@ -29,8 +26,6 @@ if TYPE_CHECKING:
 _NO_LINES = "No uncovered lines."
 _NO_BRANCHES = "No uncovered branches."
 _NO_SUMMARY = "No summary data."
-_NO_DIFF_NEW = "No new uncovered lines."
-_NO_DIFF_RESOLVED = "No resolved uncovered lines."
 
 
 def _heading(text: str, options: RenderOptions) -> str:
@@ -39,19 +34,6 @@ def _heading(text: str, options: RenderOptions) -> str:
 
 def _subheading(text: str, options: RenderOptions) -> str:
     return f"\x1b[1m{text}\x1b[0m" if (options.color and options.is_tty) else text
-
-
-def _render_rich_table(table: Table, *, color: bool) -> str:
-    buf = StringIO()
-    console = Console(
-        file=buf,
-        force_terminal=color,
-        color_system="standard" if color else None,
-        no_color=not color,
-        width=10_000,
-    )
-    console.print(table)
-    return buf.getvalue().rstrip()
 
 
 def _render_lines_ranges(
@@ -77,7 +59,7 @@ def _render_lines_ranges(
         t.add_column("# Lines", justify="right")
         for r in f.uncovered:
             t.add_row(str(r.start), str(r.end), str(r.line_count))
-        blocks.append(_render_rich_table(t, color=options.color))
+        blocks.append(render_table(t, color=options.color))
 
     if not any_files:
         return _NO_LINES
@@ -216,7 +198,7 @@ def _render_top_offenders(
                 brpct,
                 str(r.uncovered_lines),
             )
-        return _render_rich_table(t, color=options.color)
+        return render_table(t, color=options.color)
 
     parts: list[str] = [
         _subheading("Top offenders (statements)", options),
@@ -225,6 +207,31 @@ def _render_top_offenders(
         _render_top("File", top_br),
     ]
     return "\n".join([p for p in parts if p]).rstrip()
+
+
+def _directory_rollup_row(group: str, rows: Sequence[SummaryRow]) -> list[str]:
+    st_total = sum(r.statements.total for r in rows)
+    st_cov = sum(r.statements.covered for r in rows)
+    st_miss = sum(r.statements.missed for r in rows)
+    br_total = sum(r.branches.total for r in rows)
+    br_cov = sum(r.branches.covered for r in rows)
+    br_miss = sum(r.branches.missed for r in rows)
+    uncov = sum(r.uncovered_lines for r in rows)
+    ranges = sum(r.uncovered_ranges for r in rows)
+
+    stmt_pct = 100.0 if st_total == 0 else (st_cov / st_total) * 100.0
+    br_pct = None if br_total == 0 else (br_cov / br_total) * 100.0
+    br_pct_s = "—" if br_pct is None else f"{br_pct:.1f}%"
+
+    return [
+        group,
+        f"{stmt_pct:.1f}%",
+        str(st_miss),
+        br_pct_s,
+        str(br_miss),
+        str(uncov),
+        str(ranges),
+    ]
 
 
 def _render_directory_rollups(
@@ -247,31 +254,7 @@ def _render_directory_rollups(
     for r in files:
         grouped[group_key(r.file)].append(r)
 
-    roll_rows: list[list[str]] = []
-    for g in sorted(grouped):
-        rs = grouped[g]
-        st_total = sum(x.statements.total for x in rs)
-        st_cov = sum(x.statements.covered for x in rs)
-        st_miss = sum(x.statements.missed for x in rs)
-        br_total = sum(x.branches.total for x in rs)
-        br_cov = sum(x.branches.covered for x in rs)
-        br_miss = sum(x.branches.missed for x in rs)
-        uncov = sum(x.uncovered_lines for x in rs)
-        ranges = sum(x.uncovered_ranges for x in rs)
-
-        stmt_pct = 100.0 if st_total == 0 else (st_cov / st_total) * 100.0
-        br_pct = None if br_total == 0 else (br_cov / br_total) * 100.0
-        br_pct_s = "—" if br_pct is None else f"{br_pct:.1f}%"
-
-        roll_rows.append([
-            g,
-            f"{stmt_pct:.1f}%",
-            str(st_miss),
-            br_pct_s,
-            str(br_miss),
-            str(uncov),
-            str(ranges),
-        ])
+    roll_rows = [_directory_rollup_row(g, grouped[g]) for g in sorted(grouped)]
 
     roll_headers = [
         ("Dir",),
@@ -306,18 +289,6 @@ def _render_files_table(
         ("Uncov", "Lines"),
         ("Uncov", "Ranges"),
     ]
-    have_deltas = any(r.delta_missed_statements is not None for r in files)
-    if have_deltas:
-        headers.extend([
-            ("Δ miss", "stmt"),
-            ("Δ miss", "br"),
-            ("Δ uncov", "lines"),
-        ])
-
-    def fmt_delta(x: int | None) -> str:
-        if x is None:
-            return ""
-        return f"{x:+d}"
 
     rows: list[list[str]] = []
     for r in files:
@@ -335,12 +306,6 @@ def _render_files_table(
             str(r.uncovered_lines),
             str(r.uncovered_ranges),
         ]
-        if have_deltas:
-            row.extend([
-                fmt_delta(r.delta_missed_statements),
-                fmt_delta(r.delta_missed_branches),
-                fmt_delta(r.delta_uncovered_lines),
-            ])
         rows.append(row)
 
     table = format_table(headers, rows, color=options.color) if rows else ""
@@ -349,7 +314,7 @@ def _render_files_table(
     return "\n".join([_subheading("Files", options), table]).rstrip()
 
 
-def _render_summary_footer(sec: SummarySection, *, have_deltas: bool) -> str:
+def _render_summary_footer(sec: SummarySection) -> str:
     st = sec.totals.statements
     bt = sec.totals.branches
     stmt_pct = (st.covered / st.total * 100.0) if st.total else 100.0
@@ -358,7 +323,6 @@ def _render_summary_footer(sec: SummarySection, *, have_deltas: bool) -> str:
         f"Overall (weighted): statements {st.covered}/{st.total} covered ({stmt_pct:.1f}%)",
         f"Overall (weighted): branches {bt.covered}/{bt.total} covered ({br_pct:.1f}%)",
         f"Files with branches: {sec.files_with_branches}/{sec.total_files}",
-        ("Note: baseline deltas are (current - baseline)." if have_deltas else ""),
     ]
     return "\n".join([p for p in parts if p]).rstrip()
 
@@ -367,8 +331,6 @@ def _render_summary_section(sec: SummarySection, *, options: RenderOptions) -> s
     files = _summary_visible_files(sec, options=options)
     if not files:
         return _NO_SUMMARY
-
-    have_deltas = any(r.delta_missed_statements is not None for r in files)
 
     blocks: list[str] = []
     blocks.append(_render_top_offenders(files, options=options))
@@ -381,34 +343,11 @@ def _render_summary_section(sec: SummarySection, *, options: RenderOptions) -> s
     if file_table:
         blocks.append(file_table)
 
-    footer = _render_summary_footer(sec, have_deltas=have_deltas)
+    footer = _render_summary_footer(sec)
     if footer:
         blocks.append(footer)
 
     return "\n".join([b for b in blocks if b]).rstrip()
-
-
-def _render_diff_section(sec: DiffSection, *, options: RenderOptions) -> str:
-    parts: list[str] = []
-    parts.append(_subheading("New", options))
-    if sec.new:
-        parts.append(_render_lines_ranges(sec.new, options=options))
-        code = _render_lines_code_blocks(sec.new, options=options)
-        if code:
-            parts.append(code)
-    else:
-        parts.append(_NO_DIFF_NEW)
-
-    parts.append(_subheading("Resolved", options))
-    if sec.resolved:
-        parts.append(_render_lines_ranges(sec.resolved, options=options))
-        code = _render_lines_code_blocks(sec.resolved, options=options)
-        if code:
-            parts.append(code)
-    else:
-        parts.append(_NO_DIFF_RESOLVED)
-
-    return "\n".join(parts).rstrip()
 
 
 def render_human(report: Report, options: RenderOptions) -> str:
@@ -440,13 +379,6 @@ def render_human(report: Report, options: RenderOptions) -> str:
                 msg = "render_human expected the summary section to be present but it is missing"
                 raise ValueError(msg)
             parts.extend((_heading("Summary", options), _render_summary_section(sec, options=options)))
-        elif name == "diff":
-            sec = report.sections.diff
-            if sec is None:
-                msg = "render_human expected the diff section to be present but it is missing"
-                raise ValueError(msg)
-            parts.extend((_heading("Diff", options), _render_diff_section(sec, options=options)))
-
     return "\n\n".join([p for p in parts if p]).rstrip()
 
 

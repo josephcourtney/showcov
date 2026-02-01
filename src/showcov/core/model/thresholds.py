@@ -4,12 +4,13 @@ import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from showcov.model.types import FULL_COVERAGE
+from showcov.core.model.metrics import pct
+from showcov.core.model.types import FULL_COVERAGE
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from showcov.model.report import LinesSection, Report
+    from showcov.core.model.report import LinesSection, Report
 
 _THRESHOLD_PATTERN = re.compile(r"^[a-zA-Z_-]+=")
 
@@ -126,8 +127,8 @@ def evaluate(report: Report, thresholds: Sequence[Threshold]) -> ThresholdsResul
         st = summary.totals.statements
         bt = summary.totals.branches
 
-        stmt_pct = float(FULL_COVERAGE) if st.total == 0 else (st.covered / st.total) * float(FULL_COVERAGE)
-        br_pct = float(FULL_COVERAGE) if bt.total == 0 else (bt.covered / bt.total) * float(FULL_COVERAGE)
+        stmt_pct = pct(st.covered, st.total)
+        br_pct = pct(bt.covered, bt.total)
 
     if need_miss:
         lines = report.sections.lines

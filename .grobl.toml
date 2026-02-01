@@ -3,6 +3,7 @@
 # (exclude from directory tree listings)
 # ============================================
 exclude_tree = [
+  "!build",
   "tests/snapshots",
   ".ropeproject",
   "uv.lock",
@@ -67,19 +68,19 @@ exclude_tree = [
   ".ipynb_checkpoints",
 
   # ---------------- build artifacts ----------------
-  # common JS/Java/VSCode outputs
-  "dist",
-  "build",
-  "out",              # common JS/Java/VSCode outputs
-  "target",           # Rust, Maven, etc.
-  "wheels",           # Python distribution wheels
-  "mutants",          # mutation testing artifacts
-  "htmlcov",          # coverage HTML reports
-  "site/",            # MkDocs static site
-  ".angular",
-  ".gradle",
-  "storybook-static", # Storybook build output
-  "public/build",     # Svelte/V
+  # # common JS/Java/VSCode outputs
+  # "dist",
+  # "build",
+  # "out",              # common JS/Java/VSCode outputs
+  # "target",           # Rust, Maven, etc.
+  # "wheels",           # Python distribution wheels
+  # "mutants",          # mutation testing artifacts
+  # "htmlcov",          # coverage HTML reports
+  # "site/",            # MkDocs static site
+  # ".angular",
+  # ".gradle",
+  # "storybook-static", # Storybook build output
+  # "public/build",     # Svelte/V
 
   # ---------------- coverage ----------------
   ".coverage",     # coverage.py raw db
@@ -123,6 +124,7 @@ exclude_tree = [
 # but contents usually aren't (exclude from *printing*)
 # =================================================
 exclude_print = [
+  "!build",
   # ---------------- legal / boilerplate ----------------
   "LICENSE",
   "LICENSE.*",
@@ -134,9 +136,9 @@ exclude_print = [
   "docs",
 
   # ---------------- build artifacts (defensive) ----------------
-  "dist",
-  "build",
-  "out",
+  # "dist",
+  # "build",
+  # "out",
 
   # ---------------- assets / binaries ----------------
   "*.lproj",
