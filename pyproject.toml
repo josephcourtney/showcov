@@ -25,7 +25,7 @@
   ]
 
   [project.scripts]
-    showcov = "showcov.cli:cli"
+    showcov = "showcov.entrypoints.cli:cli"
 
 [dependency-groups]
   dev = [

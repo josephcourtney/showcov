@@ -9,14 +9,14 @@ from pathlib import Path
 from typing import (
 TYPE_CHECKING,
 )
-from showcov.core.model.metrics import pct
-from showcov.core.model.report import (
+from showcov.model.metrics import pct
+from showcov.model.report import (
     SummaryCounts,
     SummaryRow,
     SummarySection,
     SummaryTotals,
 )
-from showcov.core.model.types import (
+from showcov.model.types import (
 SummarySort,
 )
 from .records import (
@@ -29,7 +29,7 @@ from .lines import (
     _uncovered_line_ranges,
 )
 if TYPE_CHECKING:
-    from showcov.core.model.path_filter import PathFilter
+    from showcov.model.path_filter import PathFilter
 
 TINY_STATEMENT_THRESHOLD = 3
 def _summary_counts_stmt(records_for_file: list[tuple[int, int]]) -> tuple[int, int, int]:

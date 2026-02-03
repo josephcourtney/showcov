@@ -3,10 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from showcov.core.build import BuildOptions, build_report
-from showcov.core.enrich import enrich_report
-from showcov.core.model.types import BranchMode, SummarySort
-from showcov.inputs.records import collect_cobertura_records
+from showcov.adapters.coverage.records import collect_cobertura_records
+from showcov.engine.build import BuildOptions, build_report
+from showcov.engine.enrich import enrich_report
+from showcov.model.types import BranchMode, SummarySort
 
 if TYPE_CHECKING:
     from pathlib import Path

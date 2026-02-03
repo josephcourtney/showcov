@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import (
     TYPE_CHECKING,
 )
-from showcov.core.model.report import (
+from showcov.model.report import (
     FileCounts,
     LinesSection,
     LineSummary,
@@ -22,7 +22,7 @@ from .records import (
     _deduplicate_statement_records,
 )
 if TYPE_CHECKING:
-    from showcov.core.model.path_filter import PathFilter
+    from showcov.model.path_filter import PathFilter
 
 def _build_lines_section(
     records: list[Record],

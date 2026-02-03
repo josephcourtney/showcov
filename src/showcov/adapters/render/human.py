@@ -7,12 +7,13 @@ from typing import TYPE_CHECKING
 
 from rich.table import Table
 
-from showcov.render.table import format_table, render_table
+from showcov.adapters.render.table import format_table, render_table
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Sequence
 
-    from showcov.core.model.report import (
+    from showcov.adapters.render.render import RenderOptions
+    from showcov.model.report import (
         BranchesSection,
         LinesSection,
         Report,
@@ -21,7 +22,6 @@ if TYPE_CHECKING:
         SummarySection,
         UncoveredFile,
     )
-    from showcov.render.render import RenderOptions
 
 _NO_LINES = "No uncovered lines."
 _NO_BRANCHES = "No uncovered branches."

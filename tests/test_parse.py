@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from showcov.inputs.cobertura import (
+from showcov.adapters.coverage.cobertura import (
     iter_line_records,
     parse_condition_coverage,
     parse_conditions,

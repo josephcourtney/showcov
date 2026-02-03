@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from showcov.inputs.cobertura import iter_line_records, read_root
+from showcov.adapters.coverage.cobertura import iter_line_records, read_root
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
     from pathlib import Path
 
-    from showcov.core.build.records import Record
+    from showcov.model.records import Record
 
 
 def collect_cobertura_records(paths: Sequence[Path]) -> list[Record]:

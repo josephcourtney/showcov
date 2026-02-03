@@ -2,15 +2,15 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from showcov.core.pipeline import build_and_render_text
-from showcov.render.render import RenderOptions
+from showcov.adapters.render.render import RenderOptions
+from showcov.usecases.reporting import build_and_render_text
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from showcov.core.model.path_filter import PathFilter
-    from showcov.core.model.report import Report
-    from showcov.core.model.types import BranchMode, SummarySort
+    from showcov.model.path_filter import PathFilter
+    from showcov.model.report import Report
+    from showcov.model.types import BranchMode, SummarySort
 
 
 def generate_report_and_text(

@@ -1,6 +1,6 @@
-from showcov.cli import cli
-from showcov.cli.completion import build_completion_script
-from showcov.cli.man import build_man_page
+from showcov.entrypoints.cli import cli
+from showcov.entrypoints.cli.completion import build_completion_script
+from showcov.entrypoints.cli.man import build_man_page
 
 
 def test_build_man_page_mentions_subcommands() -> None:

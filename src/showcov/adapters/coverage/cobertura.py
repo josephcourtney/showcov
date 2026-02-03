@@ -6,14 +6,14 @@ from typing import TYPE_CHECKING
 
 from defusedxml import ElementTree
 
-from showcov.core.model.report import BranchCondition
 from showcov.errors import InvalidCoverageXMLError
+from showcov.model.report import BranchCondition
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
     from pathlib import Path
 
-    from showcov.inputs.types import ElementLike
+    from showcov.adapters.coverage.types import ElementLike
 
 
 @dataclass(frozen=True, slots=True)

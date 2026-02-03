@@ -9,7 +9,7 @@ import click
 import typer
 from typer.main import get_command
 
-from showcov.cli.exit_codes import EXIT_OK
+from showcov.entrypoints.cli.exit_codes import EXIT_OK
 from showcov.io import write_output
 
 _EXIT_STATUS = """\

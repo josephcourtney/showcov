@@ -6,22 +6,21 @@ from typing import TYPE_CHECKING
 from defusedxml import ElementTree
 
 from showcov._meta import logger
-from showcov.core.build import BuildOptions, build_report
-from showcov.core.enrich import enrich_report
-from showcov.core.model.thresholds import Threshold, ThresholdsResult
-from showcov.core.model.thresholds import evaluate as evaluate_thresholds
+from showcov.adapters.coverage.records import collect_cobertura_records
+from showcov.engine.build import BuildOptions, build_report
+from showcov.engine.enrich import enrich_report
 from showcov.errors import CoverageXMLNotFoundError, InvalidCoverageXMLError
-from showcov.inputs.records import collect_cobertura_records
-from showcov.render.render import RenderOptions, render
+from showcov.model.thresholds import Threshold, ThresholdsResult
+from showcov.model.thresholds import evaluate as evaluate_thresholds
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
     from pathlib import Path
 
-    from showcov.core.build.records import Record
-    from showcov.core.model.path_filter import PathFilter
-    from showcov.core.model.report import Report
-    from showcov.core.model.types import BranchMode, SummarySort
+    from showcov.model.path_filter import PathFilter
+    from showcov.model.records import Record
+    from showcov.model.report import Report
+    from showcov.model.types import BranchMode, SummarySort
 
 
 class PipelineError(Exception):
@@ -87,28 +86,7 @@ def _make_build_options(
     )
 
 
-def _render_options(
-    *,
-    color: bool,
-    show_paths: bool,
-    show_line_numbers: bool,
-    is_tty_like: bool,
-    show_covered: bool,
-    summary_group: bool,
-    summary_group_depth: int,
-) -> RenderOptions:
-    return RenderOptions(
-        color=color,
-        show_paths=show_paths,
-        show_line_numbers=show_line_numbers,
-        is_tty=is_tty_like,
-        show_covered=show_covered,
-        summary_group=summary_group,
-        summary_group_depth=summary_group_depth,
-    )
-
-
-def build_and_render_text(
+def build_report_from_coverage(
     *,
     coverage_paths: tuple[Path, ...],
     base_path: Path,
@@ -123,14 +101,8 @@ def build_and_render_text(
     context_after: int,
     show_paths: bool,
     show_line_numbers: bool,
-    render_fmt: str,
-    is_tty_like: bool,
-    color: bool,
-    show_covered: bool,
-    summary_group: bool,
-    summary_group_depth: int,
     drop_empty_branches: bool,
-) -> tuple[Report, str]:
+) -> Report:
     try:
         records = collect_cobertura_records(coverage_paths)
         opts = _make_build_options(
@@ -167,17 +139,7 @@ def build_and_render_text(
     if drop_empty_branches and report.sections.branches is not None and not report.sections.branches.gaps:
         report = replace(report, sections=replace(report.sections, branches=None))
 
-    render_opts = _render_options(
-        color=color,
-        show_paths=show_paths,
-        show_line_numbers=show_line_numbers,
-        is_tty_like=is_tty_like,
-        show_covered=show_covered,
-        summary_group=summary_group,
-        summary_group_depth=summary_group_depth,
-    )
-    rendered = render(report, fmt=render_fmt, options=render_opts)
-    return report, rendered
+    return report
 
 
 def evaluate_thresholds_or_raise(
@@ -201,6 +163,6 @@ __all__ = [
     "SystemIOError",
     "ThresholdError",
     "UnexpectedError",
-    "build_and_render_text",
+    "build_report_from_coverage",
     "evaluate_thresholds_or_raise",
 ]

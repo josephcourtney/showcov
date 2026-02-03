@@ -5,7 +5,7 @@ import pathlib
 
 from click.testing import CliRunner
 
-from showcov.cli import cli
+from showcov.entrypoints.cli import cli
 
 
 def test_cli_report_default_human_output(project) -> None:

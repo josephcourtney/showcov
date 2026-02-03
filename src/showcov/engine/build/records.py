@@ -2,24 +2,14 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import (
-TYPE_CHECKING,
-TypeAlias,
+    TYPE_CHECKING,
+    TypeAlias,
 )
-from showcov.core.model.report import (
-    BranchCondition,
-)
+from showcov.model.records import Record
+
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
-    from showcov.core.model.path_filter import PathFilter
-
-Record = tuple[
-    str,  # file
-    int,  # line
-    int,  # hits
-    tuple[int, int] | None,  # branch_counts
-    tuple[int, ...],  # missing_branches
-    tuple[BranchCondition, ...],  # conditions
-]
+    from showcov.model.path_filter import PathFilter
 
 BranchLineRec: TypeAlias = tuple[int, tuple[int, int] | None, tuple[int, ...]]
 

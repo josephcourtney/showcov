@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from showcov.core.model.path_filter import PathFilter
-from showcov.core.model.types import (
+from showcov.model.path_filter import PathFilter
+from showcov.model.types import (
     BranchMode,
     SummarySort,
 )
-from .records import Record
+from showcov.model.records import Record
 
 @dataclass(frozen=True, slots=True)
 class BuildOptions:

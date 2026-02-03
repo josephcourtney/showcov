@@ -7,31 +7,31 @@ from typing import TYPE_CHECKING, Annotated
 import click.utils as click_utils
 import typer
 
-from showcov.cli._shared import resolve_use_color
-from showcov.cli.exit_codes import (
+from showcov.adapters.coverage.discover import resolve_coverage_paths
+from showcov.engine.pipeline import (
+    DataError,
+    NoInputError,
+    SystemIOError,
+    ThresholdError,
+    UnexpectedError,
+    evaluate_thresholds_or_raise,
+)
+from showcov.entrypoints.cli._shared import resolve_use_color
+from showcov.entrypoints.cli.exit_codes import (
     EXIT_DATAERR,
     EXIT_GENERIC,
     EXIT_NOINPUT,
     EXIT_OK,
     EXIT_THRESHOLD,
 )
-from showcov.core.model.path_filter import PathFilter
-from showcov.core.model.thresholds import Threshold
-from showcov.core.model.types import BranchMode, SummarySort
-from showcov.core.pipeline import (
-    DataError,
-    NoInputError,
-    SystemIOError,
-    ThresholdError,
-    UnexpectedError,
-    build_and_render_text,
-    evaluate_thresholds_or_raise,
-)
-from showcov.inputs.discover import resolve_coverage_paths
 from showcov.io import write_output
+from showcov.model.path_filter import PathFilter
+from showcov.model.thresholds import Threshold
+from showcov.model.types import BranchMode, SummarySort
+from showcov.usecases.reporting import build_and_render_text
 
 if TYPE_CHECKING:
-    from showcov.core.model.report import Report
+    from showcov.model.report import Report
 
 _BOOL_TRUE = True
 _BOOL_FALSE = False

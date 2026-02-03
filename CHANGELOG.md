@@ -11,7 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - introduce `inputs.cobertura` and `cli.exit_codes` to centralize coverage parsing and shared exit-code constants
 
 ### Changed
-- reorganize `showcov.coverage/engine/model` into `showcov.inputs` and `showcov.core` while updating all CLI/testing imports
+- reorganize `showcov.coverage/engine/model` into `showcov.adapters.coverage` and `showcov.engine` while updating all CLI/testing imports
 - remove the legacy `showcov.run` helper and make `showcov.report` drive the new pipeline, CLI, and tests
 
 ## [0.2.4] - 2026-01-31

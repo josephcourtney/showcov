@@ -4,41 +4,52 @@
   root_package = "showcov"
 
   [[tool.importlinter.contracts]]
-    name = "Model layer does not depend on higher layers"
+    name = "model is pure"
     type = "forbidden"
-    source_modules = ["showcov.core.model"]
+    source_modules = ["showcov.model"]
     forbidden_modules = [
-      "showcov.cli",
-      "showcov.render",
-      "showcov.core",
-      "showcov.inputs",
+      "showcov.engine",
+      "showcov.adapters",
+      "showcov.entrypoints",
+      "showcov.usecases",
     ]
 
   [[tool.importlinter.contracts]]
-    name = "Coverage parsing does not depend on engine/render/cli"
+    name = "engine depends only on model"
     type = "forbidden"
-    source_modules = ["showcov.inputs"]
+    source_modules = ["showcov.engine"]
     forbidden_modules = [
-      "showcov.cli",
-      "showcov.render",
-      "showcov.core",
+      "showcov.adapters",
+      "showcov.entrypoints",
+      "showcov.usecases",
     ]
 
   [[tool.importlinter.contracts]]
-    name = "Engine does not depend on CLI or render"
+    name = "coverage adapters don't depend on engine/render/entrypoints"
     type = "forbidden"
-    source_modules = ["showcov.core"]
+    source_modules = ["showcov.adapters.coverage"]
     forbidden_modules = [
-      "showcov.cli",
-      "showcov.render",
+      "showcov.engine",
+      "showcov.adapters.render",
+      "showcov.entrypoints",
     ]
 
   [[tool.importlinter.contracts]]
-    name = "Render does not depend on engine/coverage/cli"
+    name = "render adapters don't depend on engine/coverage/entrypoints"
     type = "forbidden"
-    source_modules = ["showcov.render"]
+    source_modules = ["showcov.adapters.render"]
     forbidden_modules = [
-      "showcov.cli",
-      "showcov.core",
-      "showcov.inputs",
+      "showcov.engine",
+      "showcov.adapters.coverage",
+      "showcov.entrypoints",
+    ]
+
+  [[tool.importlinter.contracts]]
+    name = "entrypoints depend on usecases, not engine/adapters directly"
+    type = "forbidden"
+    source_modules = ["showcov.entrypoints"]
+    forbidden_modules = [
+      "showcov.engine",
+      "showcov.adapters",
+      "showcov.domain",
     ]

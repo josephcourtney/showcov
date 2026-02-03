@@ -3,11 +3,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pytest
+from showcov.model.thresholds import Threshold, evaluate, parse_threshold
 
-from showcov.core.build import BuildOptions, build_report
-from showcov.core.model.thresholds import Threshold, evaluate, parse_threshold
-from showcov.core.model.types import BranchMode, SummarySort
-from showcov.inputs.records import collect_cobertura_records
+from showcov.adapters.coverage.records import collect_cobertura_records
+from showcov.engine.build import BuildOptions, build_report
+from showcov.model.types import BranchMode, SummarySort
 
 if TYPE_CHECKING:
     from pathlib import Path

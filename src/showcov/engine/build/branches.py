@@ -4,12 +4,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, TypedDict
 
-from showcov.core.model.report import (
+from showcov.model.report import (
     BranchCondition,
     BranchesSection,
     BranchGap,
 )
-from showcov.core.model.types import (
+from showcov.model.types import (
     FULL_COVERAGE,
     BranchMode,
 )
@@ -22,7 +22,7 @@ from ._util import (
 )
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
-    from showcov.core.model.path_filter import PathFilter
+    from showcov.model.path_filter import PathFilter
 
 class _BranchAccumulator(TypedDict):
     bc: tuple[int, int] | None

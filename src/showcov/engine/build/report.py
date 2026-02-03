@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from .types import BuildOptions
-from showcov.core.model.report import (
+from showcov.model.report import (
     EnvironmentMeta,
     LinesSection,
     OptionsMeta,

@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-from showcov.core.model.types import FULL_COVERAGE
+from showcov.model.types import FULL_COVERAGE
 
 # -----------------------------------------------------------------------------
 # Core surface model (what renderers + JSON output consume)

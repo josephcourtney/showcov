@@ -3,10 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from showcov.render.human import render_human
+from showcov.adapters.render.human import render_human
 
 if TYPE_CHECKING:
-    from showcov.core.model.report import Report
+    from showcov.model.report import Report
 
 
 @dataclass(frozen=True, slots=True)

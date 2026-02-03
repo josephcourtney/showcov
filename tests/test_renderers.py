@@ -4,10 +4,10 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from showcov.core.build import BuildOptions, build_report
-from showcov.core.model.types import BranchMode, SummarySort
-from showcov.inputs.records import collect_cobertura_records
-from showcov.render.render import RenderOptions, render
+from showcov.adapters.coverage.records import collect_cobertura_records
+from showcov.adapters.render.render import RenderOptions, render
+from showcov.engine.build import BuildOptions, build_report
+from showcov.model.types import BranchMode, SummarySort
 
 if TYPE_CHECKING:
     from pathlib import Path

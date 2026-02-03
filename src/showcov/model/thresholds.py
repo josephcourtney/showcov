@@ -4,13 +4,13 @@ import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from showcov.core.model.metrics import pct
-from showcov.core.model.types import FULL_COVERAGE
+from showcov.model.metrics import pct
+from showcov.model.types import FULL_COVERAGE
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from showcov.core.model.report import LinesSection, Report
+    from showcov.model.report import LinesSection, Report
 
 _THRESHOLD_PATTERN = re.compile(r"^[a-zA-Z_-]+=")
 

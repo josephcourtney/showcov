@@ -4,12 +4,12 @@ from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from showcov.core.model.report import FileCounts, Report, SourceLine, UncoveredFile, UncoveredRange
+from showcov.model.report import FileCounts, Report, SourceLine, UncoveredFile, UncoveredRange
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from showcov.core.build import BuildOptions
+    from showcov.engine.build import BuildOptions
 
 
 def read_file_lines_uncached(path: Path) -> list[str]:
