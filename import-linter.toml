@@ -14,6 +14,22 @@
       "showcov.usecases",
     ]
 
+  # Single source of truth for layering:
+  [[tool.importlinter.contracts]]
+    name = "layering"
+    type = "layers"
+    layers = [
+      "showcov.entrypoints",
+      "showcov.usecases",
+      "showcov.engine",
+      "showcov.adapters",
+      "showcov.model",
+    ]
+    ignore_imports = [
+      # (optional) allow typing-only cycles if needed:
+      # "showcov.* -> showcov.* [label=TYPE_CHECKING]"
+    ]
+
   [[tool.importlinter.contracts]]
     name = "engine depends only on model"
     type = "forbidden"
@@ -42,14 +58,4 @@
       "showcov.engine",
       "showcov.adapters.coverage",
       "showcov.entrypoints",
-    ]
-
-  [[tool.importlinter.contracts]]
-    name = "entrypoints depend on usecases, not engine/adapters directly"
-    type = "forbidden"
-    source_modules = ["showcov.entrypoints"]
-    forbidden_modules = [
-      "showcov.engine",
-      "showcov.adapters",
-      "showcov.domain",
     ]

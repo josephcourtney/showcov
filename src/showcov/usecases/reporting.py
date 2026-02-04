@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from showcov.adapters.render.render import RenderOptions, render
-from showcov.engine.pipeline import build_report_from_coverage
+from showcov.usecases.pipeline import build_report_from_coverage
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -33,7 +33,7 @@ def build_and_render_text(
     color: bool,
     show_covered: bool,
     summary_group: bool,
-    summary_group_depth: int,
+    summary_max_depth: int | None,
     drop_empty_branches: bool,
 ) -> tuple[Report, str]:
     report = build_report_from_coverage(
@@ -60,7 +60,7 @@ def build_and_render_text(
         is_tty=is_tty_like,
         show_covered=show_covered,
         summary_group=summary_group,
-        summary_group_depth=summary_group_depth,
+        summary_max_depth=summary_max_depth,
     )
     return report, render(report, fmt=render_fmt, options=render_opts)
 

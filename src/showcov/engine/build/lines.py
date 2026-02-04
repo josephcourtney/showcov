@@ -1,6 +1,8 @@
 
 from __future__ import annotations
 
+from .record_ops import _apply_filters, _deduplicate_statement_records
+from showcov.model.records import Record
 from ._util import (
     _display_path,
     _group_consecutive,
@@ -15,11 +17,6 @@ from showcov.model.report import (
     LineSummary,
     UncoveredFile,
     UncoveredRange,
-)
-from .records import (
-    Record,
-    _apply_filters,
-    _deduplicate_statement_records,
 )
 if TYPE_CHECKING:
     from showcov.model.path_filter import PathFilter

@@ -51,7 +51,7 @@ def generate_report_and_text(
         color=render_opts.color,
         show_covered=render_opts.show_covered,
         summary_group=render_opts.summary_group,
-        summary_group_depth=render_opts.summary_group_depth,
+        summary_max_depth=render_opts.summary_max_depth,
         drop_empty_branches=drop_empty_branches,
     )
 

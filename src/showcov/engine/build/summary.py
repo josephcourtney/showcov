@@ -1,6 +1,12 @@
 
 from __future__ import annotations
 
+from .record_ops import (
+    _apply_filters,
+    _deduplicate_statement_records,
+    _deduplicate_branch_records,
+)
+from showcov.model.records import Record
 from ._util import (
         _display_path,
 )
@@ -18,12 +24,6 @@ from showcov.model.report import (
 )
 from showcov.model.types import (
 SummarySort,
-)
-from .records import (
-Record,
-_apply_filters,
-_deduplicate_statement_records,
-_deduplicate_branch_records,
 )
 from .lines import (
     _uncovered_line_ranges,

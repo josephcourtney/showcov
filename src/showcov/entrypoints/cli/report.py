@@ -7,15 +7,7 @@ from typing import TYPE_CHECKING, Annotated
 import click.utils as click_utils
 import typer
 
-from showcov.adapters.coverage.discover import resolve_coverage_paths
-from showcov.engine.pipeline import (
-    DataError,
-    NoInputError,
-    SystemIOError,
-    ThresholdError,
-    UnexpectedError,
-    evaluate_thresholds_or_raise,
-)
+from showcov.adapters.output import write_output
 from showcov.entrypoints.cli._shared import resolve_use_color
 from showcov.entrypoints.cli.exit_codes import (
     EXIT_DATAERR,
@@ -24,10 +16,18 @@ from showcov.entrypoints.cli.exit_codes import (
     EXIT_OK,
     EXIT_THRESHOLD,
 )
-from showcov.io import write_output
 from showcov.model.path_filter import PathFilter
 from showcov.model.thresholds import Threshold
 from showcov.model.types import BranchMode, SummarySort
+from showcov.usecases.inputs import resolve_coverage_inputs
+from showcov.usecases.pipeline import (
+    DataError,
+    NoInputError,
+    SystemIOError,
+    ThresholdError,
+    UnexpectedError,
+    evaluate_thresholds_or_raise,
+)
 from showcov.usecases.reporting import build_and_render_text
 
 if TYPE_CHECKING:
@@ -52,7 +52,7 @@ def _build_report_and_text(
     want_snippets: bool,
     context: int,
     sort: SummarySort,
-    group_depth: int,
+    max_depth: int,
     is_tty_like: bool,
     use_color: bool,
 ) -> tuple[Report, str]:
@@ -77,7 +77,7 @@ def _build_report_and_text(
             color=use_color,
             show_covered=False,
             summary_group=True,
-            summary_group_depth=group_depth,
+            summary_max_depth=max_depth,
             drop_empty_branches=True,
         )
     except NoInputError as exc:
@@ -119,11 +119,11 @@ def report_cmd(
     lines: Annotated[
         bool,
         typer.Option("--lines/--no-lines", help="Show uncovered statement lines."),
-    ] = _BOOL_TRUE,
+    ] = _BOOL_FALSE,
     branches: Annotated[
         bool,
         typer.Option("--branches/--no-branches", help="Show partially covered branch lines."),
-    ] = _BOOL_TRUE,
+    ] = _BOOL_FALSE,
     summary: Annotated[
         bool,
         typer.Option("--summary/--no-summary", help="Show summary and directory rollups."),
@@ -151,14 +151,14 @@ def report_cmd(
             case_sensitive=False,
         ),
     ] = SummarySort.MISSED_STATEMENTS,
-    group_depth: Annotated[
-        int,
+    max_depth: Annotated[
+        int | None,
         typer.Option(
-            "--group-depth",
-            help="Directory rollup depth for summary (e.g., 2 groups by top two path parts).",
+            "--max-depth",
+            help="Maximum directory depth to display from the root (1=top-level only). If omitted, unlimited.",
             min=1,
         ),
-    ] = 2,
+    ] = None,
     # Thresholds (keep the same semantics)
     fail_under_stmt: Annotated[
         float | None,
@@ -188,7 +188,7 @@ def report_cmd(
     include = include or []
     exclude = exclude or []
 
-    coverage_paths = resolve_coverage_paths(coverage, cwd=Path.cwd())
+    coverage_paths = resolve_coverage_inputs(coverage, cwd=Path.cwd())
 
     sections: set[str] = set()
     if lines:
@@ -225,7 +225,7 @@ def report_cmd(
         want_snippets=want_snippets,
         context=int(context),
         sort=sort,
-        group_depth=int(group_depth),
+        max_depth=max_depth if max_depth is None else int(max_depth),
         is_tty_like=is_tty_like,
         use_color=use_color,
     )

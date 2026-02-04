@@ -8,8 +8,8 @@ import typer
 from click.shell_completion import BashComplete, FishComplete, ShellComplete, ZshComplete
 from typer.main import get_command
 
+from showcov.adapters.output import write_output
 from showcov.entrypoints.cli.exit_codes import EXIT_OK
-from showcov.io import write_output
 
 ShellName = Literal["bash", "zsh", "fish"]
 

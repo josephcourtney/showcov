@@ -1,13 +1,19 @@
 from __future__ import annotations
 
-from collections import defaultdict
+import operator
 from collections.abc import Callable
+from dataclasses import dataclass, field
 from pathlib import PurePosixPath
 from typing import TYPE_CHECKING
 
 from rich.table import Table
 
 from showcov.adapters.render.table import format_table, render_table
+from showcov.model.metrics import pct  # <-- you also hit NameError earlier
+from showcov.model.report import (
+    SummaryCounts,
+    SummaryRow,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Sequence
@@ -18,7 +24,6 @@ if TYPE_CHECKING:
         LinesSection,
         Report,
         SourceLine,
-        SummaryRow,
         SummarySection,
         UncoveredFile,
     )
@@ -26,6 +31,25 @@ if TYPE_CHECKING:
 _NO_LINES = "No uncovered lines."
 _NO_BRANCHES = "No uncovered branches."
 _NO_SUMMARY = "No summary data."
+
+
+def _limit_display_path(path: str, *, max_depth: int | None) -> str:
+    """Truncate a posix-ish relative path to at most max_depth components.
+
+    Examples (max_depth=1):
+      pkg/mod.py      -> pkg/
+      pkg/sub/a.py    -> pkg/
+      mod.py          -> mod.py
+    """
+    if max_depth is None:
+        return path
+    p = PurePosixPath(path)
+    parts = list(p.parts)
+    if len(parts) <= 1:
+        return path
+    # keep first max_depth components; display as a directory rollup label
+    kept = parts[:max_depth]
+    return "/".join(kept) + "/"
 
 
 def _heading(text: str, options: RenderOptions) -> str:
@@ -51,7 +75,8 @@ def _render_lines_ranges(
         any_files = True
 
         if options.show_paths and f.file:
-            blocks.append(f"{f.file}  File")
+            label = _limit_display_path(f.file, max_depth=options.summary_max_depth)
+            blocks.append(f"{label}  File")
         # Table of ranges (always)
         t = Table(show_header=True, header_style="bold")
         t.add_column("Start", justify="right")
@@ -90,7 +115,8 @@ def _render_lines_code_blocks(
                 continue
             label = f"{r.start}-{r.end}" if r.start != r.end else f"{r.start}"
             if options.show_paths and f.file:
-                blocks.append(f"{f.file}:{label}")
+                fname = _limit_display_path(f.file, max_depth=options.summary_max_depth)
+                blocks.append(f"{fname}:{label}")
             else:
                 blocks.append(label)
             blocks.extend(_render_source_line(sl, options=options) for sl in r.source)
@@ -137,7 +163,11 @@ def _render_branches_section(sec: BranchesSection, *, options: RenderOptions) ->
 
     rows: list[list[str]] = []
     for gap in sec.gaps:
-        file_label = gap.file if (options.show_paths and gap.file) else ""
+        if options.show_paths and gap.file:
+            file_label = _limit_display_path(gap.file, max_depth=options.summary_max_depth)
+        else:
+            file_label = ""
+
         for cond in gap.conditions:
             cov = "missing" if cond.coverage is None else f"{cond.coverage}%"
             typ = (cond.type or "branch").lower()
@@ -234,48 +264,172 @@ def _directory_rollup_row(group: str, rows: Sequence[SummaryRow]) -> list[str]:
     ]
 
 
-def _render_directory_rollups(
+@dataclass
+class _DirNode:
+    name: str  # single path component, e.g. "adapters"
+    path: str  # full path from root, e.g. "src/showcov/adapters"
+    children: dict[str, _DirNode] = field(default_factory=dict)
+    files: list[SummaryRow] = field(default_factory=list)
+
+
+def _insert_file(root: _DirNode, row: SummaryRow) -> None:
+    p = PurePosixPath(row.file)
+    parts = list(p.parts)
+
+    if len(parts) <= 1:
+        root.files.append(row)
+        return
+
+    dir_parts = parts[:-1]
+
+    cur = root
+    accum: list[str] = []
+    for part in dir_parts:
+        accum.append(part)
+        full = "/".join(accum)
+        nxt = cur.children.get(part)
+        if nxt is None:
+            nxt = _DirNode(name=part, path=full)
+            cur.children[part] = nxt
+        cur = nxt
+
+    cur.files.append(row)
+
+
+def _aggregate_dir(node: _DirNode) -> SummaryRow:
+    # Aggregate across *all descendant files*
+    all_files: list[SummaryRow] = []
+
+    def collect(n: _DirNode) -> None:
+        all_files.extend(n.files)
+        for child in n.children.values():
+            collect(child)
+
+    collect(node)
+
+    st_total = sum(r.statements.total for r in all_files)
+    st_cov = sum(r.statements.covered for r in all_files)
+    st_miss = sum(r.statements.missed for r in all_files)
+
+    br_total = sum(r.branches.total for r in all_files)
+    br_cov = sum(r.branches.covered for r in all_files)
+    br_miss = sum(r.branches.missed for r in all_files)
+
+    uncov_lines = sum(r.uncovered_lines for r in all_files)
+    uncov_ranges = sum(r.uncovered_ranges for r in all_files)
+
+    stmt_pct = pct(st_cov, st_total)
+    br_pct = None if br_total == 0 else pct(br_cov, br_total)
+
+    return SummaryRow(
+        file=node.path + "/",
+        statements=SummaryCounts(total=st_total, covered=st_cov, missed=st_miss),
+        branches=SummaryCounts(total=br_total, covered=br_cov, missed=br_miss),
+        statement_pct=float(stmt_pct),
+        branch_pct=(None if br_pct is None else float(br_pct)),
+        uncovered_lines=int(uncov_lines),
+        uncovered_ranges=int(uncov_ranges),
+        untested=False,
+        tiny=False,
+    )
+
+
+def _tree_order_rows(root: _DirNode, *, max_depth: int | None) -> list[SummaryRow]:
+    """
+    Walk the _DirNode tree in directory-tree order and emit:
+      - a rollup row for each directory (node.path + "/"), displayed with tree glyphs
+      - then files in that directory (basename), displayed with tree glyphs.
+
+    Returns SummaryRow objects where `.file` is already the display label (tree-style).
+    """
+    out: list[SummaryRow] = []
+
+    def walk_dir(
+        node: _DirNode,
+        *,
+        ancestor_last: list[bool],
+        is_last: bool,
+        is_root: bool,
+        depth: int,  # depth in directory components; root synthetic node is depth=0
+    ) -> None:
+        if not is_root:
+            name = node.name + "/"
+            prefix = _tree_prefix(ancestor_last, is_last=is_last)
+            out.append(_with_display_file(_aggregate_dir(node), prefix + name))
+
+        # If we've reached max_depth, do not expand this directory's contents.
+        # depth counts real directories from the top; root is depth 0.
+        if not is_root and (max_depth is not None and depth >= max_depth):
+            return
+
+        dir_items = sorted(node.children.items(), key=operator.itemgetter(0))
+        file_items = sorted(node.files, key=lambda r: PurePosixPath(r.file).name)
+
+        total_children = len(dir_items) + len(file_items)
+        next_ancestor_last = ancestor_last.copy() if is_root else [*ancestor_last, is_last]
+
+        idx = 0
+        for _dirname, child in dir_items:
+            idx += 1
+            child_is_last = idx == total_children
+            walk_dir(
+                child,
+                ancestor_last=next_ancestor_last,
+                is_last=child_is_last,
+                is_root=False,
+                depth=depth + 1,
+            )
+
+        for r in file_items:
+            idx += 1
+            file_is_last = idx == total_children
+            prefix = _tree_prefix(next_ancestor_last, is_last=file_is_last)
+            fname = PurePosixPath(r.file).name
+            out.append(_with_display_file(r, prefix + fname))
+
+    walk_dir(root, ancestor_last=[], is_last=True, is_root=True, depth=0)
+    return out
+
+
+def _tree_prefix(ancestor_last: list[bool], *, is_last: bool) -> str:
+    """
+    Build a tree(1)-style prefix.
+
+    ancestor_last: for each ancestor level, True if that ancestor was the last child.
+    is_last: whether the current node is the last among its siblings.
+    """
+    if not ancestor_last:
+        return ""
+    # For each ancestor: draw a vertical continuation if ancestor wasn't last.
+    parts = [("    " if last else "│   ") for last in ancestor_last]
+    parts.append("└── " if is_last else "├── ")
+    return "".join(parts)
+
+
+def _with_display_file(row: SummaryRow, display: str) -> SummaryRow:
+    """Copy a SummaryRow but replace its .file label with a display string."""
+    # SummaryRow is a dataclass (frozen=True), so use dataclasses.replace
+    from dataclasses import replace
+
+    return replace(row, file=display)
+
+
+def _render_summary_tree_table(
     files: Sequence[SummaryRow],
     *,
     options: RenderOptions,
 ) -> str:
-    if not options.summary_group:
-        return ""
-    depth = max(1, int(options.summary_group_depth))
-    grouped: dict[str, list[SummaryRow]] = defaultdict(list)
-
-    def group_key(path: str) -> str:
-        p = PurePosixPath(path)
-        parts = p.parts
-        if not parts:
-            return path
-        return "/".join(parts[: min(depth, len(parts))])
+    # Build tree
+    root = _DirNode(name="", path="")
 
     for r in files:
-        grouped[group_key(r.file)].append(r)
+        _insert_file(root, r)
 
-    roll_rows = [_directory_rollup_row(g, grouped[g]) for g in sorted(grouped)]
+    rows_in_order = _tree_order_rows(
+        root,
+        max_depth=options.summary_max_depth,
+    )
 
-    roll_headers = [
-        ("Dir",),
-        ("Stmt%",),
-        ("Miss stmt",),
-        ("Br%",),
-        ("Miss br",),
-        ("Uncov lines",),
-        ("Ranges",),
-    ]
-    roll_table = format_table(roll_headers, roll_rows, color=options.color) if roll_rows else ""
-    if not roll_table:
-        return ""
-    return "\n".join([_subheading("Directory rollups", options), roll_table]).rstrip()
-
-
-def _render_files_table(
-    files: Sequence[SummaryRow],
-    *,
-    options: RenderOptions,
-) -> str:
     headers = [
         ("File",),
         ("Stmt%",),
@@ -291,10 +445,16 @@ def _render_files_table(
     ]
 
     rows: list[list[str]] = []
-    for r in files:
+    for r in rows_in_order:
         brpct = "—" if r.branch_pct is None else f"{r.branch_pct:.1f}%"
-        row = [
-            r.file + ("  [untested]" if r.untested else "") + ("  [tiny]" if r.tiny else ""),
+
+        # Preserve your existing file tags for *files only*
+        label = r.file
+        if not label.rstrip().endswith("/"):
+            label = label + ("  [untested]" if r.untested else "") + ("  [tiny]" if r.tiny else "")
+
+        rows.append([
+            label,
             f"{r.statement_pct:.1f}%",
             str(r.statements.total),
             str(r.statements.covered),
@@ -305,13 +465,12 @@ def _render_files_table(
             str(r.branches.missed),
             str(r.uncovered_lines),
             str(r.uncovered_ranges),
-        ]
-        rows.append(row)
+        ])
 
     table = format_table(headers, rows, color=options.color) if rows else ""
     if not table:
         return ""
-    return "\n".join([_subheading("Files", options), table]).rstrip()
+    return "\n".join([_subheading("Summary", options), table]).rstrip()
 
 
 def _render_summary_footer(sec: SummarySection) -> str:
@@ -333,15 +492,10 @@ def _render_summary_section(sec: SummarySection, *, options: RenderOptions) -> s
         return _NO_SUMMARY
 
     blocks: list[str] = []
-    blocks.append(_render_top_offenders(files, options=options))
 
-    rollups = _render_directory_rollups(files, options=options)
-    if rollups:
-        blocks.append(rollups)
-
-    file_table = _render_files_table(files, options=options)
-    if file_table:
-        blocks.append(file_table)
+    tree_table = _render_summary_tree_table(files, options=options)
+    if tree_table:
+        blocks.append(tree_table)
 
     footer = _render_summary_footer(sec)
     if footer:

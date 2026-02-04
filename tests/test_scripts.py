@@ -18,3 +18,4 @@ def test_build_completion_script_includes_report_flags() -> None:
     assert "--code" in script
     assert "--context" in script
     assert "--fail-under-stmt" in script
+    assert "--max-depth" in script

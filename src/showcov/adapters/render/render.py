@@ -26,7 +26,7 @@ class RenderOptions:
     # Summary presentation controls
     show_covered: bool = False
     summary_group: bool = True
-    summary_group_depth: int = 2
+    summary_max_depth: int | None = None
 
 
 def render(report: Report, *, fmt: str, options: RenderOptions) -> str:

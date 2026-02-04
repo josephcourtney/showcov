@@ -13,10 +13,10 @@ from showcov.model.types import (
     FULL_COVERAGE,
     BranchMode,
 )
-from .records import (
-    Record,
+from .record_ops import (
     _apply_filters,
 )
+from showcov.model.records import Record
 from ._util import (
     _display_path,
 )

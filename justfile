@@ -152,7 +152,7 @@ lint-no-fix:
 [group('code quality')]
 lint-imports:
   @just _log_start lint-imports
-  bash -euo pipefail -c 'if [ ! -x {{IMPORTLINTER}} ]; then echo "[lint-imports] ERROR: lint-imports not found ({{IMPORTLINTER}}); install import-linter dev dep and run '\''just setup'\''"; exit 1; fi; set +e; output="$({{IMPORTLINTER}} --verbose --config {{IMPORTLINTER_CONFIG}} 2>&1)"; status=$?; set -e; if [ "$status" -ne 0 ]; then echo "[lint-imports] FAILED"; echo; echo "$output"; exit "$status"; else echo "[lint-imports] no import-linter contract violations detected."; fi'
+  @bash -euo pipefail -c 'if [ ! -x {{IMPORTLINTER}} ]; then echo "[lint-imports] ERROR: lint-imports not found ({{IMPORTLINTER}}); install import-linter dev dep and run '\''just setup'\''"; exit 1; fi; set +e; output="$({{IMPORTLINTER}} --verbose --config {{IMPORTLINTER_CONFIG}} 2>&1)"; status=$?; set -e; if [ "$status" -ne 0 ]; then echo "[lint-imports] FAILED"; echo; echo "$output"; exit "$status"; else echo "[lint-imports] no import-linter contract violations detected."; fi'
   @just _log_end lint-imports
 
 # Code Quality: Format with `ruff format` and auto-fix where possible
@@ -173,7 +173,7 @@ format-no-fix:
 [group('code quality')]
 typecheck:
   @just _log_start typecheck
-  bash -euo pipefail -c '\
+  @bash -euo pipefail -c '\
     if [ -x {{TY}} ]; then \
       {{TY}} check {{PY_SRC}} {{PY_TESTPATH}}; \
       exit 0; \
@@ -211,7 +211,7 @@ complexity-raw:
 [group('code quality')]
 complexity-strict MIN_COMPLEXITY="11":
   @just _log_start complexity-strict
-  bash -euo pipefail -c 'echo "[complexity-strict] Failing if any block has cyclomatic complexity >= ${MIN_COMPLEXITY}"; output="$({{RADON}} cc -s -n {{MIN_COMPLEXITY}} {{PY_SRC}} || true)"; if [ -n "$output" ]; then echo "[complexity-strict] Found blocks with complexity >= ${MIN_COMPLEXITY}:"; echo "$output"; exit 1; fi; echo "[complexity-strict] All blocks are below complexity ${MIN_COMPLEXITY}."'
+  @bash -euo pipefail -c 'echo "[complexity-strict] Failing if any block has cyclomatic complexity >= ${MIN_COMPLEXITY}"; output="$({{RADON}} cc -s -n {{MIN_COMPLEXITY}} {{PY_SRC}} || true)"; if [ -n "$output" ]; then echo "[complexity-strict] Found blocks with complexity >= ${MIN_COMPLEXITY}:"; echo "$output"; exit 1; fi; echo "[complexity-strict] All blocks are below complexity ${MIN_COMPLEXITY}."'
   @just _log_end complexity-strict
 
 # Code Quality: duplication detection
@@ -230,14 +230,14 @@ dup:
 [group('security')]
 sec-secrets:
   @just _log_start sec-secrets
-  bash -euo pipefail -c 'if command -v trufflehog >/dev/null 2>&1; then tmp_file=$(mktemp); printf ".venv\nbuild\ndist\n" > "$tmp_file"; trufflehog filesystem . --exclude-paths "$tmp_file"; rm -f "$tmp_file"; else echo "[sec-secrets] skipping: trufflehog not found on PATH"; fi'
+  @bash -euo pipefail -c 'if command -v trufflehog >/dev/null 2>&1; then tmp_file=$(mktemp); printf ".venv\nbuild\ndist\n" > "$tmp_file"; trufflehog filesystem . --exclude-paths "$tmp_file"; rm -f "$tmp_file"; else echo "[sec-secrets] skipping: trufflehog not found on PATH"; fi'
   @just _log_end sec-secrets
 
 # Security: Dependency scan with pip-audit
 [group('security')]
 sec-deps:
   @just _log_start sec-deps
-  bash -euo pipefail -c 'if [ -x .venv/bin/pip-audit ]; then PIP_NO_CACHE_DIR=1 .venv/bin/pip-audit; else echo "[sec-deps] ERROR: .venv/bin/pip-audit not found; run '\''just setup'\'' to install dev deps"; exit 1; fi'
+  @bash -euo pipefail -c 'if [ -x .venv/bin/pip-audit ]; then PIP_NO_CACHE_DIR=1 .venv/bin/pip-audit; else echo "[sec-deps] ERROR: .venv/bin/pip-audit not found; run '\''just setup'\'' to install dev deps"; exit 1; fi'
   @just _log_end sec-deps
 
 
@@ -269,7 +269,7 @@ test-strict:
 [group('testing')]
 test-marker MARKER:
   @just _log_start test-marker
-  bash -euo pipefail -c 'set +e; {{PYTEST}} {{PY_TESTPATH}} -m "{{MARKER}}"; status=$?; set -e; if [ "$status" -eq 5 ]; then echo "[{{MARKER}}] skipping: no tests marked with {{MARKER}} collected"; elif [ "$status" -ne 0 ]; then exit "$status"; fi'
+  @bash -euo pipefail -c 'set +e; {{PYTEST}} {{PY_TESTPATH}} -m "{{MARKER}}"; status=$?; set -e; if [ "$status" -eq 5 ]; then echo "[{{MARKER}}] skipping: no tests marked with {{MARKER}} collected"; elif [ "$status" -ne 0 ]; then exit "$status"; fi'
   @just _log_end test-marker
 
 # Testing: Run tests marked with "unit" and not marked with "slow"
@@ -330,42 +330,42 @@ cov:
 [group('test quality')]
 cov-lines:
   @just _log_start cov-lines
-  bash -euo pipefail -c 'if [ -x {{SHOWCOV}} ]; then {{SHOWCOV}} --lines --code --context 2 ; else echo "[cov-lines] skipping: showcov ({{SHOWCOV}}) not found"; fi'
+  @bash -euo pipefail -c 'if [ -x {{SHOWCOV}} ]; then {{SHOWCOV}} --lines --code --context 2 ; else echo "[cov-lines] skipping: showcov ({{SHOWCOV}}) not found"; fi'
   @just _log_end cov-lines
 
 # Test Quality: Run mutation testing on the test suite
 [group('test quality')]
 mutation *ARGS:
   @just _log_start mutation
-  bash -euo pipefail -c 'if [ -x {{MUTMUT}} ]; then {{MUTMUT}} run {{ARGS}}; else echo "[mutmut] skipping: mutmut not found ({{MUTMUT}})"; fi'
+  @bash -euo pipefail -c 'if [ -x {{MUTMUT}} ]; then {{MUTMUT}} run {{ARGS}}; else echo "[mutmut] skipping: mutmut not found ({{MUTMUT}})"; fi'
   @just _log_end mutation
 
 # Test Quality: Report mutation testing results
 [group('test quality')]
 mutation-report:
   @just _log_start mutation-report
-  bash -euo pipefail -c 'if [ -x {{MUTMUT}} ]; then {{MUTMUT}} results; else echo "[mutation-report] skipping: mutmut not found ({{MUTMUT}})"; fi'
+  @bash -euo pipefail -c 'if [ -x {{MUTMUT}} ]; then {{MUTMUT}} results; else echo "[mutation-report] skipping: mutmut not found ({{MUTMUT}})"; fi'
   @just _log_end mutation-report
 
 # Test Quality: Test test flakiness by repeated runs of the test suite
 [group('test quality')]
 flake N='5':
   @just _log_start flake
-  bash -euo pipefail -c 'set +e; rm -f .flake-log.txt; for i in $(seq 1 {{N}}); do echo "=== run $i ===" | tee -a .flake-log.txt; {{PYTEST}} {{PY_TESTPATH}} --maxfail=50 --randomly-seed=last | tee -a .flake-log.txt; done; set -e'
+  @bash -euo pipefail -c 'set +e; rm -f .flake-log.txt; for i in $(seq 1 {{N}}); do echo "=== run $i ===" | tee -a .flake-log.txt; {{PYTEST}} {{PY_TESTPATH}} --maxfail=50 --randomly-seed=last | tee -a .flake-log.txt; done; set -e'
   @just _log_end flake
 
 # Test Quality: coverage of changed lines vs main
 [group('test quality')]
 diff-cov BRANCH="origin/main":
   @just _log_start diff-cov
-  bash -euo pipefail -c 'if [ ! -f .coverage.xml ]; then echo "[diff-cov] .coverage.xml not found; run '\''just test-strict'\'' first"; exit 1; fi; {{DIFF_COVER}} .coverage.xml --compare-branch={{BRANCH}}'
+  @bash -euo pipefail -c 'if [ ! -f .coverage.xml ]; then echo "[diff-cov] .coverage.xml not found; run '\''just test-strict'\'' first"; exit 1; fi; {{DIFF_COVER}} .coverage.xml --compare-branch={{BRANCH}}'
   @just _log_end diff-cov
 
 # Test Quality: strict coverage of changed lines vs main with threshold
 [group('test quality')]
 diff-cov-strict BRANCH="origin/main" THRESHOLD="90":
   @just _log_start diff-cov-strict
-  bash -euo pipefail -c 'if [ ! -f .coverage.xml ]; then echo "[diff-cov-strict] .coverage.xml not found; run '\''just test-strict'\'' first"; exit 1; fi; echo "[diff-cov-strict] Enforcing changed-line coverage >= ${THRESHOLD}% against ${BRANCH}"; {{DIFF_COVER}} .coverage.xml --compare-branch={{BRANCH}} --fail-under={{THRESHOLD}}'
+  @bash -euo pipefail -c 'if [ ! -f .coverage.xml ]; then echo "[diff-cov-strict] .coverage.xml not found; run '\''just test-strict'\'' first"; exit 1; fi; echo "[diff-cov-strict] Enforcing changed-line coverage >= ${THRESHOLD}% against ${BRANCH}"; {{DIFF_COVER}} .coverage.xml --compare-branch={{BRANCH}} --fail-under={{THRESHOLD}}'
   @just _log_end diff-cov-strict
 
 
@@ -378,7 +378,7 @@ diff-cov-strict BRANCH="origin/main" THRESHOLD="90":
 [group('metrics')]
 wily-index:
   @just _log_start wily-index
-  bash -euo pipefail -c 'stash_name=""; if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then if [ -n "$(git status --porcelain)" ]; then stash_name="wily:temp:$(date -u +%Y%m%dT%H%M%SZ)"; git stash push -u -m "$stash_name" >/dev/null; trap "git stash pop -q" EXIT; fi; fi; {{WILY}} --config {{WILY_CONFIG}} --cache {{WILY_CACHE}} build {{PY_SRC}} {{PY_TESTPATH}}'
+  @bash -euo pipefail -c 'stash_name=""; if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then if [ -n "$(git status --porcelain)" ]; then stash_name="wily:temp:$(date -u +%Y%m%dT%H%M%SZ)"; git stash push -u -m "$stash_name" >/dev/null; trap "git stash pop -q" EXIT; fi; fi; {{WILY}} --config {{WILY_CONFIG}} --cache {{WILY_CACHE}} build {{PY_SRC}} {{PY_TESTPATH}}'
   @just _log_end wily-index
 
 # Metrics: report current metrics from index
@@ -386,7 +386,7 @@ wily-index:
 wily-metrics FILE="":
   @just _log_start wily-metrics
   @just wily-index
-  bash -euo pipefail -c 'file="{{FILE}}"; if [ -z "$file" ]; then file="{{PY_SRC}}/{{PYTHON_PACKAGE}}/__init__.py"; fi; {{WILY}} --config {{WILY_CONFIG}} --cache {{WILY_CACHE}} report "$file"'
+  @bash -euo pipefail -c 'file="{{FILE}}"; if [ -z "$file" ]; then file="{{PY_SRC}}/{{PYTHON_PACKAGE}}/__init__.py"; fi; {{WILY}} --config {{WILY_CONFIG}} --cache {{WILY_CACHE}} report "$file"'
   @just _log_end wily-metrics
 
 # Metrics: report stats for all files
@@ -394,7 +394,7 @@ wily-metrics FILE="":
 wily-stats:
   @just _log_start wily-stats
   @just wily-index
-  bash -euo pipefail -c 'mapfile -t files < <(rg --files -g "*.py" {{PY_SRC}} {{PY_TESTPATH}}); if [ "${#files[@]}" -eq 0 ]; then echo "[wily-stats] no Python files found in {{PY_SRC}} or {{PY_TESTPATH}}"; exit 0; fi; {{WILY}} --config {{WILY_CONFIG}} --cache {{WILY_CACHE}} diff --all --no-detail "${files[@]}"'
+  @bash -euo pipefail -c 'mapfile -t files < <(rg --files -g "*.py" {{PY_SRC}} {{PY_TESTPATH}}); if [ "${#files[@]}" -eq 0 ]; then echo "[wily-stats] no Python files found in {{PY_SRC}} or {{PY_TESTPATH}}"; exit 0; fi; {{WILY}} --config {{WILY_CONFIG}} --cache {{WILY_CACHE}} diff --all --no-detail "${files[@]}"'
   @just _log_end wily-stats
 
 
@@ -406,7 +406,7 @@ wily-stats:
 [group('documentation')]
 build-docs:
   @just _log_start build-docs
-  bash -euo pipefail -c 'if [ -x {{MKDOCS}} ]; then {{MKDOCS}} build; else echo "[build-docs] skipping: mkdocs not found ({{MKDOCS}} or on PATH)"; fi'
+  @bash -euo pipefail -c 'if [ -x {{MKDOCS}} ]; then {{MKDOCS}} build; else echo "[build-docs] skipping: mkdocs not found ({{MKDOCS}} or on PATH)"; fi'
   @just _log_end build-docs
 
 # Documentation: Serve the documentation site locally
@@ -414,7 +414,7 @@ build-docs:
 docs:
   @just _log_start docs
   @just build-docs
-  bash -euo pipefail -c 'if [ -x {{MKDOCS}} ]; then python3 -m webbrowser http://127.0.0.1:8000; {{MKDOCS}} serve --livereload; else echo "[docs] skipping: mkdocs not found ({{MKDOCS}} or on PATH)"; fi'
+  @bash -euo pipefail -c 'if [ -x {{MKDOCS}} ]; then python3 -m webbrowser http://127.0.0.1:8000; {{MKDOCS}} serve --livereload; else echo "[docs] skipping: mkdocs not found ({{MKDOCS}} or on PATH)"; fi'
   @just _log_end docs
 
 
@@ -471,7 +471,7 @@ clean:
 [group('cleaning')]
 stash-untracked:
   @just _log_start stash-untracked
-  bash -euo pipefail -c 'if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then msg="scour:untracked:$(date -u +%Y%m%dT%H%M%SZ)"; if git ls-files --others --exclude-standard --directory --no-empty-directory | rg -q .; then git ls-files --others --exclude-standard -z | xargs -0 git stash push -m "$msg" -- >/dev/null; echo "Stashed untracked (non-ignored) files as: $msg"; else echo "No untracked (non-ignored) paths to stash."; fi; else echo "[stash-untracked] not a git repository; skipping"; fi'
+  @bash -euo pipefail -c 'if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then msg="scour:untracked:$(date -u +%Y%m%dT%H%M%SZ)"; if git ls-files --others --exclude-standard --directory --no-empty-directory | rg -q .; then git ls-files --others --exclude-standard -z | xargs -0 git stash push -m "$msg" -- >/dev/null; echo "Stashed untracked (non-ignored) files as: $msg"; else echo "No untracked (non-ignored) paths to stash."; fi; else echo "[stash-untracked] not a git repository; skipping"; fi'
   @just _log_end stash-untracked
 
 # Cleaning: Remove git-ignored files/dirs while keeping .venv
@@ -480,7 +480,7 @@ scour:
   @just _log_start scour
   @just clean
   @just stash-untracked
-  bash -euo pipefail -c 'if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then git clean -fXd -e .venv; else echo "[scour] not a git repository; skipping git clean"; fi'
+  @bash -euo pipefail -c 'if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then git clean -fXd -e .venv; else echo "[scour] not a git repository; skipping git clean"; fi'
   @just _log_end scour
 
 
