@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.2] - 2026-02-09
+
+### Added
+- add Coverage.py sqlite (`.coverage`) ingestion so `showcov report` can run without generating `coverage.xml`
+- add `--input-backend` to `showcov report` so users can force XML or sqlite inputs when discovering coverage data
+
 ## [0.2.5] - 2026-01-31
 
 ### Added

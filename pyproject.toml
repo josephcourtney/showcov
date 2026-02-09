@@ -1,7 +1,7 @@
 # =================================== project ====================================
 [project]
   name = "showcov"
-  version = "0.3.1"
+  version = "0.3.2"
   description = "Print out uncovered code."
   readme = "README.md"
   authors = [
@@ -18,6 +18,8 @@
   requires-python = ">=3.11,<3.15"
   dependencies = [
     "defusedxml>=0.7.1",
+    # Needed to read Coverage.py sqlite (.coverage) inputs without requiring XML export.
+    "coverage>=7.12.0",
     "more-itertools>=10.8.0",
     "pathspec>=1.0.3",
     "rich-click>=1.9.5",
@@ -100,7 +102,7 @@
     "--import-mode=importlib",
     "--cov=showcov",
     "--cov-branch",
-    "--cov-report=xml",
+    "--cov-report=",
   ]
   xfail_strict = true
 
@@ -177,31 +179,7 @@
 
 # =================================== test:coverage ===================================
 [tool.coverage.run]
-  source   = ["showcov"]
-  branch   = true
-  parallel = true
-
-[tool.coverage.report]
-  show_missing = false
-  skip_covered = true
-  # Regexes for lines to exclude from consideration
-  exclude_also = [
-    # Don't complain about missing debug-only code:
-    "def __repr__",
-    "if self\\.debug",
-
-    # Don't complain if tests don't hit defensive assertion code:
-    "raise AssertionError",
-    "raise NotImplementedError",
-
-    # Don't complain if non-runnable code isn't run:
-    "if 0:",
-    "if __name__ == .__main__.",
-
-    # Don't complain about abstract methods, they aren't run:
-    "@(abc\\.)?abstractmethod",
-  ]
-  ignore_errors = true
-
-[tool.coverage.xml]
-  output = ".coverage.xml"
+  source         = ["showcov"]
+  branch         = true
+  parallel       = true
+  dynamiccontext = "test_function"

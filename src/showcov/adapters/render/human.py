@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import operator
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import PurePosixPath
 from typing import TYPE_CHECKING
 
@@ -335,8 +335,9 @@ def _aggregate_dir(node: _DirNode) -> SummaryRow:
 
 
 def _tree_order_rows(root: _DirNode, *, max_depth: int | None) -> list[SummaryRow]:
-    """
-    Walk the _DirNode tree in directory-tree order and emit:
+    """Walk the _DirNode tree in directory-tree order.
+
+    Emits:
       - a rollup row for each directory (node.path + "/"), displayed with tree glyphs
       - then files in that directory (basename), displayed with tree glyphs.
 
@@ -408,9 +409,6 @@ def _tree_prefix(ancestor_last: list[bool], *, is_last: bool) -> str:
 
 def _with_display_file(row: SummaryRow, display: str) -> SummaryRow:
     """Copy a SummaryRow but replace its .file label with a display string."""
-    # SummaryRow is a dataclass (frozen=True), so use dataclasses.replace
-    from dataclasses import replace
-
     return replace(row, file=display)
 
 

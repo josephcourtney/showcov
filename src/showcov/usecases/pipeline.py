@@ -6,10 +6,15 @@ from typing import TYPE_CHECKING
 from defusedxml import ElementTree
 
 from showcov._meta import logger
-from showcov.adapters.coverage.records import collect_cobertura_records
+from showcov.adapters.coverage.collect import collect_records
 from showcov.engine.build import BuildOptions, build_report
 from showcov.engine.enrich import enrich_report
-from showcov.errors import CoverageXMLNotFoundError, InvalidCoverageXMLError
+from showcov.errors import (
+    CoverageInputDataError,
+    CoverageInputNotFoundError,
+    CoverageXMLNotFoundError,
+    InvalidCoverageXMLError,
+)
 from showcov.model.thresholds import Threshold, ThresholdsResult
 from showcov.model.thresholds import evaluate as evaluate_thresholds
 
@@ -28,11 +33,11 @@ class PipelineError(Exception):
 
 
 class NoInputError(PipelineError):
-    """Coverage XML input was missing or could not be discovered."""
+    """Coverage input was missing or could not be discovered."""
 
 
 class DataError(PipelineError):
-    """Coverage XML data is malformed or could not be parsed."""
+    """Coverage input data is malformed or could not be parsed."""
 
 
 class SystemIOError(PipelineError):
@@ -104,7 +109,7 @@ def build_report_from_coverage(
     drop_empty_branches: bool,
 ) -> Report:
     try:
-        records = collect_cobertura_records(coverage_paths)
+        records = collect_records(coverage_paths)
         opts = _make_build_options(
             coverage_paths=coverage_paths,
             base_path=base_path,
@@ -125,10 +130,10 @@ def build_report_from_coverage(
         report = build_report(opts)
         if want_snippets or want_file_stats:
             report = enrich_report(report, opts)
-    except CoverageXMLNotFoundError as exc:
+    except (CoverageXMLNotFoundError, CoverageInputNotFoundError) as exc:
         raise NoInputError(str(exc)) from exc
-    except (ElementTree.ParseError, InvalidCoverageXMLError) as exc:
-        msg = f"failed to parse coverage XML: {exc}"
+    except (CoverageInputDataError, ElementTree.ParseError, InvalidCoverageXMLError) as exc:
+        msg = f"failed to read coverage input: {exc}"
         raise DataError(msg) from exc
     except OSError as exc:
         raise SystemIOError(str(exc)) from exc

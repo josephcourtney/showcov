@@ -7,6 +7,18 @@ class ShowcovError(Exception):
     """Base class for all custom showcov exceptions."""
 
 
+class CoverageInputError(ShowcovError):
+    """Base class for errors related to coverage inputs (XML or DB)."""
+
+
+class CoverageInputNotFoundError(CoverageInputError):
+    """Coverage input file could not be located on disk."""
+
+
+class CoverageInputDataError(CoverageInputError):
+    """Coverage input data is malformed or could not be parsed/read."""
+
+
 class CoverageXMLError(ShowcovError):
     """Base class for errors related to coverage XML handling."""
 
@@ -20,6 +32,9 @@ class InvalidCoverageXMLError(CoverageXMLError):
 
 
 __all__ = [
+    "CoverageInputDataError",
+    "CoverageInputError",
+    "CoverageInputNotFoundError",
     "CoverageXMLError",
     "CoverageXMLNotFoundError",
     "InvalidCoverageXMLError",

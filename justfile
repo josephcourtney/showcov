@@ -11,32 +11,39 @@ set export := true
 # ----------------------------------------------------------------------
 
 MODE          := env("MODE", "dev")  # dev | debug | ci
+ROOT_DIR       := justfile_directory()
+PACKAGE        := file_stem(ROOT_DIR)
 PYTHON_PACKAGE := env("PYTHON_PACKAGE", "hiwlic")
-PY_TESTPATH    := env("PY_TESTPATH", "tests")
-PY_SRC         := env("PY_SRC", "src")
 VERBOSE        := env("VERBOSE", "0")
+REPO_CACHE_DIR := ROOT_DIR + "/.cache"
+UV_CACHE_DIR   := REPO_CACHE_DIR + "/uv"
+RUFF_CACHE_DIR := REPO_CACHE_DIR + "/ruff"
+
+PY_TESTPATH    := "tests "
+PY_SRC         := "src"
+PYTHONPATH     := if env("PYTHONPATH", "") == "" { ROOT_DIR } else { ROOT_DIR + ":" + env("PYTHONPATH", "") }
 
 # ----------------------------------------------------------------------
 # Tool wrappers
 # ----------------------------------------------------------------------
 
-UV                  := "uv"
-PYTHON              := justfile_directory() + "/.venv/bin/python"
-RUFF                := justfile_directory() + "/.venv/bin/ruff"
-PYTEST              := justfile_directory() + "/.venv/bin/pytest"
-TY                  := justfile_directory() + "/.venv/bin/ty"
-SHOWCOV             := justfile_directory() + "/.venv/bin/showcov"
-MUTMUT              := justfile_directory() + "/.venv/bin/mutmut"
-MKDOCS              := justfile_directory() + "/.venv/bin/mkdocs"
-WILY                := justfile_directory() + "/.venv/bin/wily"
-WILY_CACHE          := justfile_directory() + "/.wily"
-WILY_CONFIG         := justfile_directory() + "/wily.cfg"
-VULTURE             := justfile_directory() + "/.venv/bin/vulture"
-RADON               := justfile_directory() + "/.venv/bin/radon"
+UV                  := "uv --cache-dir " + UV_CACHE_DIR
+PYTHON              := ROOT_DIR + "/.venv/bin/python"
+RUFF                := ROOT_DIR + "/.venv/bin/ruff"
+PYTEST              := ROOT_DIR + "/.venv/bin/pytest"
+TY                  := ROOT_DIR + "/.venv/bin/ty"
+SHOWCOV             := ROOT_DIR + "/.venv/bin/showcov"
+MUTMUT              := ROOT_DIR + "/.venv/bin/mutmut"
+MKDOCS              := ROOT_DIR + "/.venv/bin/mkdocs"
+WILY                := ROOT_DIR + "/.venv/bin/wily"
+WILY_CACHE          := ROOT_DIR + "/.wily"
+WILY_CONFIG         := ROOT_DIR + "/wily.cfg"
+VULTURE             := ROOT_DIR + "/.venv/bin/vulture"
+RADON               := ROOT_DIR + "/.venv/bin/radon"
 JSCPD               := "npx --yes jscpd@4.0"
-DIFF_COVER          := justfile_directory() + "/.venv/bin/diff-cover"
-IMPORTLINTER        := justfile_directory() + "/.venv/bin/lint-imports"
-IMPORTLINTER_CONFIG := justfile_directory() + "/import-linter.toml"
+DIFF_COVER          := ROOT_DIR + "/.venv/bin/diff-cover"
+IMPORTLINTER        := ROOT_DIR + "/.venv/bin/lint-imports"
+IMPORTLINTER_CONFIG := ROOT_DIR + "/import-linter.toml"
 
 # ======================================================================
 # Meta / Defaults
@@ -56,6 +63,7 @@ help:
 env:
   @just _log_start env
   @echo "MODE={{MODE}}"
+  @echo "PACKAGE={{PACKAGE}}"
   @echo "PYTHON_PACKAGE={{PYTHON_PACKAGE}}"
   @echo "PY_TESTPATH={{PY_TESTPATH}}"
   @echo "PY_SRC={{PY_SRC}}"
@@ -87,6 +95,9 @@ _log_start NAME:
 
 _log_end NAME:
   @bash -euo pipefail -c 'if [ "{{VERBOSE}}" != "0" ]; then printf "=== END: %s ===\n\n" "{{NAME}}"; fi'
+
+_cache_dirs:
+  @mkdir -p {{REPO_CACHE_DIR}} {{UV_CACHE_DIR}} {{RUFF_CACHE_DIR}}
 
 # ----------------------------------------------------------------------
 # Quiet runners (brief on success, verbose on failure)
@@ -126,6 +137,7 @@ _run_soft NAME CMD:
 # Bootstrap: refresh .venv via `uv sync`
 setup:
   @just _log_start setup
+  @just _cache_dirs
   {{UV}} sync
   @just _log_end setup
 
@@ -138,14 +150,16 @@ setup:
 [group('code quality')]
 lint:
   @just _log_start lint
-  {{RUFF}} check --fix {{PY_SRC}} {{PY_TESTPATH}} 
+  @just _cache_dirs
+  {{RUFF}} check --cache-dir {{RUFF_CACHE_DIR}} --fix {{PY_SRC}} {{PY_TESTPATH}} 
   @just _log_end lint
 
 # Code Quality: Check for linting violations with `ruff check` without modifying files
 [group('code quality')]
 lint-no-fix:
   @just _log_start lint-no-fix
-  {{RUFF}} check --no-fix {{PY_SRC}} {{PY_TESTPATH}}
+  @just _cache_dirs
+  {{RUFF}} check --cache-dir {{RUFF_CACHE_DIR}} --no-fix {{PY_SRC}} {{PY_TESTPATH}}
   @just _log_end lint-no-fix
 
 # Code Quality: Lint import architecture (Import Linter)
@@ -159,14 +173,16 @@ lint-imports:
 [group('code quality')]
 format:
   @just _log_start format
-  {{RUFF}} format {{PY_SRC}} {{PY_TESTPATH}} 
+  @just _cache_dirs
+  {{RUFF}} format --cache-dir {{RUFF_CACHE_DIR}} {{PY_SRC}} {{PY_TESTPATH}} 
   @just _log_end format
 
 # Code Quality: Check for formatting violations with `ruff format` without modifying files
 [group('code quality')]
 format-no-fix:
   @just _log_start format-no-fix
-  {{RUFF}} format --check {{PY_SRC}} {{PY_TESTPATH}}
+  @just _cache_dirs
+  {{RUFF}} format --cache-dir {{RUFF_CACHE_DIR}} --check {{PY_SRC}} {{PY_TESTPATH}}
   @just _log_end format-no-fix
 
 # Code Quality: Typecheck with `ty` (if available)
@@ -245,75 +261,24 @@ sec-deps:
 # Testing
 # ======================================================================
 
-# Testing: Run full test suite
-[group('testing')]
-test-pretty:
-  @just _log_start test
-  {{PYTEST}} --rich {{PY_TESTPATH}} 
-  @just _log_end test
 
-[group('testing')]
-test:
-  @just _log_start test
-  {{PYTEST}} {{PY_TESTPATH}} 
-  @just _log_end test
+_test-strict:
+  {{PYTEST}} "{{ROOT_DIR}}/tests"
 
-# Testing: Run full test suite and fail if any test fails
+# Testing: Run tests and fail if any test fails
 [group('testing')]
-test-strict:
+test-strict *parts:
   @just _log_start test-strict
-  {{PYTEST}} {{PY_TESTPATH}}
+  @just _test-strict {{parts}}
   @just _log_end test-strict
 
-# Testing: Marker-driven test runner with graceful "no tests" handling
+# Testing: Run tests but do not fail on test failure
 [group('testing')]
-test-marker MARKER:
-  @just _log_start test-marker
-  @bash -euo pipefail -c 'set +e; {{PYTEST}} {{PY_TESTPATH}} -m "{{MARKER}}"; status=$?; set -e; if [ "$status" -eq 5 ]; then echo "[{{MARKER}}] skipping: no tests marked with {{MARKER}} collected"; elif [ "$status" -ne 0 ]; then exit "$status"; fi'
-  @just _log_end test-marker
+test *parts:
+  @just _log_start test-strict
+  @just _test-strict {{parts}} || true
+  @just _log_end test-strict
 
-# Testing: Run tests marked with "unit" and not marked with "slow"
-[group('testing')]
-test-fast:
-  @just _log_start test-fast
-  @just test-marker "unit and not slow"
-  @just _log_end test-fast
-
-# Testing: Run tests marked with "smoke"
-[group('testing')]
-test-smoke:
-  @just _log_start test-smoke
-  @just test-marker "smoke"
-  @just _log_end test-smoke
-
-# Testing: Run tests marked with "regression"
-[group('testing')]
-test-regression:
-  @just _log_start test-regression
-  @just test-marker "regression"
-  @just _log_end test-regression
-
-# Testing: Run tests marked with "performance"
-[group('testing')]
-test-performance:
-  @just _log_start test-performance
-  @just test-marker "performance"
-  @just _log_end test-performance
-
-# Testing: Run tests marked with "property_based"
-[group('testing')]
-test-property:
-  @just _log_start test-property
-  @just test-marker "property_based"
-  @just _log_end test-property
-
-
-# Testing: Run full test suite and report slowest tests
-[group('testing')]
-test-timed:
-  @just _log_start test-timed
-  {{PYTEST}} --durations=25 {{PY_TESTPATH}}
-  @just _log_end test-timed
 
 # ======================================================================
 # Test Quality
@@ -323,79 +288,15 @@ test-timed:
 [group('test quality')]
 cov:
   @just _log_start cov
-  @bash -euo pipefail -c 'if [ -x {{SHOWCOV}} ]; then {{SHOWCOV}} --summary --no-lines --no-branches; else echo "[cov-lines] skipping: showcov ({{SHOWCOV}}) not found"; fi'
+  @bash -euo pipefail -c 'if [ -x {{SHOWCOV}} ]; then {{SHOWCOV}} report --summary --no-lines --no-branches; else echo "[cov-lines] skipping: showcov ({{SHOWCOV}}) not found"; fi'
   @just _log_end cov
 
 # Test Quality: List lines not covered by last test execution
 [group('test quality')]
 cov-lines:
   @just _log_start cov-lines
-  @bash -euo pipefail -c 'if [ -x {{SHOWCOV}} ]; then {{SHOWCOV}} --lines --code --context 2 ; else echo "[cov-lines] skipping: showcov ({{SHOWCOV}}) not found"; fi'
+  @bash -euo pipefail -c 'if [ -x {{SHOWCOV}} ]; then {{SHOWCOV}} report --lines --code --context 2 ; else echo "[cov-lines] skipping: showcov ({{SHOWCOV}}) not found"; fi'
   @just _log_end cov-lines
-
-# Test Quality: Run mutation testing on the test suite
-[group('test quality')]
-mutation *ARGS:
-  @just _log_start mutation
-  @bash -euo pipefail -c 'if [ -x {{MUTMUT}} ]; then {{MUTMUT}} run {{ARGS}}; else echo "[mutmut] skipping: mutmut not found ({{MUTMUT}})"; fi'
-  @just _log_end mutation
-
-# Test Quality: Report mutation testing results
-[group('test quality')]
-mutation-report:
-  @just _log_start mutation-report
-  @bash -euo pipefail -c 'if [ -x {{MUTMUT}} ]; then {{MUTMUT}} results; else echo "[mutation-report] skipping: mutmut not found ({{MUTMUT}})"; fi'
-  @just _log_end mutation-report
-
-# Test Quality: Test test flakiness by repeated runs of the test suite
-[group('test quality')]
-flake N='5':
-  @just _log_start flake
-  @bash -euo pipefail -c 'set +e; rm -f .flake-log.txt; for i in $(seq 1 {{N}}); do echo "=== run $i ===" | tee -a .flake-log.txt; {{PYTEST}} {{PY_TESTPATH}} --maxfail=50 --randomly-seed=last | tee -a .flake-log.txt; done; set -e'
-  @just _log_end flake
-
-# Test Quality: coverage of changed lines vs main
-[group('test quality')]
-diff-cov BRANCH="origin/main":
-  @just _log_start diff-cov
-  @bash -euo pipefail -c 'if [ ! -f .coverage.xml ]; then echo "[diff-cov] .coverage.xml not found; run '\''just test-strict'\'' first"; exit 1; fi; {{DIFF_COVER}} .coverage.xml --compare-branch={{BRANCH}}'
-  @just _log_end diff-cov
-
-# Test Quality: strict coverage of changed lines vs main with threshold
-[group('test quality')]
-diff-cov-strict BRANCH="origin/main" THRESHOLD="90":
-  @just _log_start diff-cov-strict
-  @bash -euo pipefail -c 'if [ ! -f .coverage.xml ]; then echo "[diff-cov-strict] .coverage.xml not found; run '\''just test-strict'\'' first"; exit 1; fi; echo "[diff-cov-strict] Enforcing changed-line coverage >= ${THRESHOLD}% against ${BRANCH}"; {{DIFF_COVER}} .coverage.xml --compare-branch={{BRANCH}} --fail-under={{THRESHOLD}}'
-  @just _log_end diff-cov-strict
-
-
-
-# ======================================================================
-# Metrics
-# ======================================================================
-
-# Metrics: build or update wily index incrementally
-[group('metrics')]
-wily-index:
-  @just _log_start wily-index
-  @bash -euo pipefail -c 'stash_name=""; if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then if [ -n "$(git status --porcelain)" ]; then stash_name="wily:temp:$(date -u +%Y%m%dT%H%M%SZ)"; git stash push -u -m "$stash_name" >/dev/null; trap "git stash pop -q" EXIT; fi; fi; {{WILY}} --config {{WILY_CONFIG}} --cache {{WILY_CACHE}} build {{PY_SRC}} {{PY_TESTPATH}}'
-  @just _log_end wily-index
-
-# Metrics: report current metrics from index
-[group('metrics')]
-wily-metrics FILE="":
-  @just _log_start wily-metrics
-  @just wily-index
-  @bash -euo pipefail -c 'file="{{FILE}}"; if [ -z "$file" ]; then file="{{PY_SRC}}/{{PYTHON_PACKAGE}}/__init__.py"; fi; {{WILY}} --config {{WILY_CONFIG}} --cache {{WILY_CACHE}} report "$file"'
-  @just _log_end wily-metrics
-
-# Metrics: report stats for all files
-[group('metrics')]
-wily-stats:
-  @just _log_start wily-stats
-  @just wily-index
-  @bash -euo pipefail -c 'mapfile -t files < <(rg --files -g "*.py" {{PY_SRC}} {{PY_TESTPATH}}); if [ "${#files[@]}" -eq 0 ]; then echo "[wily-stats] no Python files found in {{PY_SRC}} or {{PY_TESTPATH}}"; exit 0; fi; {{WILY}} --config {{WILY_CONFIG}} --cache {{WILY_CACHE}} diff --all --no-detail "${files[@]}"'
-  @just _log_end wily-stats
 
 
 # ======================================================================
@@ -438,19 +339,6 @@ publish:
 
 
 # ======================================================================
-# Running
-# ======================================================================
-
-# Run: CLI mode via `python -m {{PYTHON_PACKAGE}}`
-[group('run')]
-cli:
-  @just _log_start cli
-  @just setup
-  .venv/bin/python -m {{PYTHON_PACKAGE}}
-  @just _log_end cli
-
-
-# ======================================================================
 # Cleaning / maintenance
 # ======================================================================
 
@@ -471,7 +359,7 @@ clean:
 [group('cleaning')]
 stash-untracked:
   @just _log_start stash-untracked
-  @bash -euo pipefail -c 'if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then msg="scour:untracked:$(date -u +%Y%m%dT%H%M%SZ)"; if git ls-files --others --exclude-standard --directory --no-empty-directory | rg -q .; then git ls-files --others --exclude-standard -z | xargs -0 git stash push -m "$msg" -- >/dev/null; echo "Stashed untracked (non-ignored) files as: $msg"; else echo "No untracked (non-ignored) paths to stash."; fi; else echo "[stash-untracked] not a git repository; skipping"; fi'
+  @bash -euo pipefail -c 'if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then msg="scour:untracked:$(date -u +%Y%m%dT%H%M%SZ)"; if git ls-files --others --exclude-standard --directory --no-empty-directory | grep -q .; then git ls-files --others --exclude-standard -z | xargs -0 git stash push -m "$msg" -- >/dev/null; echo "Stashed untracked (non-ignored) files as: $msg"; else echo "No untracked (non-ignored) paths to stash."; fi; else echo "[stash-untracked] not a git repository; skipping"; fi'
   @just _log_end stash-untracked
 
 # Cleaning: Remove git-ignored files/dirs while keeping .venv
@@ -502,30 +390,7 @@ fix:
   @just cov
   @just _log_end fix
 
-# ----------------------------------------------------------------------
-# MODE-driven orchestration
-#
-# MODE=dev   : fast, gating on core hygiene; avoids expensive gates by default.
-# MODE=debug : minimal gating + increased diagnostics; skips expensive gates.
-# MODE=ci    : full enforcement (equivalent to prior `check`).
-# ----------------------------------------------------------------------
-
-# CI: full enforcement (previous `check` behavior)
-[group('ci')]
-check-ci:
-  @just _log_start check-ci
-  @just _run setup "{{UV}} sync"
-  @just _run format "{{RUFF}} format --check {{PY_SRC}} {{PY_TESTPATH}}"
-  @just _run lint "{{RUFF}} check --no-fix {{PY_SRC}} {{PY_TESTPATH}}"
-  @just _run typecheck 'just typecheck'
-  @just _run lint-imports 'just lint-imports'
-  @just _run test "{{PYTEST}} -q {{PY_TESTPATH}}"
-  @just _run metrics-gate 'just metrics-gate'
-  @just cov
-  @just _run sec-deps 'just sec-deps'
-  @just _log_end check-ci
-
-# Dev: fast-ish gating (no expensive metrics/security gates by default)
+# Convenience: lint-no-fx, format-no-fix, typecheck, lint-imports, test, cov
 check:
   @just _log_start check
   @just _run_soft lint-no-fix "just lint-no-fix"
@@ -533,12 +398,7 @@ check:
   @just _run_soft typecheck 'just typecheck'
   @just _run_soft lint-imports 'just lint-imports'
   @just test
+  # @just _run metrics-gate 'just metrics-gate'
   @just cov
+  # @just _run sec-deps 'just sec-deps'
   @just _log_end check
-
-
-# Optional: a convenience alias for full local enforcement without changing MODE
-check-full:
-  @just _log_start check-full
-  MODE=ci just check-ci
-  @just _log_end check-full

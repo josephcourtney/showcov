@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Annotated
 import click.utils as click_utils
 import typer
 
+from showcov.adapters.coverage.input_kind import CoverageInputBackend
 from showcov.adapters.output import write_output
 from showcov.entrypoints.cli._shared import resolve_use_color
 from showcov.entrypoints.cli.exit_codes import (
@@ -52,7 +53,7 @@ def _build_report_and_text(
     want_snippets: bool,
     context: int,
     sort: SummarySort,
-    max_depth: int,
+    max_depth: int | None,
     is_tty_like: bool,
     use_color: bool,
 ) -> tuple[Report, str]:
@@ -113,8 +114,22 @@ def report_cmd(
     ] = None,
     coverage: Annotated[
         list[Path] | None,
-        typer.Argument(help="Coverage XML file(s). If omitted, discovery is used."),
+        typer.Argument(
+            help=(
+                "Coverage input file(s): Cobertura XML (coverage.xml) "
+                "or Coverage.py sqlite data (.coverage). "
+                "If omitted, discovery is used."
+            ),
+        ),
     ] = None,
+    backend: Annotated[
+        CoverageInputBackend,
+        typer.Option(
+            "--input-backend",
+            case_sensitive=False,
+            help="Choose which coverage backend to use when inputs are discovered.",
+        ),
+    ] = CoverageInputBackend.AUTO,
     # Section toggles (simpler than --sections)
     lines: Annotated[
         bool,
@@ -155,7 +170,9 @@ def report_cmd(
         int | None,
         typer.Option(
             "--max-depth",
-            help="Maximum directory depth to display from the root (1=top-level only). If omitted, unlimited.",
+            help=(
+                "Maximum directory depth to display from the root (1=top-level only). If omitted, unlimited."
+            ),
             min=1,
         ),
     ] = None,
@@ -188,7 +205,7 @@ def report_cmd(
     include = include or []
     exclude = exclude or []
 
-    coverage_paths = resolve_coverage_inputs(coverage, cwd=Path.cwd())
+    coverage_paths = resolve_coverage_inputs(coverage, cwd=Path.cwd(), backend=backend)
 
     sections: set[str] = set()
     if lines:

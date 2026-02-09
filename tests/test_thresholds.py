@@ -3,10 +3,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pytest
-from showcov.model.thresholds import Threshold, evaluate, parse_threshold
 
 from showcov.adapters.coverage.records import collect_cobertura_records
 from showcov.engine.build import BuildOptions, build_report
+from showcov.model.thresholds import Threshold, evaluate, parse_threshold
 from showcov.model.types import BranchMode, SummarySort
 
 if TYPE_CHECKING:

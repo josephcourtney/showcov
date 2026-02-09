@@ -2,10 +2,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from showcov.model.path_filter import PathFilter
-
 from showcov.adapters.coverage.records import collect_cobertura_records
 from showcov.engine.build import BuildOptions, build_report
+from showcov.model.path_filter import PathFilter
 from showcov.model.types import BranchMode, SummarySort
 
 if TYPE_CHECKING:
@@ -201,9 +200,8 @@ def test_build_branches_uses_richer_conditions(project: dict[str, Path]) -> None
 
 
 def test_internal_branch_accumulator_prefers_larger_denominator() -> None:
-    from showcov.model.report import BranchCondition
-
     from showcov.engine.build import branches as branches_mod
+    from showcov.model.report import BranchCondition
 
     records = [
         ("pkg/mod.py", 10, 1, (1, 2), (), (BranchCondition(number=-1, type="line", coverage=50),)),
