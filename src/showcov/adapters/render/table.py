@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import re
 import sys
 from io import StringIO
@@ -20,8 +21,7 @@ _SRGB_UPPER_THRESHOLD = 0.04045
 _SRGB_LOWER_THRESHOLD = 0.0031308
 _FLAME_BLEND = 0.25
 _FLAME_HALF = 0.5
-_TWILIGHT_FG_LUMINANCE = 0.5
-_FLAME_FG_LUMINANCE = 0.55
+_LUMINANCE_THRESHOLD = 0.5
 
 
 def _clamp(x: float, lo: float = 0.0, hi: float = 1.0) -> float:
@@ -72,47 +72,36 @@ def _rgb_to_hex(r: int, g: int, b: int) -> str:
 
 
 def heat_style(pct: float | None, colormap: Literal["twilight", "flame"] = "twilight") -> Style:
+    if pct is None:
+        return Style(dim=True)
+
+    t = _clamp(pct / 100.0)
+
     if colormap == "twilight":
-        if pct is None:
-            return Style(dim=True)
-
-        t = _clamp(pct / 100.0)
-
-        # --- perceptual design ---
-        lightness = 0.78  # fixed lightness (key for contrast)
-        a = -0.30 + 0.60 * t  # red → green
-        b = 0.22 * (1 - abs(2 * t - 1))  # warm mid
+        lightness = 0.63
+        theta = 3.95 * (1 - t) + 0.31 * t
+        r = -0.30 * (1 - t) + -0.2 * t
+        a = r * math.sin(theta)
+        b = r * math.cos(theta)
 
         r, g, b = _oklab_to_srgb(lightness, a, b)
-        lum = _luminance(r, g, b)
-
-        fg = "black" if lum > _TWILIGHT_FG_LUMINANCE else "white"
 
     elif colormap == "flame":
-        if pct is None:
-            return Style(dim=True)
-        t = _clamp(pct / 100.0)
-
-        # red -> yellow -> green ramp
         if t < _FLAME_HALF:
-            # red (255, 80, 80) to yellow (255, 210, 80)
             u = t / _FLAME_HALF
             r, g, b = 255, int(80 + u * (210 - 80)), 80
         else:
-            # yellow (255, 210, 80) to green (80, 200, 120)
             u = (t - _FLAME_HALF) / _FLAME_HALF
             r, g, b = int(255 + u * (80 - 255)), int(210 + u * (200 - 210)), int(80 + u * (120 - 80))
-
-        # mute background a bit (blend toward dark)
         blend = _FLAME_BLEND  # 0 = no mute, 1 = fully black
         r, g, b = int(r * (1 - blend)), int(g * (1 - blend)), int(b * (1 - blend))
 
-        fg = "black" if _luminance(r, g, b) > _FLAME_FG_LUMINANCE else "white"
     else:
         msg = f"colormap must be 'twilight' or 'flame', not {colormap!r}"
         raise ValueError(msg)
 
-    return Style(color=fg, bgcolor=_rgb_to_hex(r, g, b), bold=True)
+    fg = "black" if _luminance(r, g, b) > _LUMINANCE_THRESHOLD else "white"
+    return Style(color=_rgb_to_hex(r, g, b), bold=True)
 
 
 def _header_text(parts: Sequence[str]) -> str:
@@ -191,7 +180,6 @@ def _render_table(table: Table, *, color: bool) -> str:
         file=buf,
         force_terminal=color,
         width=sys.maxsize,
-        color_system="standard" if color else None,
         no_color=not color,
     )
     console.print(table)
