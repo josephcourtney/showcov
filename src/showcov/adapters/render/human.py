@@ -219,11 +219,12 @@ def _render_top_offenders(
         t.add_column("Br%", justify="right")
         t.add_column("Uncov lines", justify="right")
         for r in rows_in:
-            brpct = "—" if r.branch_pct is None else f"{r.branch_pct:.1f}%"
+            stmt_pct = "—" if r.statements.total == 0 else f"{r.statements.percent:.1f}%"
+            brpct = "—" if r.branches.total == 0 else f"{r.branches.percent:.1f}%"
             t.add_row(
                 r.file,
                 str(r.statements.missed),
-                f"{r.statement_pct:.1f}%",
+                stmt_pct,
                 str(r.branches.missed),
                 brpct,
                 str(r.uncovered_lines),
@@ -240,27 +241,29 @@ def _render_top_offenders(
 
 
 def _directory_rollup_row(group: str, rows: Sequence[SummaryRow]) -> list[str]:
-    st_total = sum(r.statements.total for r in rows)
-    st_cov = sum(r.statements.covered for r in rows)
-    st_miss = sum(r.statements.missed for r in rows)
-    br_total = sum(r.branches.total for r in rows)
-    br_cov = sum(r.branches.covered for r in rows)
-    br_miss = sum(r.branches.missed for r in rows)
-    uncov = sum(r.uncovered_lines for r in rows)
-    ranges = sum(r.uncovered_ranges for r in rows)
+    def combine(attr: str) -> SummaryCounts:
+        total = sum(getattr(r, attr).total for r in rows)
+        covered = sum(getattr(r, attr).covered for r in rows)
+        missed = sum(getattr(r, attr).missed for r in rows)
+        return SummaryCounts(
+            total=total,
+            covered=covered,
+            missed=missed,
+            percent=float(pct(covered, total)),
+        )
 
-    stmt_pct = 100.0 if st_total == 0 else (st_cov / st_total) * 100.0
-    br_pct = None if br_total == 0 else (br_cov / br_total) * 100.0
-    br_pct_s = "—" if br_pct is None else f"{br_pct:.1f}%"
+    lines_counts = combine("lines")
+    statements_counts = combine("statements")
+    branches_counts = combine("branches")
 
     return [
         group,
-        f"{stmt_pct:.1f}%",
-        str(st_miss),
-        br_pct_s,
-        str(br_miss),
-        str(uncov),
-        str(ranges),
+        "—" if lines_counts.total == 0 else f"{lines_counts.percent:.1f}%",
+        str(lines_counts.total),
+        "—" if statements_counts.total == 0 else f"{statements_counts.percent:.1f}%",
+        str(statements_counts.total),
+        "—" if branches_counts.total == 0 else f"{branches_counts.percent:.1f}%",
+        str(branches_counts.total),
     ]
 
 
@@ -307,30 +310,33 @@ def _aggregate_dir(node: _DirNode) -> SummaryRow:
 
     collect(node)
 
-    st_total = sum(r.statements.total for r in all_files)
-    st_cov = sum(r.statements.covered for r in all_files)
-    st_miss = sum(r.statements.missed for r in all_files)
+    def combine(attr: str) -> SummaryCounts:
+        total = sum(getattr(r, attr).total for r in all_files)
+        covered = sum(getattr(r, attr).covered for r in all_files)
+        missed = sum(getattr(r, attr).missed for r in all_files)
+        return SummaryCounts(
+            total=total,
+            covered=covered,
+            missed=missed,
+            percent=float(pct(covered, total)),
+        )
 
-    br_total = sum(r.branches.total for r in all_files)
-    br_cov = sum(r.branches.covered for r in all_files)
-    br_miss = sum(r.branches.missed for r in all_files)
+    lines_counts = combine("lines")
+    statements_counts = combine("statements")
+    branches_counts = combine("branches")
 
     uncov_lines = sum(r.uncovered_lines for r in all_files)
     uncov_ranges = sum(r.uncovered_ranges for r in all_files)
 
-    stmt_pct = pct(st_cov, st_total)
-    br_pct = None if br_total == 0 else pct(br_cov, br_total)
-
     return SummaryRow(
         file=node.path + "/",
-        statements=SummaryCounts(total=st_total, covered=st_cov, missed=st_miss),
-        branches=SummaryCounts(total=br_total, covered=br_cov, missed=br_miss),
-        statement_pct=float(stmt_pct),
-        branch_pct=(None if br_pct is None else float(br_pct)),
-        uncovered_lines=int(uncov_lines),
-        uncovered_ranges=int(uncov_ranges),
+        lines=lines_counts,
+        statements=statements_counts,
+        branches=branches_counts,
         untested=False,
         tiny=False,
+        uncovered_lines=int(uncov_lines),
+        uncovered_ranges=int(uncov_ranges),
     )
 
 
@@ -430,21 +436,19 @@ def _render_summary_tree_table(
 
     headers = [
         ("File",),
-        ("Stmt%",),
+        ("Line %",),
+        ("Lines", "Total"),
+        ("Stmt %",),
         ("Statements", "Total"),
-        ("Statements", "Covered"),
-        ("Statements", "Missed"),
         ("Br%",),
         ("Branches", "Total"),
-        ("Branches", "Covered"),
-        ("Branches", "Missed"),
-        ("Uncov", "Lines"),
-        ("Uncov", "Ranges"),
     ]
 
     rows: list[list[str]] = []
     for r in rows_in_order:
-        brpct = "—" if r.branch_pct is None else f"{r.branch_pct:.1f}%"
+        lines_pct = "—" if r.lines.total == 0 else f"{r.lines.percent:.1f}%"
+        statements_pct = "—" if r.statements.total == 0 else f"{r.statements.percent:.1f}%"
+        branches_pct = "—" if r.branches.total == 0 else f"{r.branches.percent:.1f}%"
 
         # Preserve your existing file tags for *files only*
         label = r.file
@@ -453,16 +457,12 @@ def _render_summary_tree_table(
 
         rows.append([
             label,
-            f"{r.statement_pct:.1f}%",
+            lines_pct,
+            str(r.lines.total),
+            statements_pct,
             str(r.statements.total),
-            str(r.statements.covered),
-            str(r.statements.missed),
-            brpct,
+            branches_pct,
             str(r.branches.total),
-            str(r.branches.covered),
-            str(r.branches.missed),
-            str(r.uncovered_lines),
-            str(r.uncovered_ranges),
         ])
 
     table = format_table(headers, rows, color=options.color) if rows else ""
@@ -472,13 +472,20 @@ def _render_summary_tree_table(
 
 
 def _render_summary_footer(sec: SummarySection) -> str:
-    st = sec.totals.statements
-    bt = sec.totals.branches
-    stmt_pct = (st.covered / st.total * 100.0) if st.total else 100.0
-    br_pct = (bt.covered / bt.total * 100.0) if bt.total else 100.0
+    lines_pct = "—" if sec.lines.total == 0 else f"{sec.lines.percent:.1f}%"
+    statements_pct = "—" if sec.statements.total == 0 else f"{sec.statements.percent:.1f}%"
+    branches_pct = "—" if sec.branches.total == 0 else f"{sec.branches.percent:.1f}%"
+
     parts = [
-        f"Overall (weighted): statements {st.covered}/{st.total} covered ({stmt_pct:.1f}%)",
-        f"Overall (weighted): branches {bt.covered}/{bt.total} covered ({br_pct:.1f}%)",
+        f"Overall (weighted): lines {sec.lines.covered}/{sec.lines.total} covered ({lines_pct})",
+        (
+            f"Overall (weighted): statements {sec.statements.covered}/{sec.statements.total} "
+            f"covered ({statements_pct})"
+        ),
+        (
+            f"Overall (weighted): branches {sec.branches.covered}/{sec.branches.total} covered "
+            f"({branches_pct})"
+        ),
         f"Files with branches: {sec.files_with_branches}/{sec.total_files}",
     ]
     return "\n".join([p for p in parts if p]).rstrip()

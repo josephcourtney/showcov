@@ -6,7 +6,7 @@ import typer
 from typer.main import get_command
 
 from showcov import __version__
-from showcov.entrypoints.cli import completion, man, report
+from showcov.entrypoints.cli import completion, debug, man, report
 
 
 def create_app() -> typer.Typer:
@@ -27,6 +27,8 @@ def create_app() -> typer.Typer:
     report.register(app)
     completion.register(app)
     man.register(app)
+
+    debug.register(app)
 
     return app
 

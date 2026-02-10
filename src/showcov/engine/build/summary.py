@@ -20,7 +20,6 @@ from showcov.model.report import (
     SummaryCounts,
     SummaryRow,
     SummarySection,
-    SummaryTotals,
 )
 from showcov.model.types import (
 SummarySort,
@@ -53,6 +52,22 @@ def _summary_counts_br(
         missed += max(0, t - c)
     return total, covered, missed
 
+
+def _make_summary_counts(total: int, covered: int, missed: int) -> SummaryCounts:
+    return SummaryCounts(
+        total=total,
+        covered=covered,
+        missed=missed,
+        percent=float(pct(covered, total)),
+    )
+
+
+def _combine_summary_counts(rows: tuple[SummaryRow, ...], attr: str) -> SummaryCounts:
+    total = sum(getattr(r, attr).total for r in rows)
+    covered = sum(getattr(r, attr).covered for r in rows)
+    missed = sum(getattr(r, attr).missed for r in rows)
+    return _make_summary_counts(total, covered, missed)
+
 def _build_summary_section(
     records: list[Record],
     *,
@@ -74,45 +89,19 @@ def _build_summary_section(
     _sort_summary_rows(rows, sort)
     rows_tuple = tuple(rows)
 
-    totals = _aggregate_summary_totals(rows_tuple)
+    lines_counts = _combine_summary_counts(rows_tuple, "lines")
+    statements_counts = _combine_summary_counts(rows_tuple, "statements")
+    branches_counts = _combine_summary_counts(rows_tuple, "branches")
+
     files_with_branches = sum(1 for r in rows_tuple if r.branches.total > 0)
     return SummarySection(
         files=rows_tuple,
-        totals=totals,
+        lines=lines_counts,
+        statements=statements_counts,
+        branches=branches_counts,
         files_with_branches=int(files_with_branches),
         total_files=len(rows_tuple),
     )
-
-@dataclass(frozen=True, slots=True)
-class _SummaryDerived:
-    uncovered_lines: int
-    uncovered_ranges: int
-    statement_pct: float
-    branch_pct: float | None
-    untested: bool
-    tiny: bool
-
-
-def _compute_summary_derived(
-    *,
-    statements: SummaryCounts,
-    branches: SummaryCounts,
-    uncovered_lines: int,
-    uncovered_ranges: int,
-) -> _SummaryDerived:
-    stmt_pct = pct(statements.covered, statements.total)
-    br_pct = None if branches.total == 0 else pct(branches.covered, branches.total)
-    untested = bool(statements.total > 0 and statements.covered == 0)
-    tiny = bool(statements.total > 0 and statements.total <= TINY_STATEMENT_THRESHOLD)
-    return _SummaryDerived(
-        uncovered_lines=int(uncovered_lines),
-        uncovered_ranges=int(uncovered_ranges),
-        statement_pct=float(stmt_pct),
-        branch_pct=(None if br_pct is None else float(br_pct)),
-        untested=bool(untested),
-        tiny=bool(tiny),
-    )
-
 
 def _build_summary_row(
     file: str,
@@ -127,46 +116,43 @@ def _build_summary_row(
     # When merging multiple reports, prefer the largest denominator (best fidelity). If multiple
     # inputs share that denominator, keep the maximum covered count (prevents order-dependent undercount).
     stmt_records = _deduplicate_statement_records(file, records)
-    statements = SummaryCounts(*_summary_counts_stmt(stmt_records))
+    stmt_total, stmt_cov, stmt_miss = _summary_counts_stmt(stmt_records)
+    statements = _make_summary_counts(stmt_total, stmt_cov, stmt_miss)
 
     branch_records = _deduplicate_branch_records(file, records)
-    branches = SummaryCounts(*_summary_counts_br(branch_records))
+    br_total, br_cov, br_miss = _summary_counts_br(branch_records)
+    branches = _make_summary_counts(br_total, br_cov, br_miss)
 
     # Hotness: uncovered statement lines and uncovered ranges
     ranges = _uncovered_line_ranges(stmt_records)
     uncovered_lines = sum((b - a + 1) for a, b in ranges)
     uncovered_ranges = len(ranges)
-
-    derived = _compute_summary_derived(
-        statements=statements,
-        branches=branches,
-        uncovered_lines=uncovered_lines,
-        uncovered_ranges=uncovered_ranges,
-    )
+    lines_total = stmt_total
+    lines_covered = lines_total - uncovered_lines
+    lines = _make_summary_counts(lines_total, lines_covered, uncovered_lines)
 
     label = _display_path(file, base=base)
+    untested = bool(statements.total > 0 and statements.covered == 0)
+    tiny = bool(statements.total > 0 and statements.total <= TINY_STATEMENT_THRESHOLD)
 
     return SummaryRow(
         file=label,
+        lines=lines,
         statements=statements,
         branches=branches,
-        statement_pct=derived.statement_pct,
-        branch_pct=derived.branch_pct,
-        uncovered_lines=derived.uncovered_lines,
-        uncovered_ranges=derived.uncovered_ranges,
-        untested=derived.untested,
-        tiny=derived.tiny,
+        untested=untested,
+        tiny=tiny,
+        uncovered_lines=int(uncovered_lines),
+        uncovered_ranges=int(uncovered_ranges),
     )
 
 
 def _summary_statement_pct(row: SummaryRow) -> float:
-    st = row.statements
-    return pct(st.covered, st.total)
+    return row.statements.percent
 
 
 def _summary_branch_pct(row: SummaryRow) -> float:
-    bt = row.branches
-    return pct(bt.covered, bt.total)
+    return row.branches.percent
 
 
 def _sort_key_missed_stmt(r: SummaryRow) -> tuple[int, int, str]:
@@ -199,17 +185,4 @@ def _sort_summary_rows(rows: list[SummaryRow], sort: SummarySort) -> None:
         rows.sort(key=_sort_key_uncovered_lines)
     else:
         rows.sort(key=_sort_key_missed_stmt)
-
-
-def _aggregate_summary_totals(rows: tuple[SummaryRow, ...]) -> SummaryTotals:
-    st_total = sum(r.statements.total for r in rows)
-    st_cov = sum(r.statements.covered for r in rows)
-    st_miss = sum(r.statements.missed for r in rows)
-    br_total = sum(r.branches.total for r in rows)
-    br_cov = sum(r.branches.covered for r in rows)
-    br_miss = sum(r.branches.missed for r in rows)
-    return SummaryTotals(
-        statements=SummaryCounts(total=st_total, covered=st_cov, missed=st_miss),
-        branches=SummaryCounts(total=br_total, covered=br_cov, missed=br_miss),
-    )
 

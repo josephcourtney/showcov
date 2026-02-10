@@ -184,6 +184,7 @@ class SummaryCounts:
     total: int
     covered: int
     missed: int
+    percent: float
 
     def __post_init__(self) -> None:
         """Validate that counts are non-negative and consistent."""
@@ -199,28 +200,24 @@ class SummaryCounts:
 @dataclass(frozen=True, slots=True)
 class SummaryRow:
     file: str
+    lines: SummaryCounts
     statements: SummaryCounts
     branches: SummaryCounts
-    # Derived / actionable fields
-    statement_pct: float = 100.0
-    branch_pct: float | None = None  # None when branches.total == 0
-    uncovered_lines: int = 0
-    uncovered_ranges: int = 0
-    # Lightweight tags
+
     untested: bool = False  # statements.total > 0 and statements.covered == 0
     tiny: bool = False  # statements.total is very small (heuristic)
-
-
-@dataclass(frozen=True, slots=True)
-class SummaryTotals:
-    statements: SummaryCounts
-    branches: SummaryCounts
+    uncovered_lines: int = 0
+    uncovered_ranges: int = 0
 
 
 @dataclass(frozen=True, slots=True)
 class SummarySection:
     files: tuple[SummaryRow, ...]
-    totals: SummaryTotals
+
+    lines: SummaryCounts
+    statements: SummaryCounts
+    branches: SummaryCounts
+
     # Extra summary metadata (presentation/trust)
     files_with_branches: int = 0
     total_files: int = 0
@@ -239,8 +236,8 @@ class ReportSections:
     """
 
     lines: LinesSection | None = None
-    branches: BranchesSection | None = None
     summary: SummarySection | None = None
+    branches: BranchesSection | None = None
 
     def present(self) -> tuple[SectionName, ...]:
         out: list[SectionName] = []

@@ -5,12 +5,12 @@ single dataset, and emits a deterministic summary of uncovered code. All workflo
 single `report` command, which toggles the available sections and enrichment flags (no additional
 subcommands or formats).
 
-## Features
+-## Features
 
-- **Unified coverage report from one or more XML files**
+- **Unified coverage report from Cobertura XML or Coverage.py sqlite data**
   - Merges multiple coverage reports into a single dataset.
-  - Automatically locates the coverage XML via common project configs or accepts explicit paths.
-  - Normalizes file paths relative to the project root for stable output.
+  - Automatically locates coverage XML or Coverage.py `.coverage` inputs via common project configs or accepts explicit paths.
+  - Normalizes file paths relative to the project root for stable output and exposes `--input-backend` so `showcov report` can lock in XML or sqlite discovery.
 
 - **Report sections**
   - **Uncovered lines:** groups contiguous misses and merges gaps separated only by blank lines. Toggle with `--lines/--no-lines`.
@@ -52,3 +52,6 @@ subcommands or formats).
 
 - **Developer tooling (artifacts)**
   - Generators for a plain-text manual page and shell completion scripts (bash/zsh/fish) to aid distribution and packaging.
+- **Heatmap-style summary percentages**
+  - Summary tables (Statements/Branches/Lines) now use ANSI heat styling when color is enabled so percentages pop.
+  - Use `showcov debug <flame|twilight>` to visualize the palettes and tweak color/formatting during development.

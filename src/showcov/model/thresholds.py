@@ -4,7 +4,6 @@ import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from showcov.model.metrics import pct
 from showcov.model.types import FULL_COVERAGE
 
 if TYPE_CHECKING:
@@ -124,11 +123,8 @@ def evaluate(report: Report, thresholds: Sequence[Threshold]) -> ThresholdsResul
             msg = "threshold evaluation requires the summary section in the report"
             raise ValueError(msg)
 
-        st = summary.totals.statements
-        bt = summary.totals.branches
-
-        stmt_pct = pct(st.covered, st.total)
-        br_pct = pct(bt.covered, bt.total)
+        stmt_pct = summary.statements.percent
+        br_pct = summary.branches.percent
 
     if need_miss:
         lines = report.sections.lines

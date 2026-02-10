@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.3] - 2026-02-10
+
+### Added
+- add heatmap-style percentage rendering for summary tables so `showcov report` highlights coverage at a glance
+- add `showcov debug <colormap>` to print the live `flame` and `twilight` palettes and continue tuning the styles
+
+### Changed
+- unify the summary model around `SummaryCounts` so statements, branches, and line totals share a consistent interface that feeds thresholds, renderer, and diagnostics
+
 ## [0.3.2] - 2026-02-09
 
 ### Added

@@ -25,8 +25,9 @@ def test_cli_report_default_human_output(project) -> None:
     # Default output is summary-only now (tree view), so file is basename under its dir.
     assert "pkg/" in result.output
     assert "mod.py" in result.output
-    # Summary-only output reports counts, not specific line numbers.
-    assert "Uncov" in result.output
+    # Summary-only output reports counts via the summary table.
+    assert "Lines" in result.output
+    assert "Statements" in result.output
     assert "1" in result.output  # uncovered lines/ranges count appears
 
 
