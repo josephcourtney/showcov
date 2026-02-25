@@ -1,15 +1,24 @@
 from __future__ import annotations
 
 import operator
+import re
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from pathlib import PurePosixPath
 from typing import TYPE_CHECKING
 
+from rich.style import Style
 from rich.table import Table
+from rich.text import Text
 
-from showcov.adapters.render.table import format_table, render_table
-from showcov.model.metrics import pct  # <-- you also hit NameError earlier
+from showcov.adapters.render.table import (
+    colormap,
+    format_table,
+    get_bg,
+    render_table,
+    scalar_to_text_style,
+)
+from showcov.model.metrics import pct
 from showcov.model.report import (
     SummaryCounts,
     SummaryRow,
@@ -28,9 +37,13 @@ if TYPE_CHECKING:
         UncoveredFile,
     )
 
+
 _NO_LINES = "No uncovered lines."
 _NO_BRANCHES = "No uncovered branches."
 _NO_SUMMARY = "No summary data."
+
+
+_RGB_RE = re.compile(r"\x1b\]11;rgb:([0-9a-fA-F]+)/([0-9a-fA-F]+)/([0-9a-fA-F]+)(?:\x07|\x1b\\)")
 
 
 def _limit_display_path(path: str, *, max_depth: int | None) -> str:
@@ -418,8 +431,124 @@ def _with_display_file(row: SummaryRow, display: str) -> SummaryRow:
     return replace(row, file=display)
 
 
+_SUMMARY_TREE_HEADERS: list[tuple[str, ...]] = [
+    ("File",),
+    ("Line %",),
+    ("Lines", "Total"),
+    ("Stmt %",),
+    ("Statements", "Total"),
+    ("Br%",),
+    ("Branches", "Total"),
+]
+
+
+def _is_summary_dir_label(label: str) -> bool:
+    return label.rstrip().endswith("/")
+
+
+def _summary_footer_pct_cell(covered: int, total: int) -> Text:
+    if total == 0:
+        return Text("    —")
+    pct_value = 100 * (covered / total)
+    return Text(f"{pct_value:5.1f}%", style=colormap(pct_value))
+
+
+def _summary_tree_footers(summary: SummarySection) -> list[object]:
+    return [
+        "",
+        _summary_footer_pct_cell(summary.lines.covered, summary.lines.total),
+        f"{summary.lines.total:d}",
+        _summary_footer_pct_cell(summary.statements.covered, summary.statements.total),
+        f"{summary.statements.total:d}",
+        _summary_footer_pct_cell(summary.branches.covered, summary.branches.total),
+        f"{summary.branches.total:d}",
+    ]
+
+
+def _summary_metric_scale_denominators(rows_in_order: Sequence[SummaryRow]) -> tuple[int, int, int]:
+    file_rows = [r for r in rows_in_order if not _is_summary_dir_label(r.file)]
+    return (
+        max((r.lines.total for r in file_rows), default=0) or 1,
+        max((r.statements.total for r in file_rows), default=0) or 1,
+        max((r.branches.total for r in file_rows), default=0) or 1,
+    )
+
+
+def _summary_display_label(row: SummaryRow) -> tuple[str, bool]:
+    label = row.file
+    is_dir = _is_summary_dir_label(label)
+    if is_dir:
+        return label, True
+    label = label + ("  [untested]" if row.untested else "") + ("  [tiny]" if row.tiny else "")
+    return label, False
+
+
+def _summary_metric_pair(
+    counts: SummaryCounts,
+    *,
+    scale_denom: int,
+    bold: bool,
+    bg: str,
+) -> tuple[Text, Text]:
+    pct_text = "—" if counts.total == 0 else f"{counts.percent:5.1f}%"
+    intensity = counts.total / scale_denom
+    value_style = Style(color=scalar_to_text_style(intensity, bg), bold=bold, bgcolor=bg)
+    pct_cell = Text(
+        pct_text,
+        style=Style(color=colormap(counts.percent, intensity), bold=bold),
+    )
+    total_cell = Text(str(counts.total), style=value_style)
+    return pct_cell, total_cell
+
+
+def _summary_directory_metric_pair(
+    counts: SummaryCounts,
+    *,
+    bold: bool,
+    bg: str,
+) -> tuple[Text, Text]:
+    pct_text = "—" if counts.total == 0 else f"{counts.percent:5.1f}%"
+    intensity = 0.63
+    value_style = Style(color=scalar_to_text_style(intensity, bg), bold=bold, bgcolor=bg)
+    pct_cell = Text(
+        pct_text,
+        style=Style(color=colormap(counts.percent, intensity), bold=bold),
+    )
+    total_cell = Text(str(counts.total), style=value_style)
+    return pct_cell, total_cell
+
+
+def _summary_row_cells(
+    row: SummaryRow,
+    *,
+    max_total_l: int,
+    max_total_s: int,
+    max_total_b: int,
+    bg: str,
+) -> list[object]:
+    label, is_dir = _summary_display_label(row)
+    bold = is_dir
+
+    metrics: list[tuple[SummaryCounts, int]] = [
+        (row.lines, max_total_l),
+        (row.statements, max_total_s),
+        (row.branches, max_total_b),
+    ]
+
+    cells: list[object] = [label]
+    for counts, denom in metrics:
+        pct_cell, total_cell = (
+            _summary_directory_metric_pair(counts, bold=bold, bg=bg)
+            if is_dir
+            else _summary_metric_pair(counts, scale_denom=denom, bold=bold, bg=bg)
+        )
+        cells.extend((pct_cell, total_cell))
+    return cells
+
+
 def _render_summary_tree_table(
     files: Sequence[SummaryRow],
+    summary: SummarySection,
     *,
     options: RenderOptions,
 ) -> str:
@@ -433,62 +562,28 @@ def _render_summary_tree_table(
         root,
         max_depth=options.summary_max_depth,
     )
+    if not rows_in_order:
+        return ""
 
-    headers = [
-        ("File",),
-        ("Line %",),
-        ("Lines", "Total"),
-        ("Stmt %",),
-        ("Statements", "Total"),
-        ("Br%",),
-        ("Branches", "Total"),
+    max_total_l, max_total_s, max_total_b = _summary_metric_scale_denominators(rows_in_order)
+    footers = _summary_tree_footers(summary)
+
+    bg = get_bg()
+    rows: list[list[object]] = [
+        _summary_row_cells(
+            r,
+            max_total_l=max_total_l,
+            max_total_s=max_total_s,
+            max_total_b=max_total_b,
+            bg=bg,
+        )
+        for r in rows_in_order
     ]
 
-    rows: list[list[str]] = []
-    for r in rows_in_order:
-        lines_pct = "—" if r.lines.total == 0 else f"{r.lines.percent:.1f}%"
-        statements_pct = "—" if r.statements.total == 0 else f"{r.statements.percent:.1f}%"
-        branches_pct = "—" if r.branches.total == 0 else f"{r.branches.percent:.1f}%"
-
-        # Preserve your existing file tags for *files only*
-        label = r.file
-        if not label.rstrip().endswith("/"):
-            label = label + ("  [untested]" if r.untested else "") + ("  [tiny]" if r.tiny else "")
-
-        rows.append([
-            label,
-            lines_pct,
-            str(r.lines.total),
-            statements_pct,
-            str(r.statements.total),
-            branches_pct,
-            str(r.branches.total),
-        ])
-
-    table = format_table(headers, rows, color=options.color) if rows else ""
+    table = format_table(_SUMMARY_TREE_HEADERS, rows, footers, color=options.color) if rows else ""
     if not table:
         return ""
     return "\n".join([_subheading("Summary", options), table]).rstrip()
-
-
-def _render_summary_footer(sec: SummarySection) -> str:
-    lines_pct = "—" if sec.lines.total == 0 else f"{sec.lines.percent:.1f}%"
-    statements_pct = "—" if sec.statements.total == 0 else f"{sec.statements.percent:.1f}%"
-    branches_pct = "—" if sec.branches.total == 0 else f"{sec.branches.percent:.1f}%"
-
-    parts = [
-        f"Overall (weighted): lines {sec.lines.covered}/{sec.lines.total} covered ({lines_pct})",
-        (
-            f"Overall (weighted): statements {sec.statements.covered}/{sec.statements.total} "
-            f"covered ({statements_pct})"
-        ),
-        (
-            f"Overall (weighted): branches {sec.branches.covered}/{sec.branches.total} covered "
-            f"({branches_pct})"
-        ),
-        f"Files with branches: {sec.files_with_branches}/{sec.total_files}",
-    ]
-    return "\n".join([p for p in parts if p]).rstrip()
 
 
 def _render_summary_section(sec: SummarySection, *, options: RenderOptions) -> str:
@@ -498,13 +593,9 @@ def _render_summary_section(sec: SummarySection, *, options: RenderOptions) -> s
 
     blocks: list[str] = []
 
-    tree_table = _render_summary_tree_table(files, options=options)
+    tree_table = _render_summary_tree_table(files, sec, options=options)
     if tree_table:
         blocks.append(tree_table)
-
-    footer = _render_summary_footer(sec)
-    if footer:
-        blocks.append(footer)
 
     return "\n".join([b for b in blocks if b]).rstrip()
 
@@ -537,7 +628,7 @@ def render_human(report: Report, options: RenderOptions) -> str:
             if sec is None:
                 msg = "render_human expected the summary section to be present but it is missing"
                 raise ValueError(msg)
-            parts.extend((_heading("Summary", options), _render_summary_section(sec, options=options)))
+            parts.append(_render_summary_section(sec, options=options))
     return "\n\n".join([p for p in parts if p]).rstrip()
 
 

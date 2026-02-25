@@ -1,7 +1,7 @@
 # =================================== project ====================================
 [project]
   name = "showcov"
-version = "0.3.3"
+  version = "0.3.5"
   description = "Print out uncovered code."
   readme = "README.md"
   authors = [
@@ -19,11 +19,12 @@ version = "0.3.3"
   dependencies = [
     "defusedxml>=0.7.1",
     # Needed to read Coverage.py sqlite (.coverage) inputs without requiring XML export.
-    "coverage>=7.12.0",
     "more-itertools>=10.8.0",
     "pathspec>=1.0.3",
     "rich-click>=1.9.5",
     "typer>=0.21.1",
+    "darkdetect>=0.8.0",
+    "coverage>=7.13.4",
   ]
 
   [project.scripts]
@@ -34,7 +35,6 @@ version = "0.3.3"
     "rust-just>=1.43.0",
     "pytest>=9.0.1",
     "pytest-randomly>=4.0.1",
-    "coverage>=7.12.0",
     "pytest-cov>=7.0.0",
     "hypothesis>=6.138.7",
     "mutmut>=3.3.1; python_version < \"3.14\"",
@@ -53,7 +53,8 @@ version = "0.3.3"
     # "pytest-clarity>=1.0.1",
     # "pytest-instafail>=0.5.0",
     # "pytest-tldr>=0.2.6",
-  ]
+    "coverage>=7.13.4",
+]
   docs = [
     "mkdocs-material>=9.7.0",
     "mkdocs>=1.6.1",          # documentation site
@@ -103,6 +104,8 @@ version = "0.3.3"
     "--cov=showcov",
     "--cov-branch",
     "--cov-report=",
+    "--cov-context=test",
+
   ]
   xfail_strict = true
 
@@ -179,7 +182,6 @@ version = "0.3.3"
 
 # =================================== test:coverage ===================================
 [tool.coverage.run]
-  source         = ["showcov"]
-  branch         = true
-  parallel       = true
-  dynamiccontext = "test_function"
+  source   = ["showcov"]
+  branch   = true
+  parallel = true

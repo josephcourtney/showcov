@@ -4,6 +4,26 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.5] - 2026-02-25
+
+### Changed
+- refactor summary tree table rendering into smaller helper functions to reduce repetition and isolate footer, scaling, and row-cell formatting logic
+- tighten renderer and color helper type signatures so `ty check` passes across the human summary table and debug heatmap paths
+
+### Fixed
+- fix summary table rendering crashes when branch totals are zero or no file rows are present at a given tree depth
+- fix sqlite coverage ingestion typing at the private `coverage.py` analysis boundary by explicitly casting the returned analysis object
+- fix `format_table()` footer handling to remain compatible with existing callers that do not pass footer cells
+
+## [0.3.4] - 2026-02-25
+
+### Added
+- add terminal background detection and theme-aware summary table styling so coverage heatmap intensity adapts to dark and light terminals
+- add `darkdetect` as a fallback for terminal theme detection when OSC 11 background queries are unavailable
+
+### Changed
+- simplify `showcov debug` to print the current heatmap and brightness preview table without requiring a colormap argument
+
 ## [0.3.3] - 2026-02-10
 
 ### Added

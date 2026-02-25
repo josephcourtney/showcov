@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Protocol, cast
 
 from coverage import Coverage
 from coverage.exceptions import CoverageException, DataError
@@ -124,7 +124,10 @@ def _records_for_file(cov: Coverage, file: str) -> list[Record]:
     try:
         # coverage.py doesn't currently expose the rich branch analysis we need
         # (missing/executed branch arcs) through a fully public API.
-        analysis: _AnalysisLike = cov._analyze(file)  # noqa: SLF001
+        analysis = cast(
+            "_AnalysisLike",
+            cov._analyze(file),  # noqa: SLF001 # this is relatively stable and there is no public alternative
+        )
     except (CoverageException, DataError, OSError, ValueError, TypeError) as exc:
         msg = f"failed to analyze {file}: {exc!s}"
         raise CoverageInputDataError(msg) from exc
